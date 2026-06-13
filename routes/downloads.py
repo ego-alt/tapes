@@ -11,7 +11,8 @@ downloads_blueprint = Blueprint("downloads", __name__)
 @login_required
 def list_jobs():
     jobs = (DownloadJob.query.filter_by(user_id=current_user.id)
-            .order_by(DownloadJob.created_at.desc()).limit(20).all())
+            .filter(DownloadJob.status.in_(["queued", "running"]))
+            .order_by(DownloadJob.created_at.desc()).all())
     return jsonify([j.to_dict() for j in jobs])
 
 

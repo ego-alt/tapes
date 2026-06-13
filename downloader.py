@@ -1,11 +1,3 @@
-"""Stage 4 downloader: a single background worker drains queued DownloadJobs,
-runs yt-dlp into MUSIC_DIR/_downloads/, cleans the title, and rescans.
-
-v1 uses an in-process worker thread (fine for standalone / a single gunicorn
-worker). Under multiple gunicorn workers this would want a dedicated process;
-jobs are claimed via a status flip to limit double-processing.
-"""
-
 import pathlib
 import queue
 import re
@@ -79,14 +71,13 @@ def _process(app, job_id: int):
     db.session.commit()
 
     music_dir = pathlib.Path(app.config["MUSIC_DIR"])
-    dl_dir = music_dir / "_downloads"
-    dl_dir.mkdir(parents=True, exist_ok=True)
+    music_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "-x", "--audio-format", "mp3", "--audio-quality", "0",
         "--embed-thumbnail", "--embed-metadata", "--no-playlist", "--newline",
-        "-o", str(dl_dir / "%(title)s.%(ext)s"), job.url,
+        "-o", str(music_dir / "%(title)s.%(ext)s"), job.url,
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
@@ -111,7 +102,7 @@ def _process(app, job_id: int):
         raise RuntimeError("yt-dlp failed (see server log)")
 
     if not final_mp3:
-        mp3s = sorted(dl_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
+        mp3s = sorted(music_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
         if not mp3s:
             raise RuntimeError("no mp3 produced")
         final_mp3 = str(mp3s[-1])
@@ -134,7 +125,6 @@ def _process(app, job_id: int):
 
 
 def _clean_tag(path: str):
-    """Strip YouTube cruft from the embedded title."""
     try:
         from mutagen.easyid3 import EasyID3
         audio = EasyID3(path)

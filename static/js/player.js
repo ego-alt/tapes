@@ -26,7 +26,7 @@
 
   // ---------- shelf ----------
   async function loadShelf() {
-    shelf = await jget("/api/playlists");
+    shelf = await jget("api/playlists");
     const list = $("shelfList");
     list.innerHTML = "";
     const icon = { all: "▤", singles: "♪", favorites: "♥" };
@@ -42,7 +42,7 @@
         del.className = "shelf-del"; del.textContent = "×"; del.title = "Delete tape";
         del.addEventListener("click", async (e) => {
           e.stopPropagation();
-          if (confirm(`Delete tape "${s.name}"?`)) { await jsend(`/api/playlists/${s.key}`, "DELETE"); loadShelf(); }
+          if (confirm(`Delete tape "${s.name}"?`)) { await jsend(`api/playlists/${s.key}`, "DELETE"); loadShelf(); }
         });
         li.appendChild(del);
       }
@@ -51,7 +51,7 @@
   }
 
   async function openTape(key, name) {
-    view = await jget(`/api/playlists/${key}/tracks`);
+    view = await jget(`api/playlists/${key}/tracks`);
     $("tapeTitle").textContent = name;
     $("search").value = "";
     renderTracks(view);
@@ -127,11 +127,12 @@
 
   // ---------- favorites ----------
   async function toggleFav(t) {
-    const { fav } = await jsend(`/api/favorites/${t.id}`, "POST").then((r) => r.json());
+    const { fav } = await jsend(`api/favorites/${t.id}`, "POST").then((r) => r.json());
     [allMap[t.id], ...view, ...queue].forEach((x) => { if (x && x.id === t.id) x.fav = fav; });
     applySearch();
     const cur = currentTrack();
     if (cur && cur.id === t.id) { favBtn.textContent = fav ? "♥" : "♡"; favBtn.classList.toggle("on", fav); }
+    loadShelf();
   }
 
   // ---------- add-to-tape menu ----------
@@ -143,7 +144,7 @@
       const item = document.createElement("div");
       item.className = "menu-item"; item.textContent = s.name;
       item.addEventListener("click", async () => {
-        await jsend(`/api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
+        await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
         closeMenu(); loadShelf();
       });
       menu.appendChild(item);
@@ -165,19 +166,25 @@
     e.preventDefault();
     const url = $("dlUrl").value.trim();
     if (!url) return;
-    await jsend("/api/downloads", "POST", { url });
+    await jsend("api/downloads", "POST", { url });
     $("dlUrl").value = "";
     pollDownloads();
   });
   async function pollDownloads() {
-    const jobs = await jget("/api/downloads");
+    const jobs = await jget("api/downloads");
+    const activeIds = new Set(jobs.map((j) => j.id));
+    // A job we were tracking has disappeared from the active list → it finished.
+    let anyCompleted = false;
+    for (const id of Object.keys(dlPrev)) {
+      if (!activeIds.has(Number(id))) { anyCompleted = true; break; }
+    }
+    dlPrev = {};
+    jobs.forEach((j) => { dlPrev[j.id] = j.status; });
+    if (anyCompleted) onDownloadDone();
+
     const el = $("dlList");
     el.innerHTML = "";
-    let active = false;
     jobs.forEach((j) => {
-      if (j.status === "queued" || j.status === "running") active = true;
-      if (dlPrev[j.id] && dlPrev[j.id] !== "done" && j.status === "done") onDownloadDone();
-      dlPrev[j.id] = j.status;
       const li = document.createElement("li");
       li.className = "dl-job " + j.status;
       li.innerHTML = `<div class="dl-msg"></div>
@@ -187,10 +194,10 @@
       el.appendChild(li);
     });
     clearTimeout(dlTimer);
-    if (active && !$("dlPanel").hidden) dlTimer = setTimeout(pollDownloads, 1500);
+    if (jobs.length && !$("dlPanel").hidden) dlTimer = setTimeout(pollDownloads, 1500);
   }
   async function onDownloadDone() {
-    const allArr = await jget("/api/playlists/all/tracks");
+    const allArr = await jget("api/playlists/all/tracks");
     allArr.forEach((t) => (allMap[t.id] = t));
     await loadShelf();
     if (!$("tracksView").hidden) {
@@ -203,11 +210,11 @@
   let saveTimer = null;
   function savePlaystate() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => jsend("/api/playstate", "PUT",
+    saveTimer = setTimeout(() => jsend("api/playstate", "PUT",
       { queue: queue.map((t) => t.id), index: qi, position: audio.currentTime || 0 }), 400);
   }
   async function restorePlaystate() {
-    const ps = await jget("/api/playstate");
+    const ps = await jget("api/playstate");
     if (!ps.queue || !ps.queue.length) return;
     queue = ps.queue.map((id) => allMap[id]).filter(Boolean);
     qi = Math.min(ps.index || 0, queue.length - 1);
@@ -231,14 +238,14 @@
     e.preventDefault();
     const name = $("newTapeName").value.trim();
     if (!name) return;
-    await jsend("/api/playlists", "POST", { name });
+    await jsend("api/playlists", "POST", { name });
     $("newTapeName").value = ""; loadShelf();
   });
 
   audio.addEventListener("play", () => {
     cassette.classList.add("playing"); playBtn.textContent = "❚❚";
     const t = currentTrack();
-    if (t && t.id !== lastPlayed) { lastPlayed = t.id; jsend("/api/plays", "POST", { track_id: t.id }); }
+    if (t && t.id !== lastPlayed) { lastPlayed = t.id; jsend("api/plays", "POST", { track_id: t.id }); }
   });
   audio.addEventListener("pause", () => { cassette.classList.remove("playing"); playBtn.textContent = "▶"; savePlaystate(); });
   audio.addEventListener("ended", () => step(1));
@@ -263,7 +270,7 @@
 
   // ---------- init ----------
   (async () => {
-    const all = await jget("/api/playlists/all/tracks");
+    const all = await jget("api/playlists/all/tracks");
     all.forEach((t) => (allMap[t.id] = t));
     await loadShelf();
     await restorePlaystate();
