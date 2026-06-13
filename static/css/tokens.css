@@ -40,14 +40,14 @@
 
     /* player.css component tokens — derived from base */
     --cassette-body: var(--color-bg-elevated);
-    --reel-hub: var(--color-accent);
-    --tape: #241f1b;
+    --tape-pack: #2a221c;       /* wound tape — dark brown */
+    --reel-hub: #c7bca6;        /* pale plastic hub */
+    --reel-teeth: #b3a892;      /* sprocket teeth */
     --scrubber-track: var(--color-border);
     --scrubber-fill: var(--color-accent);
     --track-active: var(--color-accent);
     --track-hover: var(--color-bg-inset);
     --label-bg: #ece3d0;
     --label-ink: #2b2b2b;
-    --art-radius: var(--radius-md);
     --art-shadow: var(--color-shadow);
 }

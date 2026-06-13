@@ -74,6 +74,7 @@
     const t = view[i];
     audio.src = streamUrl(t.id);
     audio.play().catch(() => {});
+    cassette.classList.add("loaded");
     labelTitle.textContent = t.title;
     labelArtist.textContent = [t.artist, t.album].filter(Boolean).join(" — ");
     if (t.has_cover) { labelArt.src = coverUrl(t.id); }
