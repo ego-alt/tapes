@@ -9,13 +9,12 @@ trusting `X-Forwarded-User`. No new auth, no new login, no new design language.
 This is a plan, not a spec — settled decisions are flagged **[fixed]**; the
 choices that must be made before coding are in **§0**; deferred ones in §13.
 
-**Status (2026-06-13)** — **Stage 1 done; Stage 2 code-complete (not yet
-deployed).** Full-DIY Flask (not Navidrome): the two hard requirements —
-*aesthetic parity with calendar/library* and *dashboard gating* — are things our
-own stack already solves. Built so far: the scan, `send_file`/X-Accel streaming,
-and the realistic cassette-deck player. Stage-4 yt-dlp→mp3 pipeline has been
-exercised by hand (one track pulled) but the in-app downloader isn't built yet.
-Stage progress tracked in §12.
+**Status (2026-06-13)** — **Stages 1, 3, 4 done. Stage 2 code-complete (not yet
+deployed). Stage 5 (mobile) is what's left.** Full-DIY Flask (not Navidrome).
+Built: scan + `send_file`/X-Accel streaming, the realistic cassette-deck player,
+the shelf (mixtapes / favorites / singles), favorites + play history + persisted
+queue/resume, and the in-app yt-dlp downloader with title-cleanup. Stage 2's
+dashboard wiring is written but only runs on the Pi. Stage progress in §12.
 
 ---
 
@@ -380,19 +379,28 @@ and hear it stream.
   playback + prefix correctness await a Pi deploy. The dashboard edits are
   uncommitted in `../dashboard` pending review.
 
-### Stage 3 — library structure + mixtapes — ⬜ next up
+### Stage 3 — library structure + mixtapes — ✅ DONE
 
-- Normalize `artists`/`albums`; add `playlists` (M2M) + `favorites` + `plays` +
-  persisted `playstate` queue; the cassette **shelf** + virtual *All Tracks* /
-  *Singles* tapes; richer browse.
+- `playlists` (M2M) + `favorites` + `plays` + persisted `playstate`
+  (queue + index + position → resume across devices); the sidebar **shelf**
+  (All Tracks / Singles / Favorites + user tapes) you drill into; ♥ and
+  add-to-tape on each row.
+- *As-built:* tracks stay **denormalized** — the `artists`/`albums` normalization
+  was deferred (not needed for these features; revisit only if browse-by-artist
+  needs it).
 
-### Stage 4 — downloader — ⬜ pending (pipeline proven by hand)
+### Stage 4 — downloader — ✅ DONE
 
-- The yt-dlp → mp3 + embedded-art flow works manually; still to build: the
-  in-app downloader blueprint (`download_jobs`, SSE progress), the beets autotag
-  step, `_downloads/` target + writable mount.
+- `DownloadJob` + an in-process background **worker thread** (FIFO, requeues on
+  restart); paste-URL panel with **polled progress**; pipeline = yt-dlp (best
+  audio → mp3, embed metadata/thumbnail) → **regex title-cleanup** → scan into
+  `_downloads/`, linking the new `track_id`.
+- *As-built deltas:* title-cleanup is a regex (strips "(Official Audio)" etc.),
+  **not beets** — beets autotag remains a future upgrade (§13); progress is
+  **polled**, not SSE. Under multiple gunicorn workers this wants a dedicated
+  worker process (fine for standalone / single worker now).
 
-### Stage 5 — mobile — ⬜ later
+### Stage 5 — mobile — ⬜ next
 
 - PWA polish; (later) native client on dashboard API tokens (§10).
 
