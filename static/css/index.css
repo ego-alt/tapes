@@ -121,6 +121,8 @@ body {
 /* ---- shelf ---- */
 .sidebar-head { justify-content: space-between; }
 .shelf, .tracks-view { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+/* class display:flex would otherwise beat the `hidden` attribute */
+.shelf[hidden], .tracks-view[hidden], .dl-panel[hidden] { display: none !important; }
 .shelf-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 0 var(--space-2); }
 .shelf-row {
     display: flex; align-items: center; gap: var(--space-3);
@@ -132,7 +134,11 @@ body {
 .shelf-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
 .shelf-del { background: none; border: 0; color: var(--color-text-muted); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 2px; }
 .shelf-del:hover { color: var(--color-danger-hover); }
-.new-tape { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.new-tape {
+    display: flex; gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-border);
+}
 .new-tape .input { flex: 1; }
 
 /* ---- tracks view ---- */
