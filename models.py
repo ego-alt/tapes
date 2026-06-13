@@ -6,9 +6,6 @@ db = SQLAlchemy()
 
 
 class User(UserMixin, db.Model):
-    """Shadow user. password_hash is NULL in proxy mode (dashboard owns auth);
-    in standalone dev a single local user is auto-attached (see proxy_auth)."""
-
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -18,13 +15,10 @@ class User(UserMixin, db.Model):
 
 
 class Track(db.Model):
-    """Flat, denormalized catalog. Album/artist are plain strings and nullable —
-    a YouTube single needs neither."""
-
     __tablename__ = "tracks"
 
     id = db.Column(db.Integer, primary_key=True)
-    # Path RELATIVE to MUSIC_DIR — this is also the X-Accel-Redirect suffix.
+    # Relative to MUSIC_DIR — also used as the X-Accel-Redirect suffix.
     file_path = db.Column(db.String, unique=True, nullable=False)
     file_hash = db.Column(db.String, index=True)
     title = db.Column(db.String, nullable=False)
@@ -49,8 +43,6 @@ class Track(db.Model):
             "fav": fav,
         }
 
-
-# ---- Stage 3: per-user organization (catalog stays shared) ----
 
 class Playlist(db.Model):
     __tablename__ = "playlists"
@@ -88,19 +80,14 @@ class Play(db.Model):
 
 
 class PlayState(db.Model):
-    """One row per user: the persisted queue + position, so playback follows
-    you across devices."""
-
     __tablename__ = "playstate"
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
-    queue_json = db.Column(db.Text)        # JSON list of track ids
+    queue_json = db.Column(db.Text)
     index = db.Column(db.Integer, default=0)
     position_s = db.Column(db.Float, default=0)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
 
-
-# ---- Stage 4: downloader ----
 
 class DownloadJob(db.Model):
     __tablename__ = "download_jobs"

@@ -1,9 +1,3 @@
-"""Library scan: walk MUSIC_DIR, read tags with mutagen, cache cover
-thumbnails, upsert into `tracks`. Incremental by (path, mtime, size).
-
-`scan_library()` is the reusable core (also called by the downloader worker);
-`register_cli()` exposes it as `flask scan`."""
-
 import hashlib
 import os
 import pathlib
@@ -18,7 +12,7 @@ COVER_NAMES = ("cover.jpg", "cover.png", "folder.jpg", "folder.png")
 
 
 def partial_hash(path: str, size: int) -> str:
-    """Cheap stable identity: size + head/tail 64 KB. Survives renames/moves."""
+    # Size + head/tail 64 KB: cheap identity that survives renames.
     h = hashlib.sha1()
     h.update(str(size).encode())
     with open(path, "rb") as f:
@@ -99,8 +93,6 @@ def _write_cover(raw, abspath: pathlib.Path, cover_dir: pathlib.Path, fhash: str
 
 
 def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
-    """Walk music_dir, upsert tracks, cache covers. Returns a counts dict.
-    Must run inside an app context (uses db.session)."""
     music_dir = pathlib.Path(music_dir)
     cover_dir = pathlib.Path(cover_dir)
     cover_dir.mkdir(parents=True, exist_ok=True)

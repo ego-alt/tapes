@@ -31,16 +31,11 @@ def create_app(config=None):
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
-    # Music library (read-only). Defaults to ./music for standalone dev; the
-    # compose mount points this at /data/music on the Pi.
     music_dir = os.environ.get("MUSIC_DIR") or str(pathlib.Path(app.root_path) / "music")
     app.config["MUSIC_DIR"] = music_dir
     app.config["COVER_DIR"] = str(instance / "covers")
 
-    # Streaming transport: X-Accel-Redirect when behind nginx (Stage 2),
-    # send_file when standalone (Stage 1).
     app.config["USE_X_ACCEL"] = os.environ.get("USE_X_ACCEL", "").lower() in ("1", "true", "yes")
-
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")
 
@@ -52,7 +47,6 @@ def create_app(config=None):
 
     pathlib.Path(app.config["COVER_DIR"]).mkdir(parents=True, exist_ok=True)
 
-    # Honor X-Forwarded-* from nginx (Stage 2): x_prefix keeps url_for under /music.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 
     db.init_app(app)
