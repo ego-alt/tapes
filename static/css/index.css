@@ -78,7 +78,7 @@ body {
 }
 .track-list li.active .tl-num::before { content: "▸"; color: var(--track-active); }
 .track-list li.active .tl-num { font-size: 0; }
-.tl-meta { overflow: hidden; }
+.tl-meta { overflow: hidden; flex: 1; min-width: 0; }
 .tl-title {
     font-size: var(--text-base);
     overflow: hidden;
@@ -146,7 +146,8 @@ body {
 .tape-title { padding: 0 var(--space-4) var(--space-2); font-size: var(--text-lg); color: var(--color-text-secondary); }
 .tl-fav, .tl-add {
     background: none; border: 0; color: var(--color-text-muted); cursor: pointer;
-    font-size: 1rem; line-height: 1; padding: 2px 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s;
+    font-size: 1rem; line-height: 1; padding: 2px 4px; flex-shrink: 0;
+    opacity: 0; transition: opacity 0.12s;
 }
 .track-list li:hover .tl-fav, .track-list li:hover .tl-add { opacity: 1; }
 .tl-fav { color: var(--color-accent); opacity: 1; }
