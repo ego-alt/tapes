@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Tapes</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/primitives.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/player.css') }}">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h1><span class="accent">▰▰</span> TAPES</h1>
+      </div>
+      <div class="search-wrap">
+        <input class="input" id="search" type="search" placeholder="Search tracks…" autocomplete="off">
+      </div>
+      <ul class="track-list" id="trackList"></ul>
+    </aside>
+
+    <main class="main">
+      <button class="btn btn-ghost nav-toggle" id="navToggle" title="Toggle navigator">☰</button>
+
+      <div class="deck">
+        <div class="cassette" id="cassette">
+          <div class="cassette-label">
+            <img class="label-art" id="labelArt" alt="">
+            <div class="label-text">
+              <div class="label-title" id="labelTitle">— insert a tape —</div>
+              <div class="label-artist" id="labelArtist"></div>
+              <div class="label-stripe"></div>
+            </div>
+          </div>
+
+          <div class="cassette-window">
+            <svg class="reels" viewBox="0 0 360 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <g class="reel left" id="reelLeft">
+                <circle class="tape-pack" cx="108" cy="75" r="46"></circle>
+                <circle class="hub" cx="108" cy="75" r="18"></circle>
+                <line class="spoke" x1="108" y1="75" x2="108" y2="33"></line>
+                <line class="spoke" x1="108" y1="75" x2="144" y2="96"></line>
+                <line class="spoke" x1="108" y1="75" x2="72"  y2="96"></line>
+              </g>
+              <g class="reel right" id="reelRight">
+                <circle class="tape-pack" cx="252" cy="75" r="46"></circle>
+                <circle class="hub" cx="252" cy="75" r="18"></circle>
+                <line class="spoke" x1="252" y1="75" x2="252" y2="33"></line>
+                <line class="spoke" x1="252" y1="75" x2="288" y2="96"></line>
+                <line class="spoke" x1="252" y1="75" x2="216" y2="96"></line>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="scrub" id="scrub"><div class="scrub-fill" id="scrubFill"></div></div>
+        <div class="times"><span id="curTime">0:00</span><span id="durTime">0:00</span></div>
+
+        <div class="transport">
+          <button class="tbtn" id="prevBtn" title="Previous">⏮</button>
+          <button class="tbtn play" id="playBtn" title="Play/Pause">▶</button>
+          <button class="tbtn" id="nextBtn" title="Next">⏭</button>
+        </div>
+      </div>
+
+      <audio id="audio" preload="metadata"></audio>
+    </main>
+  </div>
+
+  <script>
+    window.MUSIC = {
+      tracksUrl: "{{ url_for('index_routes.api_tracks') }}",
+      streamBase: "{{ url_for('stream.stream', track_id=0) }}".slice(0, -1),
+      coverBase: "{{ url_for('stream.cover', track_id=0) }}".slice(0, -1),
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/player.js') }}"></script>
+</body>
+</html>

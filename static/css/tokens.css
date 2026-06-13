@@ -1,0 +1,53 @@
+/* Design tokens — Gruvbox dark + orange accent. Role names are the shared
+ * contract across dashboard / library / calendar; only the values differ.
+ * Scale + fonts copied verbatim from the contract. */
+:root {
+    --color-bg-base: #282828;
+    --color-bg-elevated: #3c3836;
+    --color-bg-inset: rgba(40, 40, 40, 0.5);
+    --color-bg-inset-soft: rgba(40, 40, 40, 0.3);
+    --color-bg-overlay: rgba(40, 40, 40, 0.85);
+    --color-border: #504945;
+    --color-border-soft: rgba(80, 73, 69, 0.5);
+    --color-text-primary: #ebdbb2;
+    --color-text-secondary: #d5c4a1;
+    --color-text-muted: #a89984;
+    --color-accent: #fe8019;          /* gruvbox bright orange */
+    --color-accent-hover: #d65d0e;    /* gruvbox neutral orange */
+    --color-danger: #cc241d;
+    --color-danger-hover: #fb4934;
+    --color-highlight-soft: rgba(235, 219, 178, 0.05);
+    --color-shadow-soft: rgba(0, 0, 0, 0.2);
+    --color-shadow: rgba(0, 0, 0, 0.35);
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-8: 40px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 2rem;
+    --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-label: 'Marker Felt', 'Comic Sans MS', 'Segoe Print', cursive;
+
+    /* player.css component tokens — derived from base */
+    --cassette-body: var(--color-bg-elevated);
+    --reel-hub: var(--color-accent);
+    --tape: #241f1b;
+    --scrubber-track: var(--color-border);
+    --scrubber-fill: var(--color-accent);
+    --track-active: var(--color-accent);
+    --track-hover: var(--color-bg-inset);
+    --label-bg: #ece3d0;
+    --label-ink: #2b2b2b;
+    --art-radius: var(--radius-md);
+    --art-shadow: var(--color-shadow);
+}

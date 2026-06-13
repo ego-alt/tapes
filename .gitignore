@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+instance/
+music/
+.ruff_cache/
+.pytest_cache/
+.env

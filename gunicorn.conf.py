@@ -1,0 +1,10 @@
+bind = "0.0.0.0:5003"
+worker_class = "gthread"
+workers = 2
+threads = 4
+timeout = 120
+keepalive = 2
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"
+proc_name = "music"
