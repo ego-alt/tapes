@@ -162,7 +162,8 @@ body {
 /* ---- download panel ---- */
 .dl-panel { border-bottom: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); }
 .dl-form { display: flex; gap: var(--space-2); }
-.dl-form .input { flex: 1; }
+.dl-form .input { flex: 1; min-width: 0; }
+.dl-form .btn { flex-shrink: 0; }
 .dl-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; max-height: 160px; overflow-y: auto; }
 .dl-job { padding: var(--space-2) 0; }
 .dl-msg { font-size: var(--text-sm); color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
