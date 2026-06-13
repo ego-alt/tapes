@@ -9,15 +9,13 @@ trusting `X-Forwarded-User`. No new auth, no new login, no new design language.
 This is a plan, not a spec — settled decisions are flagged **[fixed]**; the
 choices that must be made before coding are in **§0**; deferred ones in §13.
 
-**Status (2026-06-13)** — design only, no code yet. Decision locked: full-DIY
-Flask (not Navidrome), because the two hard requirements — *aesthetic parity
-with calendar/library* and *dashboard gating* — are things our own stack
-already solves and Navidrome's bundled UI can't match without a fork. The parts
-that historically make DIY music apps painful are already handled here:
-multi-user + auth (dashboard), mobile-client auth (dashboard API tokens),
-metadata (beets), and range-streaming (nginx X-Accel).
-What's left to build is the scan + the player UX — which is the part worth
-owning. **Four decisions (§0) gate the scaffold.**
+**Status (2026-06-13)** — **Stage 1 done; Stage 2 code-complete (not yet
+deployed).** Full-DIY Flask (not Navidrome): the two hard requirements —
+*aesthetic parity with calendar/library* and *dashboard gating* — are things our
+own stack already solves. Built so far: the scan, `send_file`/X-Accel streaming,
+and the realistic cassette-deck player. Stage-4 yt-dlp→mp3 pipeline has been
+exercised by hand (one track pulled) but the in-app downloader isn't built yet.
+Stage progress tracked in §12.
 
 ---
 
@@ -336,12 +334,19 @@ Zero new auth code — reuse the established contract:
 
 ## 12. Build stages
 
-### Stage 1 — "the cassette plays" (standalone MVP)
+### Stage 1 — "the cassette plays" (standalone MVP) — ✅ DONE
 
 The full pipe behind one screen: scan → pick a song → the cassette deck plays
 it, reels turning, skin reflecting the track. Standalone (`flask run`, hot
 reload — **no nginx / Docker / dashboard yet**), so the player can be iterated
 fast.
+
+> **As built:** realistic clear-shell cassette (orange band, sprocket reels,
+> mechanism, INDEX label); Inter loaded via Google Fonts to match
+> calendar/library. Two as-built simplifications vs the spec: `db.create_all()`
+> instead of `flask-migrate` (add migrations when the schema first changes), and
+> standalone auth auto-attaches a local user (no login form) rather than a local
+> login.
 
 - Scaffold from `calendar/` (`app.py`, `pyproject.toml`, `migrations/`,
   `/healthz`, the `tokens.css`/`primitives.css`/`index.css`/`player.css` split).
@@ -364,25 +369,30 @@ fast.
 *Exit:* open standalone, search/pick a track, hit play, watch the cassette spin
 and hear it stream.
 
-### Stage 2 — into the home stack
+### Stage 2 — into the home stack — 🟡 code-complete, not yet deployed/verified
 
-- Swap streaming to **X-Accel** (§6); wire compose + nginx (`/music/`,
-  `/_audio/`, `homehub.*` labels); copy `proxy_auth.py`; add `music` to
-  `sync_household_users.py`; verify gated playback + `X-Forwarded-Prefix`
-  correctness. *Exit:* gated playback at `https://…/music/` as a dashboard tile.
+- X-Accel path implemented (gated by `USE_X_ACCEL`); `proxy_auth.py` trusts
+  `X-Forwarded-User`; `APPLICATION_ROOT`/`ProxyFix` prefix handling. **Wired into
+  `../dashboard`:** `tapes` compose service, `/music/` + internal `/_audio/`
+  nginx blocks, `homehub.*` labels, and a `music` entry in
+  `sync_household_users.py`. ⏳ **Not yet run** — the stack only builds on the Pi
+  (bare-name siblings collide with macOS `~/Library`/`~/Music`), so gated
+  playback + prefix correctness await a Pi deploy. The dashboard edits are
+  uncommitted in `../dashboard` pending review.
 
-### Stage 3 — library structure + mixtapes
+### Stage 3 — library structure + mixtapes — ⬜ next up
 
 - Normalize `artists`/`albums`; add `playlists` (M2M) + `favorites` + `plays` +
   persisted `playstate` queue; the cassette **shelf** + virtual *All Tracks* /
   *Singles* tapes; richer browse.
 
-### Stage 4 — downloader
+### Stage 4 — downloader — ⬜ pending (pipeline proven by hand)
 
-- Downloader blueprint: `download_jobs`, SSE progress, yt-dlp → beets →
-  `_downloads/` → scan (§7); the separate writable mount.
+- The yt-dlp → mp3 + embedded-art flow works manually; still to build: the
+  in-app downloader blueprint (`download_jobs`, SSE progress), the beets autotag
+  step, `_downloads/` target + writable mount.
 
-### Stage 5 — mobile
+### Stage 5 — mobile — ⬜ later
 
 - PWA polish; (later) native client on dashboard API tokens (§10).
 

@@ -36,7 +36,6 @@
     --text-xl: 2rem;
     --font-sans: 'Inter', Arial, Helvetica, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --font-label: 'Marker Felt', 'Comic Sans MS', 'Segoe Print', cursive;
 
     /* player.css component tokens — derived from base */
     --cassette-body: var(--color-bg-elevated);

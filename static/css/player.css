@@ -87,7 +87,8 @@
         rgba(0,0,0,0.08) calc(1.25em - 1px), rgba(0,0,0,0.08) 1.25em);
 }
 .label-title {
-    font-family: var(--font-label);
+    font-family: var(--font-sans);
+    font-weight: 600;
     font-size: clamp(0.78rem, 2.2vh, 1rem);
     line-height: 1.25em;
     color: #20201d;
@@ -96,7 +97,7 @@
     text-overflow: ellipsis;
 }
 .label-artist {
-    font-family: var(--font-label);
+    font-family: var(--font-sans);
     font-size: clamp(0.62rem, 1.8vh, 0.85rem);
     line-height: 1.25em;
     color: #5a564d;
