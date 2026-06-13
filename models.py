@@ -99,6 +99,7 @@ class DownloadJob(db.Model):
     progress = db.Column(db.Float, default=0)
     message = db.Column(db.String)
     track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"))
+    playlist_id = db.Column(db.Integer, db.ForeignKey("playlists.id"), nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
 
     def to_dict(self):
@@ -109,4 +110,5 @@ class DownloadJob(db.Model):
             "progress": round(self.progress or 0, 1),
             "message": self.message or "",
             "track_id": self.track_id,
+            "playlist_id": self.playlist_id,
         }

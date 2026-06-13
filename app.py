@@ -74,6 +74,13 @@ def create_app(config=None):
 
     with app.app_context():
         db.create_all()
+        try:
+            db.session.execute(db.text(
+                "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     register_cli(app)
     start_worker(app)

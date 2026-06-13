@@ -1,11 +1,13 @@
+import json
 import pathlib
 import queue
 import re
 import subprocess
 import sys
 import threading
+from urllib.parse import urlparse
 
-from models import DownloadJob, Track, db
+from models import DownloadJob, PlaylistTrack, Track, db
 from scan import scan_library
 
 _job_queue: "queue.Queue[int]" = queue.Queue()
@@ -26,6 +28,39 @@ def clean_title(title: str) -> str:
     out = _CRUFT.sub("", title)
     out = re.sub(r"\s*-\s*topic$", "", out, flags=re.I)
     return re.sub(r"\s{2,}", " ", out).strip(" -–—")
+
+
+def expand_playlist(url: str):
+    """Return (video_url_list, playlist_title) or ([url], None) for non-playlist URLs."""
+    try:
+        if urlparse(url).path.rstrip("/") != "/playlist":
+            return [url], None
+    except Exception:
+        return [url], None
+
+    result = subprocess.run(
+        [sys.executable, "-m", "yt_dlp",
+         "--flat-playlist", "--dump-single-json", "--no-warnings",
+         "--playlist-end", "500", url],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        return [url], None
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return [url], None
+
+    if data.get("_type") != "playlist":
+        return [url], None
+
+    title = data.get("title") or "Playlist"
+    urls = [
+        f"https://www.youtube.com/watch?v={e['id']}"
+        for e in (data.get("entries") or [])
+        if e and e.get("id")
+    ]
+    return (urls or [url]), title
 
 
 def enqueue(job_id: int):
@@ -124,6 +159,15 @@ def _process(app, job_id: int):
     job.progress = 100
     job.status = "done"
     job.message = (track.title if track else "done")
+    if job.playlist_id and track:
+        exists = PlaylistTrack.query.filter_by(
+            playlist_id=job.playlist_id, track_id=track.id
+        ).first()
+        if not exists:
+            pos = PlaylistTrack.query.filter_by(playlist_id=job.playlist_id).count()
+            db.session.add(PlaylistTrack(
+                playlist_id=job.playlist_id, track_id=track.id, position=pos
+            ))
     db.session.commit()
 
 
