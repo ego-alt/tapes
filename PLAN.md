@@ -275,12 +275,12 @@ Zero new auth code — reuse the established contract:
 
 - **Port**: 5003 (library 5001, calendar 5002). **[fixed]**
 - **compose service** in `dashboard/docker-compose.yml`, modeled on `calendar`:
-  - `build: ../music-app`, `APPLICATION_ROOT=/music`,
+  - `build: ../tapes`, `APPLICATION_ROOT=/music`,
     `AUTH_PROXY_HEADER=X-Forwarded-User`, `SECRET_KEY`.
-  - volumes: `../music-app/instance:/app/instance` and the HDD music path,
+  - volumes: `../tapes/instance:/app/instance` and the HDD music path,
     following library's convention (host path via env, fixed container path,
     app env points at the *container* target):
-    `${MUSIC_HOST_DIR:-../music-app/music}:/data/music:ro` with `MUSIC_DIR=/data/music`
+    `${MUSIC_HOST_DIR:-../tapes/music}:/data/music:ro` with `MUSIC_DIR=/data/music`
     (read-only, D2 index-in-place). On the Pi, `MUSIC_HOST_DIR=/mnt/backup/music`
     (alongside the existing `/mnt/backup/books`). The downloader needs a
     **separate writable mount** for its target, e.g.
