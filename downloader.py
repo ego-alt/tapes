@@ -67,7 +67,7 @@ def _process(app, job_id: int):
         return
     job.status = "running"
     job.progress = 0
-    job.message = "starting"
+    job.message = ""
     db.session.commit()
 
     music_dir = pathlib.Path(app.config["MUSIC_DIR"])
@@ -82,6 +82,7 @@ def _process(app, job_id: int):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
     final_mp3 = None
+    title = None
     last_pct = -1
     for line in proc.stdout:
         line = line.strip()
@@ -91,11 +92,18 @@ def _process(app, job_id: int):
             if int(pct) != last_pct:
                 last_pct = int(pct)
                 job.progress = pct
-                job.message = "downloading"
+                if not title:
+                    job.message = "downloading"
                 db.session.commit()
-        d = re.search(r"\[(?:ExtractAudio|download)\] Destination: (.+\.mp3)", line)
+        d = re.search(r"\[(?:ExtractAudio|download)\] Destination: (.+)", line)
         if d:
-            final_mp3 = d.group(1)
+            path = d.group(1).strip()
+            if path.endswith(".mp3"):
+                final_mp3 = path
+            if not title:
+                title = clean_title(pathlib.Path(path).stem)
+                job.message = title
+                db.session.commit()
 
     proc.wait()
     if proc.returncode != 0:
@@ -107,12 +115,7 @@ def _process(app, job_id: int):
             raise RuntimeError("no mp3 produced")
         final_mp3 = str(mp3s[-1])
 
-    job.message = "tagging"
-    db.session.commit()
     _clean_tag(final_mp3)
-
-    job.message = "indexing"
-    db.session.commit()
     scan_library(music_dir, app.config["COVER_DIR"], full=False)
 
     rel = str(pathlib.Path(final_mp3).relative_to(music_dir))

@@ -66,9 +66,9 @@
 }
 .label-art {
     position: absolute;
-    top: 10%;
+    top: 7%;
     right: 4%;
-    height: 46%;
+    height: 62%;
     aspect-ratio: 1;
     border-radius: 2px;
     object-fit: cover;

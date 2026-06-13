@@ -190,7 +190,9 @@
       li.innerHTML = `<div class="dl-msg"></div>
         <div class="dl-bar"><div class="dl-bar-fill" style="width:${j.progress}%"></div></div>`;
       li.querySelector(".dl-msg").textContent =
-        j.status === "error" ? "⚠ " + j.message : (j.message || j.status) + ` · ${j.progress}%`;
+        j.status === "error" ? "⚠ " + j.message
+        : j.message ? j.message + ` · ${j.progress}%`
+        : j.url;
       el.appendChild(li);
     });
     clearTimeout(dlTimer);
