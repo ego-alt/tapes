@@ -6,9 +6,16 @@ from flask import Flask
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from downloader import start_worker
 from models import User, db
 from proxy_auth import load_user_for_request
-from routes import auth_blueprint, index_blueprint, stream_blueprint
+from routes import (
+    auth_blueprint,
+    downloads_blueprint,
+    index_blueprint,
+    library_blueprint,
+    stream_blueprint,
+)
 from scan import register_cli
 
 
@@ -64,6 +71,8 @@ def create_app(config=None):
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(index_blueprint)
     app.register_blueprint(stream_blueprint)
+    app.register_blueprint(library_blueprint)
+    app.register_blueprint(downloads_blueprint)
 
     @app.get("/healthz")
     def healthz():
@@ -73,6 +82,7 @@ def create_app(config=None):
         db.create_all()
 
     register_cli(app)
+    start_worker(app)
     return app
 
 

@@ -1,5 +1,8 @@
 """Library scan: walk MUSIC_DIR, read tags with mutagen, cache cover
-thumbnails, upsert into `tracks`. Incremental by (path, mtime, size)."""
+thumbnails, upsert into `tracks`. Incremental by (path, mtime, size).
+
+`scan_library()` is the reusable core (also called by the downloader worker);
+`register_cli()` exposes it as `flask scan`."""
 
 import hashlib
 import os
@@ -7,7 +10,6 @@ import pathlib
 from io import BytesIO
 
 import click
-from flask import current_app
 
 from models import Track, db
 
@@ -76,8 +78,7 @@ def _read_tags(path: str) -> dict:
     return out
 
 
-def _write_cover(raw: bytes | None, abspath: pathlib.Path, cover_dir: pathlib.Path,
-                 fhash: str) -> bool:
+def _write_cover(raw, abspath: pathlib.Path, cover_dir: pathlib.Path, fhash: str) -> bool:
     from PIL import Image
 
     if not raw:
@@ -97,69 +98,77 @@ def _write_cover(raw: bytes | None, abspath: pathlib.Path, cover_dir: pathlib.Pa
         return False
 
 
+def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
+    """Walk music_dir, upsert tracks, cache covers. Returns a counts dict.
+    Must run inside an app context (uses db.session)."""
+    music_dir = pathlib.Path(music_dir)
+    cover_dir = pathlib.Path(cover_dir)
+    cover_dir.mkdir(parents=True, exist_ok=True)
+    if not music_dir.is_dir():
+        return {"error": f"MUSIC_DIR not found: {music_dir}"}
+
+    existing = {t.file_path: t for t in Track.query.all()}
+    seen_rel = set()
+    added = updated = skipped = pruned = 0
+
+    for root, _, files in os.walk(music_dir):
+        for name in files:
+            if pathlib.Path(name).suffix.lower() not in AUDIO_EXTS:
+                continue
+            abspath = pathlib.Path(root) / name
+            rel = str(abspath.relative_to(music_dir))
+            seen_rel.add(rel)
+            st = abspath.stat()
+
+            track = existing.get(rel)
+            if track and not full and track.mtime == st.st_mtime \
+                    and track.size_bytes == st.st_size:
+                skipped += 1
+                continue
+
+            tags = _read_tags(str(abspath))
+            fhash = partial_hash(str(abspath), st.st_size)
+            has_cover = _write_cover(tags["cover"], abspath, cover_dir, fhash)
+
+            if track is None:
+                track = Track(file_path=rel)
+                db.session.add(track)
+                added += 1
+            else:
+                updated += 1
+
+            track.file_hash = fhash
+            track.title = tags["title"] or pathlib.Path(name).stem
+            track.artist = tags["artist"]
+            track.album = tags["album"]
+            track.track_no = tags["track_no"]
+            track.duration_s = tags["duration_s"]
+            track.bitrate = tags["bitrate"]
+            track.size_bytes = st.st_size
+            track.mtime = st.st_mtime
+            track.has_cover = has_cover
+
+    if prune:
+        for rel, track in existing.items():
+            if rel not in seen_rel:
+                db.session.delete(track)
+                pruned += 1
+
+    db.session.commit()
+    return {"added": added, "updated": updated, "skipped": skipped, "pruned": pruned}
+
+
 def register_cli(app):
     @app.cli.command("scan")
     @click.option("--full", is_flag=True, help="Re-read every file, ignore the mtime cache.")
     @click.option("--prune", is_flag=True, help="Drop DB rows whose files are gone.")
     def scan(full, prune):
         """Index MUSIC_DIR into the catalog."""
-        music_dir = pathlib.Path(app.config["MUSIC_DIR"])
-        cover_dir = pathlib.Path(app.config["COVER_DIR"])
-        cover_dir.mkdir(parents=True, exist_ok=True)
-        if not music_dir.is_dir():
-            click.echo(f"MUSIC_DIR not found: {music_dir}")
+        r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=full, prune=prune)
+        if "error" in r:
+            click.echo(r["error"])
             return
-
-        existing = {t.file_path: t for t in Track.query.all()}
-        seen_rel = set()
-        added = updated = skipped = 0
-
-        for root, _, files in os.walk(music_dir):
-            for name in files:
-                if pathlib.Path(name).suffix.lower() not in AUDIO_EXTS:
-                    continue
-                abspath = pathlib.Path(root) / name
-                rel = str(abspath.relative_to(music_dir))
-                seen_rel.add(rel)
-                st = abspath.stat()
-
-                track = existing.get(rel)
-                if track and not full and track.mtime == st.st_mtime \
-                        and track.size_bytes == st.st_size:
-                    skipped += 1
-                    continue
-
-                tags = _read_tags(str(abspath))
-                fhash = partial_hash(str(abspath), st.st_size)
-                has_cover = _write_cover(tags["cover"], abspath, cover_dir, fhash)
-
-                if track is None:
-                    track = Track(file_path=rel)
-                    db.session.add(track)
-                    added += 1
-                else:
-                    updated += 1
-
-                track.file_hash = fhash
-                track.title = tags["title"] or pathlib.Path(name).stem
-                track.artist = tags["artist"]
-                track.album = tags["album"]
-                track.track_no = tags["track_no"]
-                track.duration_s = tags["duration_s"]
-                track.bitrate = tags["bitrate"]
-                track.size_bytes = st.st_size
-                track.mtime = st.st_mtime
-                track.has_cover = has_cover
-
-        pruned = 0
-        if prune:
-            for rel, track in existing.items():
-                if rel not in seen_rel:
-                    db.session.delete(track)
-                    pruned += 1
-
-        db.session.commit()
         click.echo(
-            f"scan: +{added} added, ~{updated} updated, {skipped} unchanged"
-            + (f", -{pruned} pruned" if prune else "")
+            f"scan: +{r['added']} added, ~{r['updated']} updated, "
+            f"{r['skipped']} unchanged" + (f", -{r['pruned']} pruned" if prune else "")
         )
