@@ -23,6 +23,7 @@
   let queue = [];         // tracks being played
   let qi = -1;            // index into queue
   let lastPlayed = null;  // for play-count dedupe
+  let currentTape = null; // { key, name, kind }
 
   // ---------- shelf ----------
   async function loadShelf() {
@@ -36,27 +37,53 @@
       li.innerHTML = `<span class="shelf-ico">${icon[s.key] || "▰"}</span>
         <span class="shelf-name"></span><span class="shelf-count">${s.count}</span>`;
       li.querySelector(".shelf-name").textContent = s.name;
-      li.addEventListener("click", () => openTape(s.key, s.name));
-      if (s.kind === "user") {
-        const del = document.createElement("button");
-        del.className = "shelf-del"; del.textContent = "×"; del.title = "Delete tape";
-        del.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          if (confirm(`Delete tape "${s.name}"?`)) { await jsend(`api/playlists/${s.key}`, "DELETE"); loadShelf(); }
-        });
-        li.appendChild(del);
-      }
+      li.addEventListener("click", () => openTape(s.key, s.name, s.kind));
       list.appendChild(li);
     });
   }
 
-  async function openTape(key, name) {
+  async function openTape(key, name, kind) {
+    currentTape = { key, name, kind };
     view = await jget(`api/playlists/${key}/tracks`);
-    $("tapeTitle").textContent = name;
+    const titleEl = $("tapeTitle");
+    titleEl.textContent = name;
+    titleEl.contentEditable = "false";
+    titleEl.classList.toggle("editable", kind === "user");
+    titleEl.onclick = kind === "user" ? () => startTitleEdit(key) : null;
+    $("tapeDelBtn").hidden = kind !== "user";
     $("search").value = "";
     renderTracks(view);
     $("shelfView").hidden = true;
     $("tracksView").hidden = false;
+  }
+
+  function startTitleEdit(key) {
+    const el = $("tapeTitle");
+    if (el.contentEditable === "true") return;
+    const orig = el.textContent;
+    el.contentEditable = "true";
+    el.focus();
+    document.execCommand("selectAll", false, null);
+
+    function commit(save) {
+      el.onblur = null;
+      el.onkeydown = null;
+      const name = save ? el.innerText.trim() : orig;
+      el.contentEditable = "false";
+      el.textContent = name || orig;
+      if (save && name && name !== orig) {
+        jsend(`api/playlists/${key}`, "PATCH", { name }).then(() => {
+          if (currentTape) currentTape.name = name;
+          loadShelf();
+        }).catch(() => { el.textContent = orig; });
+      }
+    }
+
+    el.onblur = () => commit(true);
+    el.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(true); }
+      if (e.key === "Escape") commit(false);
+    };
   }
 
   function renderTracks(list) {
@@ -204,7 +231,7 @@
     await loadShelf();
     if (!$("tracksView").hidden) {
       const s = shelf.find((x) => x.name === $("tapeTitle").textContent);
-      if (s && (s.key === "all" || s.key === "singles")) openTape(s.key, s.name);
+      if (s && (s.key === "all" || s.key === "singles")) openTape(s.key, s.name, s.kind);
     }
   }
 
@@ -234,6 +261,14 @@
   $("nextBtn").addEventListener("click", () => step(1));
   favBtn.addEventListener("click", () => { const t = currentTrack(); if (t) toggleFav(t); });
   $("backBtn").addEventListener("click", () => { $("tracksView").hidden = true; $("shelfView").hidden = false; });
+  $("tapeDelBtn").addEventListener("click", async () => {
+    if (!currentTape || !confirm(`Delete tape "${currentTape.name}"?`)) return;
+    await jsend(`api/playlists/${currentTape.key}`, "DELETE");
+    currentTape = null;
+    $("tracksView").hidden = true;
+    $("shelfView").hidden = false;
+    loadShelf();
+  });
   $("navToggle").addEventListener("click", () => app.classList.toggle("nav-collapsed"));
   $("search").addEventListener("input", applySearch);
   $("newTapeForm").addEventListener("submit", async (e) => {

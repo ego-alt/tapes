@@ -55,6 +55,18 @@ def create_playlist():
     return jsonify({"key": str(p.id), "name": p.name, "kind": "user", "count": 0})
 
 
+@library_blueprint.route("/api/playlists/<int:pid>", methods=["PATCH"])
+@login_required
+def rename_playlist(pid):
+    p = Playlist.query.filter_by(id=pid, user_id=_uid()).first_or_404()
+    name = (request.json or {}).get("name", "").strip()
+    if not name:
+        abort(400, "name required")
+    p.name = name
+    db.session.commit()
+    return jsonify({"key": str(p.id), "name": p.name})
+
+
 @library_blueprint.route("/api/playlists/<int:pid>", methods=["DELETE"])
 @login_required
 def delete_playlist(pid):
