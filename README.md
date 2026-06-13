@@ -18,6 +18,7 @@ into the index card.
   - Scrub bar, play/pause, previous/next, and a favorite toggle.
   - Keyboard shortcuts: `Space` play/pause, `Shift + ←/→` previous/next track.
   - Lock-screen / media-key controls via the browser Media Session API.
+  - Prefetches the next track so skips and auto-advance start instantly.
   - Resumes your queue and playback position across sessions and devices.
 - **Tapes (playlists)**
   - Built-in shelves: All Tracks, Singles, and Favorites.
@@ -26,7 +27,7 @@ into the index card.
   - Search within a tape.
 - **Ripping**
   - Paste any URL to rip it to MP3 with embedded cover art and metadata (via `yt-dlp` + `ffmpeg`).
-  - Live progress bar labelled with the song title.
+  - Live progress over Server-Sent Events — no polling.
   - Paste a YouTube **playlist** URL and it expands into one job per video, collecting them into a new tape named after the playlist as each track lands.
 - **Indexing**
   - `flask scan` reads ID3 tags with `mutagen` and generates cover thumbnails with Pillow.

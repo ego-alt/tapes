@@ -130,6 +130,18 @@
     setMediaSession(t);
     markActive();
     savePlaystate();
+    prefetchNext();
+  }
+  // Warm the browser/nginx cache for the next track so skips start instantly.
+  let prefetchEl = null, prefetchId = null;
+  function prefetchNext() {
+    const next = queue[qi + 1];
+    if (!next || next.id === prefetchId) return;
+    if (prefetchEl) prefetchEl.src = "";  // abort the previous prefetch
+    prefetchId = next.id;
+    prefetchEl = new Audio();
+    prefetchEl.preload = "auto";
+    prefetchEl.src = streamUrl(next.id);
   }
   const currentTrack = () => queue[qi] || null;
   function markActive() {
@@ -184,10 +196,11 @@
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
 
   // ---------- downloads ----------
-  let dlTimer = null, dlPrev = {};
+  let dlEvt = null, dlPrev = {};
   $("dlToggle").addEventListener("click", () => {
-    $("dlPanel").hidden = !$("dlPanel").hidden;
-    if (!$("dlPanel").hidden) pollDownloads();
+    const showing = $("dlPanel").hidden;
+    $("dlPanel").hidden = !showing;
+    if (showing) openDlStream(); else closeDlStream();
   });
   $("dlForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -195,10 +208,19 @@
     if (!url) return;
     await jsend("api/downloads", "POST", { url });
     $("dlUrl").value = "";
-    pollDownloads();
+    openDlStream();
   });
-  async function pollDownloads() {
-    const jobs = await jget("api/downloads");
+  function openDlStream() {
+    if (dlEvt) return;  // already streaming
+    dlEvt = new EventSource("api/downloads/stream");
+    dlEvt.onmessage = (e) => handleJobs(JSON.parse(e.data));
+    dlEvt.addEventListener("done", closeDlStream);
+    // transient drops auto-reconnect; nothing to do on error
+  }
+  function closeDlStream() {
+    if (dlEvt) { dlEvt.close(); dlEvt = null; }
+  }
+  function handleJobs(jobs) {
     const activeIds = new Set(jobs.map((j) => j.id));
     // A job we were tracking has disappeared from the active list → it finished.
     let anyCompleted = false;
@@ -222,8 +244,6 @@
         : j.url;
       el.appendChild(li);
     });
-    clearTimeout(dlTimer);
-    if (jobs.length && !$("dlPanel").hidden) dlTimer = setTimeout(pollDownloads, 1500);
   }
   async function onDownloadDone() {
     const allArr = await jget("api/playlists/all/tracks");
