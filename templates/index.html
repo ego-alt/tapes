@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Tapes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,6 +14,8 @@
 </head>
 <body>
   <div class="app" id="app">
+    <!-- Start the drawer closed on phones, set before the sidebar paints to avoid a flash. -->
+    <script>if (window.matchMedia("(max-width: 640px)").matches) document.getElementById("app").classList.add("nav-collapsed");</script>
     <aside class="sidebar">
       <div class="sidebar-head">
         <h1><span class="accent">▰▰</span> TAPES</h1>
@@ -166,6 +168,8 @@
 
       <audio id="audio" preload="metadata"></audio>
     </main>
+
+    <div class="scrim" id="scrim"></div>
   </div>
 
   <div class="menu" id="plMenu" hidden></div>

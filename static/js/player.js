@@ -113,8 +113,15 @@
       (t.title + " " + t.artist + " " + t.album).toLowerCase().includes(q)) : view);
   }
 
+  // ---------- mobile drawer ----------
+  const isMobile = () => window.matchMedia("(max-width: 640px)").matches;
+  const closeNav = () => app.classList.add("nav-collapsed");
+
   // ---------- playback ----------
-  function playFromList(list, i) { queue = list.slice(); qi = i; loadCurrent(true); }
+  function playFromList(list, i) {
+    queue = list.slice(); qi = i; loadCurrent(true);
+    if (isMobile()) closeNav();   // reveal the deck once a track is picked
+  }
   function loadCurrent(autoplay) {
     const t = queue[qi];
     if (!t) return;
@@ -290,6 +297,7 @@
     loadShelf();
   });
   $("navToggle").addEventListener("click", () => app.classList.toggle("nav-collapsed"));
+  $("scrim").addEventListener("click", closeNav);
   $("search").addEventListener("input", applySearch);
   $("newTapeForm").addEventListener("submit", async (e) => {
     e.preventDefault();

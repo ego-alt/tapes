@@ -3,6 +3,7 @@
 body {
     margin: 0;
     height: 100vh;
+    height: 100dvh;          /* dvh tracks the mobile browser chrome; vh is the fallback */
     overflow: hidden;
     background: var(--color-bg-base);
     color: var(--color-text-primary);
@@ -12,7 +13,11 @@ body {
 .app {
     display: flex;
     height: 100vh;
+    height: 100dvh;
 }
+
+/* Backdrop behind the mobile drawer — hidden on desktop (see media query). */
+.scrim { display: none; }
 
 /* ---- navigator sidebar ---- */
 .sidebar {
@@ -109,13 +114,65 @@ body {
     position: absolute;
     top: var(--space-4);
     left: var(--space-4);
+    z-index: 10;
     font-size: var(--text-lg);
     line-height: 1;
 }
 
 @media (max-width: 640px) {
-    .sidebar { position: absolute; z-index: 5; height: 100%; box-shadow: var(--color-shadow) 0 0 40px; }
-    .app:not(.nav-collapsed) .sidebar { width: 80%; }
+    /* Off-canvas drawer: a full-height overlay that slides in from the left,
+     * rather than a column that resizes the deck. */
+    .sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 30;
+        width: min(86vw, 360px);
+        height: 100%;
+        padding-top: env(safe-area-inset-top);
+        box-shadow: 0 0 40px var(--color-shadow);
+    }
+    .app.nav-collapsed .sidebar {
+        width: min(86vw, 360px);     /* keep width so the slide reads as a drawer, not a squeeze */
+        transform: translateX(-100%);
+        border-right-color: var(--color-border);
+    }
+
+    /* Tap-to-dismiss backdrop, faded with the drawer. */
+    .scrim {
+        display: block;
+        position: absolute;
+        inset: 0;
+        z-index: 25;
+        background: rgba(0, 0, 0, 0.5);
+        transition: opacity 0.25s ease;
+    }
+    .app.nav-collapsed .scrim {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Make the toggle a solid 44px tap target that reads over the deck. */
+    .nav-toggle {
+        top: max(var(--space-4), env(safe-area-inset-top));
+        left: max(var(--space-3), env(safe-area-inset-left));
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        background: var(--color-bg-overlay);
+        border: 1px solid var(--color-border-soft);
+        color: var(--color-text-primary);
+    }
+}
+
+/* On touch (no hover), surface the per-row actions that otherwise only
+ * appear on hover — they're unreachable with a finger otherwise. */
+@media (hover: none) {
+    .tl-add,
+    .track-list li:hover .tl-add { opacity: 1; }
+    .tl-fav,
+    .track-list li:not(:hover) .tl-fav:not(.on) { opacity: 1; }
+    .tl-fav, .tl-add, .shelf-del { padding: var(--space-2); }
 }
 
 /* ---- shelf ---- */
