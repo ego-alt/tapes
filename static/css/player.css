@@ -39,8 +39,6 @@
 /* band print */
 .band-arrow { fill: rgba(20,16,8,0.8); }
 
-.cutout { fill: #14110e; }
-
 /* ---- white INDEX label on the shell ---- */
 .cassette-label {
     position: absolute;
