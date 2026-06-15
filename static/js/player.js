@@ -218,7 +218,11 @@
       li.querySelector(".tl-title").textContent = t.title;
       li.querySelector(".tl-sub").textContent = [t.artist, t.album].filter(Boolean).join(" · ");
       li.querySelector(".tl-fav").addEventListener("click", (e) => { e.stopPropagation(); toggleFav(t); });
-      li.querySelector(".tl-add").addEventListener("click", (e) => { e.stopPropagation(); openMenu(e, t); });
+      li.querySelector(".tl-add").addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!menu.hidden && menu.dataset.for === String(t.id)) closeMenu();
+        else openMenu(e, t);
+      });
       const h = li.querySelector(".tl-drag");
       if (h) h.addEventListener("click", (e) => e.stopPropagation());
       li.addEventListener("click", () => playFromList(list, i));
@@ -505,6 +509,7 @@
     return item;
   }
   function openMenu(e, t) {
+    menu.dataset.for = t.id;
     menu.innerHTML = "";
     menu.appendChild(menuItem("Play next", () => playNext(t)));
     menu.appendChild(menuItem("Add to queue", () => addToQueue(t)));
@@ -524,11 +529,17 @@
       loadShelf();
     })));
 
-    menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + "px";
-    menu.style.top = e.clientY + "px";
-    menu.hidden = false;
+    menu.hidden = false;   // show first so we can measure it, then place it
+    const pad = 8;
+    const mh = menu.offsetHeight, mw = menu.offsetWidth;
+    let top = e.clientY;
+    if (top + mh > window.innerHeight - pad) top = Math.max(pad, e.clientY - mh);  // flip up
+    let left = e.clientX;
+    if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
+    menu.style.top = top + "px";
+    menu.style.left = left + "px";
   }
-  const closeMenu = () => { menu.hidden = true; };
+  const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
 
   // ---------- downloads ----------
@@ -682,6 +693,7 @@
   $("nextBtn").innerHTML = ICONS.next;
   favBtn.innerHTML = ICONS.heart;
   $("shuffleBtn").innerHTML = ICONS.shuffle;
+  $("newTapeBtn").innerHTML = ICONS.plus;
   $("upnextIco").innerHTML = ICONS.list;
   $("upnextCaret").innerHTML = ICONS.chevronUp;
   $("shuffleBtn").classList.toggle("active", shuffleOn);
