@@ -7,27 +7,12 @@ import sys
 import threading
 from urllib.parse import urlparse
 
+from cleaning import clean_meta, clean_title
 from models import DownloadJob, PlaylistTrack, Track, db
 from scan import scan_library
 
 _job_queue: "queue.Queue[int]" = queue.Queue()
 _started = False
-
-# YouTube title cruft → stripped from the embedded title tag.
-_CRUFT = re.compile(
-    r"\s*[\(\[]\s*(?:official\s*)?(?:music\s*)?"
-    r"(?:audio|video|lyric[s]?|lyric\s*video|visuali[sz]er|hd|hq|4k|mv|m/v|"
-    r"full\s*album|official|explicit)\s*[\)\]]",
-    re.I,
-)
-
-
-def clean_title(title: str) -> str:
-    if not title:
-        return title
-    out = _CRUFT.sub("", title)
-    out = re.sub(r"\s*-\s*topic$", "", out, flags=re.I)
-    return re.sub(r"\s{2,}", " ", out).strip(" -–—")
 
 
 def expand_playlist(url: str):
@@ -176,9 +161,16 @@ def _clean_tag(path: str):
         from mutagen.easyid3 import EasyID3
         audio = EasyID3(path)
         title = (audio.get("title") or [None])[0]
-        cleaned = clean_title(title) if title else None
-        if cleaned and cleaned != title:
-            audio["title"] = cleaned
+        artist = (audio.get("artist") or [None])[0]
+        new_title, new_artist = clean_meta(title, artist)
+        changed = False
+        if new_title and new_title != title:
+            audio["title"] = new_title
+            changed = True
+        if new_artist and new_artist != artist:
+            audio["artist"] = new_artist
+            changed = True
+        if changed:
             audio.save()
     except Exception:
         pass

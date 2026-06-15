@@ -164,3 +164,49 @@ def register_cli(app):
             f"scan: +{r['added']} added, ~{r['updated']} updated, "
             f"{r['skipped']} unchanged" + (f", -{r['pruned']} pruned" if prune else "")
         )
+
+    @app.cli.command("retag")
+    @click.option("--write", is_flag=True, help="Apply changes (default: dry run / preview).")
+    def retag(write):
+        """Deterministically clean title/artist tags in place, then rescan."""
+        from mutagen.easyid3 import EasyID3
+
+        from cleaning import clean_meta
+
+        music_dir = pathlib.Path(app.config["MUSIC_DIR"])
+        changed = 0
+        for p in sorted(music_dir.rglob("*.mp3")):
+            try:
+                audio = EasyID3(str(p))
+            except Exception:
+                continue
+            title = (audio.get("title") or [None])[0]
+            artist = (audio.get("artist") or [None])[0]
+            new_title, new_artist = clean_meta(title, artist)
+            diffs = []
+            if new_title and new_title != title:
+                diffs.append(("title", title, new_title))
+            if new_artist and new_artist != artist:
+                diffs.append(("artist", artist, new_artist))
+            if not diffs:
+                continue
+            changed += 1
+            click.echo(p.name)
+            for field, old, new in diffs:
+                click.echo(f"    {field}: {old!r} -> {new!r}")
+            if write:
+                if new_title:
+                    audio["title"] = new_title
+                if new_artist:
+                    audio["artist"] = new_artist
+                try:
+                    audio.save()
+                except Exception as e:  # noqa: BLE001
+                    click.echo(f"    ! save failed: {e}")
+        click.echo(
+            f"\n{changed} file(s) "
+            + ("updated" if write else "would change — re-run with --write to apply")
+        )
+        if write and changed:
+            r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
+            click.echo(f"rescan: +{r.get('added', 0)} added, ~{r.get('updated', 0)} updated")
