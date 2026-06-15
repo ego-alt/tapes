@@ -1,0 +1,14 @@
+# These are bind-mounted at runtime — don't bake them into the image.
+music/
+instance/
+
+# Caches / local junk
+__pycache__/
+*/__pycache__/
+.ruff_cache/
+.pytest_cache/
+.venv/
+.git/
+.claude/
+docs/
+*.bak
