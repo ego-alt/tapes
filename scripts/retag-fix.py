@@ -32,12 +32,14 @@ FIXES = {
     "Apocalypse - Cigarettes After Sex (lyrics).mp3": ("Cigarettes After Sex", "Apocalypse"),
     "Like Real People Do - Hozier.mp3": ("Hozier", "Like Real People Do"),
     "[Official Video] Run to You - Pentatonix.mp3": ("Pentatonix", "Run to You"),
-    "In All My Dreams I Drown - The Devil's Carnival.mp3": ("The Devil's Carnival", "In All My Dreams I Drown"),
+    "In All My Dreams I Drown - The Devil's Carnival.mp3": (
+        "The Devil's Carnival", "In All My Dreams I Drown"),
     # best guesses for messy names — double-check these before applying
     "Sade - Smooth Operator - Official - 1984.mp3": ("Sade", "Smooth Operator"),
     "Bojack Horseman ｜ Mr. Blue - Catherine Feeny- Lyrics.mp3": ("Catherine Feeny", "Mr. Blue"),
     "Woman in Love - Barbra Streisand Subtitulado.mp3": ("Barbra Streisand", "Woman in Love"),
-    "Nobody Movie Soundtrack 2021 ⧸⧸ Serye Glaza - NATASHA KOROLYOVA.mp3": ("Natasha Korolyova", "Serye Glaza"),
+    "Nobody Movie Soundtrack 2021 ⧸⧸ Serye Glaza - NATASHA KOROLYOVA.mp3": (
+        "Natasha Korolyova", "Serye Glaza"),
     "구룡 (North Korea) — 백두의 소환 — 2025 demo.mp3": ("구룡 (North Korea)", "백두의 소환"),
     "鄭融 Stephanie Cheng ⧸ 周柏豪 Pakho Chau - 一事無成 [鄭．融精選] - 官方完整版MV.mp3": (
         "鄭融 Stephanie Cheng / 周柏豪 Pakho Chau", "一事無成"),
@@ -89,6 +91,7 @@ if WRITE and changed:
     with app.app_context():
         db_path = pathlib.Path(app.instance_path) / "music.db"
         if db_path.exists():
-            shutil.copy(db_path, db_path.with_suffix(f".pre-fix-{time.strftime('%Y%m%d-%H%M%S')}.bak"))
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            shutil.copy(db_path, db_path.with_suffix(f".pre-fix-{stamp}.bak"))
         r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
         print(f"rescan: +{r.get('added', 0)} added, ~{r.get('updated', 0)} updated")
