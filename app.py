@@ -2,7 +2,7 @@ import os
 import pathlib
 import secrets
 
-from flask import Flask, url_for
+from flask import Flask
 from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -67,18 +67,6 @@ def create_app(config=None):
     app.register_blueprint(stream_blueprint)
     app.register_blueprint(library_blueprint)
     app.register_blueprint(downloads_blueprint)
-
-    @app.context_processor
-    def _cache_bust():
-        # static_url(...) appends the file's mtime as ?v=, so a new CSS/JS busts
-        # browser + proxy caches on every deploy.
-        def static_url(filename):
-            try:
-                mtime = int((pathlib.Path(app.static_folder) / filename).stat().st_mtime)
-            except OSError:
-                mtime = 0
-            return url_for("static", filename=filename, v=mtime)
-        return {"static_url": static_url}
 
     @app.get("/healthz")
     def healthz():

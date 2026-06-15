@@ -7,10 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ static_url('css/tokens.css') }}">
-  <link rel="stylesheet" href="{{ static_url('css/primitives.css') }}">
-  <link rel="stylesheet" href="{{ static_url('css/index.css') }}">
-  <link rel="stylesheet" href="{{ static_url('css/player.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/primitives.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/player.css') }}">
 </head>
 <body>
   <div class="app" id="app">
@@ -230,6 +230,6 @@
       coverBase: "{{ url_for('stream.cover', track_id=0) }}".slice(0, -1),
     };
   </script>
-  <script src="{{ static_url('js/player.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>
