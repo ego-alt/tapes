@@ -164,6 +164,94 @@
 }
 .tbtn.play:hover { background: var(--color-accent-hover); }
 
+/* inline-svg icons — sized per container, centred by the button's flex */
+.icn { display: block; }
+.tbtn .icn { width: 22px; height: 22px; }
+.tbtn.play .icn { width: 28px; height: 28px; }
+
+/* ---- Up Next: floating pill (bottom-right) that expands into the queue ---- */
+.upnext {
+    position: absolute;
+    right: var(--space-4);
+    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;     /* panel above, pill below → expands upward */
+    align-items: flex-end;
+    gap: var(--space-2);
+    max-width: calc(100% - 2 * var(--space-4));
+}
+.upnext-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg-overlay);
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+.upnext-bar:hover { border-color: var(--color-border); }
+.upnext-ico { display: inline-flex; color: var(--color-accent); }
+.upnext-ico .icn { width: 16px; height: 16px; }
+.upnext-label { color: var(--color-text-secondary); letter-spacing: 0.02em; }
+.upnext-count {
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-inset);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+.upnext-count:empty { display: none; }
+.upnext-caret { display: inline-flex; color: var(--color-text-muted); transition: transform 0.2s ease; }
+.upnext-caret .icn { width: 14px; height: 14px; }
+.upnext.expanded .upnext-caret { transform: rotate(180deg); }
+
+.upnext-panel {
+    display: none;
+    flex-direction: column;
+    width: min(320px, 78vw);
+    max-height: min(50vh, 360px);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 40px var(--color-shadow);
+    overflow: hidden;
+}
+.upnext.expanded .upnext-panel { display: flex; }
+.upnext-panel-head {
+    padding: var(--space-3) var(--space-4) var(--space-2);
+    font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+}
+@media (prefers-reduced-motion: reduce) { .upnext-caret { transition: none; } }
+
+.queue-list { overflow-y: auto; list-style: none; margin: 0; padding: 0 var(--space-2) var(--space-3); }
+.q-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer; }
+.q-row:hover { background: var(--track-hover); }
+.q-row.active { background: var(--color-bg-inset); }
+.q-row.active .q-title { color: var(--track-active); }
+.q-drag { flex-shrink: 0; width: 16px; text-align: center; color: var(--color-text-muted); cursor: grab; touch-action: none; user-select: none; }
+.q-drag:active { cursor: grabbing; }
+.q-meta { flex: 1; min-width: 0; }
+.q-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-sub { font-size: var(--text-sm); color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-btn { background: none; border: 0; color: var(--color-text-muted); cursor: pointer; padding: 4px 5px; font-size: 0.95rem; line-height: 1; flex-shrink: 0; opacity: 0; transition: opacity 0.12s, color 0.12s; }
+.q-row:hover .q-btn { opacity: 1; }
+.q-btn:hover { color: var(--color-text-primary); }
+.q-rm:hover { color: var(--color-danger-hover); }
+.queue-empty { padding: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+
+/* Touch: row actions can't rely on hover. */
+@media (hover: none) { .q-btn { opacity: 1; } }
+
 /* Phones: size the cassette by width so it never spills past the viewport
  * (height-driven sizing overflows horizontally on narrow screens). */
 @media (max-width: 640px) {
