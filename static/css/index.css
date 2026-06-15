@@ -244,7 +244,8 @@ body {
 /* input + button: same explicit height, button square (so it isn't slim) */
 .new-tape .input, .new-tape .btn { height: 2.4rem; }
 .new-tape .btn {
-    flex-shrink: 0;
+    flex: 0 0 2.4rem;      /* fixed-width square: never grow, shrink, or stretch */
+    align-self: center;
     width: 2.4rem;
     padding: 0;
 }
