@@ -30,6 +30,8 @@ class Track(db.Model):
     # Set when the automatic LLM cleanup didn't run on rip (no key / API failure),
     # so `retag --llm --pending` can sweep up all the misses later.
     needs_llm = db.Column(db.Boolean, default=False)
+    # AcoustID cluster id — content identity for dedup (same recording, any URL).
+    acoust_id = db.Column(db.String, index=True)
     track_no = db.Column(db.Integer)
     duration_s = db.Column(db.Float)
     bitrate = db.Column(db.Integer)

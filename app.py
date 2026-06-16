@@ -40,6 +40,8 @@ def create_app(config=None):
     app.config["LLM_CLEANING"] = os.environ.get("LLM_CLEANING", "1").lower() in ("1", "true", "yes")
     # Fetch real cover art from MusicBrainz on rip (replaces the yt-dlp video thumbnail).
     app.config["ART_LOOKUP"] = os.environ.get("ART_LOOKUP", "1").lower() in ("1", "true", "yes")
+    # Acoustic-fingerprint dedup on rip (needs fpcalc + ACOUSTID_API_KEY).
+    app.config["ACOUSTID_DEDUP"] = os.environ.get("ACOUSTID_DEDUP", "1").lower() in ("1", "true", "yes")
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")
 
@@ -84,6 +86,7 @@ def create_app(config=None):
             "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
+            "ALTER TABLE tracks ADD COLUMN acoust_id VARCHAR",
         ):
             try:
                 db.session.execute(db.text(stmt))

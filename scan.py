@@ -315,3 +315,28 @@ def register_cli(app):
         if write and found:
             r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
             click.echo(f"rescan: ~{r.get('updated', 0)} updated")
+
+    @app.cli.command("fingerprint")
+    @click.option("--all", "do_all", is_flag=True,
+                  help="Re-fingerprint every track, not just those missing an acoust_id.")
+    def fingerprint(do_all):
+        """Backfill AcoustID fingerprints so existing tracks dedupe against new rips.
+
+        Needs `fpcalc` + ACOUSTID_API_KEY; throttled to ~3 lookups/sec. Stores the
+        AcoustID id on each track (the same key the rip-time content dedup uses).
+        """
+        from fingerprint import fingerprint_id
+
+        music_dir = pathlib.Path(app.config["MUSIC_DIR"])
+        tracks = Track.query.order_by(Track.artist, Track.title).all()
+        done = 0
+        for t in tracks:
+            if t.acoust_id and not do_all:
+                continue
+            fpid = fingerprint_id(str(music_dir / t.file_path))
+            click.echo(f"[{'ID' if fpid else ' -'}] {t.artist or '?'} — {t.title}")
+            if fpid:
+                t.acoust_id = fpid
+                done += 1
+        db.session.commit()
+        click.echo(f"\nfingerprinted {done} track(s)")

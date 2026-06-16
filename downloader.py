@@ -111,6 +111,15 @@ def _find_existing(url: str):
     return None
 
 
+def _discard(path: str):
+    """Remove a just-downloaded file we won't keep (and its sidecar .info.json)."""
+    for p in (pathlib.Path(path), pathlib.Path(path).with_suffix(".info.json")):
+        try:
+            p.unlink()
+        except OSError:
+            pass
+
+
 def _link_playlist(job, track):
     """Add `track` to the job's target playlist (tape), if any, avoiding dupes."""
     if not (job.playlist_id and track):
@@ -189,6 +198,24 @@ def _process(app, job_id: int):
             raise RuntimeError("no mp3 produced")
         final_mp3 = str(mp3s[-1])
 
+    # Content dedup: a different URL but the same recording? Fingerprint the audio
+    # and, if we already have it, discard this copy instead of re-tagging it.
+    fpid = None
+    if app.config.get("ACOUSTID_DEDUP", True):
+        from fingerprint import fingerprint_id
+        fpid = fingerprint_id(final_mp3)
+        if fpid:
+            dup = Track.query.filter_by(acoust_id=fpid).first()
+            if dup:
+                _discard(final_mp3)
+                _link_playlist(job, dup)
+                job.track_id = dup.id
+                job.progress = 100
+                job.status = "done"
+                job.message = f"duplicate of: {dup.title}"
+                db.session.commit()
+                return
+
     source = _read_source_meta(final_mp3, job.url)
     llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
     if app.config.get("ART_LOOKUP", True):
@@ -199,6 +226,8 @@ def _process(app, job_id: int):
     track = Track.query.filter_by(file_path=rel).first()
     if track:
         track.source_url = source.get("url") or job.url
+        if fpid:
+            track.acoust_id = fpid
         if llm_ok is not None:
             track.needs_llm = not llm_ok  # flag misses for `retag --llm --pending`
     job.track_id = track.id if track else None
