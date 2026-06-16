@@ -214,7 +214,8 @@ def register_cli(app):
                 on_status=lambda b: click.echo(f"  batch {b.processing_status}…"),
             )
             if not corrections:
-                click.echo("! no LLM results (is ANTHROPIC_API_KEY set?) — falling back to deterministic")
+                click.echo("! no LLM results (key unset, or the batch failed — check the log) "
+                           "— falling back to deterministic")
 
         changed = 0
         for i, e in enumerate(entries):

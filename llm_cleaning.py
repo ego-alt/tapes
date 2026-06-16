@@ -21,8 +21,11 @@ Two entry points share one request shape:
 Structured output is via a forced tool call, so the model must return a typed
 object — no free-text parsing.
 """
+import logging
 import os
 import time
+
+log = logging.getLogger("tapes.llm")
 
 MODEL = "claude-haiku-4-5"
 
@@ -92,13 +95,27 @@ _SYSTEM = (
 )
 
 
+_warned_no_key = False
+
+
 def _client():
-    """Anthropic client, or None when ANTHROPIC_API_KEY is unset (→ caller falls back)."""
+    """Anthropic client, or None when unavailable (→ caller falls back to deterministic).
+
+    Warns once (not per track) when the key or package is missing, so a
+    misconfigured deploy is visible in the log without spamming it.
+    """
+    global _warned_no_key
     if not os.getenv("ANTHROPIC_API_KEY"):
+        if not _warned_no_key:
+            log.warning("ANTHROPIC_API_KEY not set — LLM tag cleanup off, using deterministic only")
+            _warned_no_key = True
         return None
     try:
         import anthropic
     except ImportError:
+        if not _warned_no_key:
+            log.warning("anthropic package not installed — LLM tag cleanup off")
+            _warned_no_key = True
         return None
     return anthropic.Anthropic()
 
@@ -165,7 +182,9 @@ def correct_track(meta: dict) -> dict | None:
         return None
     try:
         msg = client.messages.create(**_params(meta))
-    except Exception:  # noqa: BLE001 — any failure → deterministic fallback
+    except Exception as e:  # noqa: BLE001 — any failure → deterministic fallback
+        # Key set but the call failed (e.g. insufficient credit, rate limit, auth).
+        log.warning("LLM tag correction failed (%s); using deterministic cleanup", e)
         return None
     return _parse(msg)
 
@@ -191,16 +210,21 @@ def correct_tracks_batch(items, *, poll_secs: int = 15, on_status=None) -> dict:
     if not requests:
         return {}
 
-    batch = client.messages.batches.create(requests=requests)
-    while True:
-        b = client.messages.batches.retrieve(batch.id)
-        if b.processing_status == "ended":
-            break
-        if on_status:
-            on_status(b)
-        time.sleep(poll_secs)
+    try:
+        batch = client.messages.batches.create(requests=requests)
+        while True:
+            b = client.messages.batches.retrieve(batch.id)
+            if b.processing_status == "ended":
+                break
+            if on_status:
+                on_status(b)
+            time.sleep(poll_secs)
 
-    results: dict = {}
-    for r in client.messages.batches.results(batch.id):
-        results[r.custom_id] = _parse(r.result.message) if r.result.type == "succeeded" else None
-    return results
+        results: dict = {}
+        for r in client.messages.batches.results(batch.id):
+            results[r.custom_id] = _parse(r.result.message) if r.result.type == "succeeded" else None
+        return results
+    except Exception as e:  # noqa: BLE001 — whole-batch failure → caller falls back
+        # e.g. insufficient credit, auth, or a network drop mid-poll.
+        log.warning("LLM batch failed (%s); falling back to deterministic", e)
+        return {}
