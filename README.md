@@ -38,7 +38,7 @@ into `./music`.
 
 Served at `/music/` behind the [dashboard](../dashboard) nginx proxy: gated by
 its `auth_request` and streaming audio via `X-Accel-Redirect`. The service is
-wired into `../dashboard/docker-compose.yml`.
+wired into `../dashboard/docker-compose.yml` (internal port `5003`).
 
 ```sh
 cd ../dashboard
@@ -47,6 +47,12 @@ MUSIC_HOST_DIR=/mnt/backup/music docker compose up -d --build music
 
 Dashboard handles login; tapes trusts the `X-Forwarded-User` header and keeps
 its own `users` rows for favorites, tapes, and playback state.
+
+After adding a user in dashboard, sync shadow accounts:
+
+```sh
+cd ../dashboard && uv run python scripts/sync_household_users.py
+```
 
 > Code is baked into the image at build time. After pulling changes, rebuild:
 > `docker compose build music && docker compose up -d music`. A bare `up -d`
