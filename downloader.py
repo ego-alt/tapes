@@ -96,7 +96,8 @@ def _process(app, job_id: int):
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "-x", "--audio-format", "mp3", "--audio-quality", "0",
-        "--embed-thumbnail", "--embed-metadata", "--no-playlist", "--newline",
+        "--embed-thumbnail", "--embed-metadata", "--write-info-json",
+        "--no-playlist", "--newline",
         "-o", str(music_dir / "%(title)s.%(ext)s"), job.url,
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -135,11 +136,16 @@ def _process(app, job_id: int):
             raise RuntimeError("no mp3 produced")
         final_mp3 = str(mp3s[-1])
 
-    _clean_tag(final_mp3)
+    source = _read_source_meta(final_mp3, job.url)
+    _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
+    if app.config.get("ART_LOOKUP", True):
+        _fetch_art(final_mp3)
     scan_library(music_dir, app.config["COVER_DIR"], full=False)
 
     rel = str(pathlib.Path(final_mp3).relative_to(music_dir))
     track = Track.query.filter_by(file_path=rel).first()
+    if track:
+        track.source_url = source.get("url") or job.url
     job.track_id = track.id if track else None
     job.progress = 100
     job.status = "done"
@@ -156,19 +162,95 @@ def _process(app, job_id: int):
     db.session.commit()
 
 
-def _clean_tag(path: str):
+def _read_source_meta(mp3_path: str, fallback_url: str) -> dict:
+    """Pull a few high-signal fields from yt-dlp's `.info.json` (written alongside
+    the mp3), then delete it. The video description is deliberately ignored."""
+    src = {"url": fallback_url}
+    try:
+        info_path = pathlib.Path(mp3_path).with_suffix(".info.json")
+        if not info_path.exists():
+            cands = list(info_path.parent.glob(pathlib.Path(mp3_path).stem + "*.info.json"))
+            info_path = cands[0] if cands else None
+        if info_path and info_path.exists():
+            data = json.loads(info_path.read_text())
+            src.update({
+                "url": data.get("webpage_url") or fallback_url,
+                "channel": data.get("channel") or data.get("uploader"),
+                "yt_track": data.get("track"),
+                "yt_artist": data.get("artist"),
+                "yt_album": data.get("album"),
+                "year": data.get("release_year"),
+                "playlist": data.get("playlist_title") or data.get("playlist"),
+            })
+            try:
+                info_path.unlink()
+            except OSError:
+                pass
+    except Exception:  # noqa: BLE001 — source signals are best-effort
+        pass
+    return {k: v for k, v in src.items() if v}
+
+
+def _fetch_art(path: str):
+    """Replace the embedded video thumbnail with real cover art when we can find a
+    confident MusicBrainz match for the (cleaned) artist + album. No-op otherwise."""
+    try:
+        from mutagen.easyid3 import EasyID3
+        audio = EasyID3(path)
+        artist = (audio.get("artist") or [None])[0]
+        album = (audio.get("album") or [None])[0]
+        if not (artist and album):
+            return
+        from art import embed_cover, fetch_cover
+        img = fetch_cover(artist, album)
+        if img:
+            embed_cover(path, img)
+    except Exception:  # noqa: BLE001 — art is best-effort; keep the thumbnail on failure
+        pass
+
+
+def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
     try:
         from mutagen.easyid3 import EasyID3
         audio = EasyID3(path)
         title = (audio.get("title") or [None])[0]
         artist = (audio.get("artist") or [None])[0]
+        album = (audio.get("album") or [None])[0]
+
+        # 1. Deterministic pass — offline, can't mistag; also the LLM fallback.
         new_title, new_artist = clean_meta(title, artist)
+
+        # 2. LLM correction + enrichment. Falls back to the deterministic result
+        #    when unavailable or low-confidence; enrichment only fills blanks.
+        enrich = {}
+        if use_llm:
+            from llm_cleaning import correct_track
+            meta = {
+                "filename": pathlib.Path(path).stem,
+                "title": new_title or title,
+                "artist": new_artist or artist,
+                "album": album,
+            }
+            if source:
+                for k in ("url", "channel", "yt_track", "yt_artist", "yt_album", "year", "playlist"):
+                    if source.get(k):
+                        meta[k] = source[k]
+            result = correct_track(meta)
+            if result and result["confidence"] in ("high", "medium"):
+                new_title = result["title"] or new_title
+                new_artist = result["artist"] or new_artist
+                enrich = result
+
         changed = False
         if new_title and new_title != title:
             audio["title"] = new_title
             changed = True
         if new_artist and new_artist != artist:
             audio["artist"] = new_artist
+            changed = True
+        # Enrichment fills a blank album only — never overwrite source metadata.
+        if enrich.get("album") and not (audio.get("album") or [None])[0]:
+            audio["album"] = enrich["album"]
             changed = True
         if changed:
             audio.save()

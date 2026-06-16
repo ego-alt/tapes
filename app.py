@@ -36,6 +36,10 @@ def create_app(config=None):
     app.config["COVER_DIR"] = str(instance / "covers")
 
     app.config["USE_X_ACCEL"] = os.environ.get("USE_X_ACCEL", "").lower() in ("1", "true", "yes")
+    # LLM tag correction on rip (needs ANTHROPIC_API_KEY; falls back to deterministic without it).
+    app.config["LLM_CLEANING"] = os.environ.get("LLM_CLEANING", "1").lower() in ("1", "true", "yes")
+    # Fetch real cover art from MusicBrainz on rip (replaces the yt-dlp video thumbnail).
+    app.config["ART_LOOKUP"] = os.environ.get("ART_LOOKUP", "1").lower() in ("1", "true", "yes")
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")
 
@@ -74,13 +78,17 @@ def create_app(config=None):
 
     with app.app_context():
         db.create_all()
-        try:
-            db.session.execute(db.text(
-                "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)"
-            ))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+        # Lightweight column adds for existing DBs (SQLite ignores IF NOT EXISTS
+        # for columns, so each is best-effort and rolls back if already present).
+        for stmt in (
+            "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
+            "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
+        ):
+            try:
+                db.session.execute(db.text(stmt))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
     register_cli(app)
     start_worker(app)

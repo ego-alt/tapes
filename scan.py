@@ -167,42 +167,88 @@ def register_cli(app):
 
     @app.cli.command("retag")
     @click.option("--write", is_flag=True, help="Apply changes (default: dry run / preview).")
-    def retag(write):
-        """Deterministically clean title/artist tags in place, then rescan."""
+    @click.option("--llm", is_flag=True,
+                  help="Use Claude (Batches API) to correct + enrich tags, not just deterministic cleanup.")
+    def retag(write, llm):
+        """Clean title/artist tags in place (and, with --llm, fill a blank album), then rescan."""
         from mutagen.easyid3 import EasyID3
 
         from cleaning import clean_meta
 
         music_dir = pathlib.Path(app.config["MUSIC_DIR"])
-        changed = 0
-        for p in sorted(music_dir.rglob("*.mp3")):
+        paths = sorted(music_dir.rglob("*.mp3"))
+
+        # Read tags + run the deterministic pass for every file up front.
+        # entries: path -> {audio, title, artist, album, dt_title, dt_artist}
+        entries = []
+        for p in paths:
             try:
                 audio = EasyID3(str(p))
             except Exception:
                 continue
             title = (audio.get("title") or [None])[0]
             artist = (audio.get("artist") or [None])[0]
-            new_title, new_artist = clean_meta(title, artist)
-            diffs = []
-            if new_title and new_title != title:
-                diffs.append(("title", title, new_title))
-            if new_artist and new_artist != artist:
-                diffs.append(("artist", artist, new_artist))
+            album = (audio.get("album") or [None])[0]
+            dt_title, dt_artist = clean_meta(title, artist)
+            entries.append({
+                "path": p, "audio": audio, "title": title, "artist": artist,
+                "album": album, "dt_title": dt_title, "dt_artist": dt_artist,
+            })
+
+        # With --llm, send the (deterministically-cleaned) tags through Claude in one batch.
+        corrections = {}
+        if llm:
+            from llm_cleaning import correct_tracks_batch
+            items = [
+                (str(i), {
+                    "filename": e["path"].stem,
+                    "title": e["dt_title"] or e["title"],
+                    "artist": e["dt_artist"] or e["artist"],
+                    "album": e["album"],
+                })
+                for i, e in enumerate(entries)
+            ]
+            click.echo(f"submitting {len(items)} track(s) to Claude (Batches API)…")
+            corrections = correct_tracks_batch(
+                items,
+                on_status=lambda b: click.echo(f"  batch {b.processing_status}…"),
+            )
+            if not corrections:
+                click.echo("! no LLM results (is ANTHROPIC_API_KEY set?) — falling back to deterministic")
+
+        changed = 0
+        for i, e in enumerate(entries):
+            res = corrections.get(str(i))
+            confident = bool(res) and res["confidence"] in ("high", "medium")
+            new_title = (res["title"] if confident else None) or e["dt_title"]
+            new_artist = (res["artist"] if confident else None) or e["dt_artist"]
+
+            diffs, writes = [], []
+            if new_title and new_title != e["title"]:
+                diffs.append(("title", e["title"], new_title))
+                writes.append(("title", new_title))
+            if new_artist and new_artist != e["artist"]:
+                diffs.append(("artist", e["artist"], new_artist))
+                writes.append(("artist", new_artist))
+            # Enrichment fills a blank album only — never overwrite an existing tag.
+            if confident and res.get("album") and not (e["audio"].get("album") or [None])[0]:
+                diffs.append(("album", None, res["album"]))
+                writes.append(("album", res["album"]))
             if not diffs:
                 continue
+
             changed += 1
-            click.echo(p.name)
+            click.echo(e["path"].name)
             for field, old, new in diffs:
                 click.echo(f"    {field}: {old!r} -> {new!r}")
             if write:
-                if new_title:
-                    audio["title"] = new_title
-                if new_artist:
-                    audio["artist"] = new_artist
+                for tag, val in writes:
+                    e["audio"][tag] = val
                 try:
-                    audio.save()
-                except Exception as e:  # noqa: BLE001
-                    click.echo(f"    ! save failed: {e}")
+                    e["audio"].save()
+                except Exception as ex:  # noqa: BLE001
+                    click.echo(f"    ! save failed: {ex}")
+
         click.echo(
             f"\n{changed} file(s) "
             + ("updated" if write else "would change — re-run with --write to apply")
@@ -210,3 +256,40 @@ def register_cli(app):
         if write and changed:
             r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
             click.echo(f"rescan: +{r.get('added', 0)} added, ~{r.get('updated', 0)} updated")
+
+    @app.cli.command("art")
+    @click.option("--write", is_flag=True, help="Embed the fetched art (default: dry run / preview).")
+    @click.option("--all", "do_all", is_flag=True,
+                  help="Also re-fetch tracks that already have a cover (upgrade thumbnails).")
+    def art(write, do_all):
+        """Fetch real cover art from MusicBrainz for tracks with a known artist + album.
+
+        Throttled to ~1 lookup/sec (MusicBrainz etiquette), so a large library
+        takes roughly one second per track. Without --all, only covers tracks
+        that currently have no art.
+        """
+        from art import embed_cover, fetch_cover
+
+        music_dir = pathlib.Path(app.config["MUSIC_DIR"])
+        tracks = Track.query.order_by(Track.artist, Track.album).all()
+        found = 0
+        for t in tracks:
+            if not (t.artist and t.album):
+                continue
+            if t.has_cover and not do_all:
+                continue
+            img = fetch_cover(t.artist, t.album)
+            click.echo(f"[{'FOUND' if img else '  -  '}] {t.artist} — {t.album} :: {t.title}")
+            if img and write:
+                try:
+                    embed_cover(str(music_dir / t.file_path), img)
+                    found += 1
+                except Exception as e:  # noqa: BLE001
+                    click.echo(f"    ! embed failed: {e}")
+        click.echo(
+            f"\n{found} cover(s) "
+            + ("embedded" if write else "found — re-run with --write to apply")
+        )
+        if write and found:
+            r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
+            click.echo(f"rescan: ~{r.get('updated', 0)} updated")

@@ -24,6 +24,9 @@ class Track(db.Model):
     title = db.Column(db.String, nullable=False)
     artist = db.Column(db.String)
     album = db.Column(db.String)
+    # Original source (e.g. the YouTube URL the track was ripped from); NULL for
+    # files added outside the ripper.
+    source_url = db.Column(db.String)
     track_no = db.Column(db.Integer)
     duration_s = db.Column(db.Float)
     bitrate = db.Column(db.Integer)
@@ -40,6 +43,7 @@ class Track(db.Model):
             "album": self.album or "",
             "duration": self.duration_s or 0,
             "has_cover": bool(self.has_cover),
+            "source_url": self.source_url or "",
             "fav": fav,
         }
 
