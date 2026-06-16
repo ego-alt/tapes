@@ -40,7 +40,7 @@ def create_app(config=None):
     app.config["LLM_CLEANING"] = os.environ.get("LLM_CLEANING", "1").lower() in ("1", "true", "yes")
     # Fetch real cover art from MusicBrainz on rip (replaces the yt-dlp video thumbnail).
     app.config["ART_LOOKUP"] = os.environ.get("ART_LOOKUP", "1").lower() in ("1", "true", "yes")
-    # Acoustic-fingerprint dedup on rip (needs the fpcalc binary; no API key).
+    # Acoustic-fingerprint dedup on rip (needs the fpcalc binary).
     app.config["FINGERPRINT_DEDUP"] = os.environ.get("FINGERPRINT_DEDUP", "1").lower() in ("1", "true", "yes")
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")

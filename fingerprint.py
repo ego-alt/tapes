@@ -5,8 +5,8 @@ per ~0.12s frame, derived from the music's harmonic content. It's robust to
 re-encoding / bitrate / loudness, but differs for a different performance (live,
 remix, cover). We store it per track and compare new rips against the library
 ourselves — `similarity()` slides one fingerprint over the other and counts
-frames that match within a few bits. Requires the `fpcalc` binary
-(Debian: libchromaprint-tools).
+frames that match within a few bits. Requires the `fpcalc` binary (Debian:
+libchromaprint-tools).
 
 Different songs essentially never match (random 32-bit frames agreeing within 3
 bits is a ~1e-6 event), so the match fraction is near 0 for unrelated audio and

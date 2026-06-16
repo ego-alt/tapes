@@ -26,8 +26,8 @@ to the current song.
   confident — using the source URL, channel/uploader, and yt-dlp's own parsed
   fields as signals; without a key it falls back to the deterministic cleanup.
 - **Cover art** — on rip, the weak YouTube thumbnail is replaced with real album
-  art from **MusicBrainz** + the Cover Art Archive when a confident
-  artist/album match exists. `flask art` backfills the library.
+  art from **MusicBrainz** + the Cover Art Archive when a confident artist/album
+  match exists. `flask art` backfills the library.
   `flask retag` re-cleans an existing library (`--llm` to use Claude in bulk).
 
 ## Run it — standalone
@@ -41,9 +41,9 @@ uv run flask --app app:create_app run --port 5003
 ```
 
 `ffmpeg` must be on your `PATH` for ripping, and `fpcalc` (Debian
-`libchromaprint-tools`) for the acoustic dedup. Set
-`ANTHROPIC_API_KEY` to enable the LLM tag pass (optional — rips work without it).
-`LLM_CLEANING=0` / `ART_LOOKUP=0` / `FINGERPRINT_DEDUP=0` turn off each pass.
+`libchromaprint-tools`) for the acoustic dedup. Set `ANTHROPIC_API_KEY` to
+enable the LLM tag pass (optional — rips work without it). `LLM_CLEANING=0` /
+`ART_LOOKUP=0` / `FINGERPRINT_DEDUP=0` turn off each pass.
 There's no login in standalone mode
 — a single local user is attached automatically. To try it without your own
 music, `uv run python scripts/generate_samples.py` writes tagged demo tracks
