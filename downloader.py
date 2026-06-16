@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 import threading
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from cleaning import clean_meta, clean_title
 from models import DownloadJob, PlaylistTrack, Track, db
@@ -81,10 +81,63 @@ def _loop(app):
         _job_queue.task_done()
 
 
+def _norm_url(url: str) -> str:
+    """Reduce a URL to a stable key — the YouTube video id when present — so that
+    youtu.be / watch?v= / extra query params all dedupe to the same track."""
+    try:
+        u = urlparse(url)
+        if "youtu.be" in u.netloc:
+            return u.path.lstrip("/") or url
+        vid = parse_qs(u.query).get("v")
+        if vid:
+            return vid[0]
+    except Exception:  # noqa: BLE001
+        pass
+    return url
+
+
+def _find_existing(url: str):
+    """Return a Track already ripped from this URL, or None. Only matches tracks
+    that carry a source_url (i.e. ripped since that was recorded)."""
+    track = Track.query.filter_by(source_url=url).first()  # fast exact-match path
+    if track:
+        return track
+    norm = _norm_url(url)
+    if norm == url:
+        return None
+    for t in Track.query.filter(Track.source_url.isnot(None)):
+        if _norm_url(t.source_url) == norm:
+            return t
+    return None
+
+
+def _link_playlist(job, track):
+    """Add `track` to the job's target playlist (tape), if any, avoiding dupes."""
+    if not (job.playlist_id and track):
+        return
+    if PlaylistTrack.query.filter_by(playlist_id=job.playlist_id, track_id=track.id).first():
+        return
+    pos = PlaylistTrack.query.filter_by(playlist_id=job.playlist_id).count()
+    db.session.add(PlaylistTrack(playlist_id=job.playlist_id, track_id=track.id, position=pos))
+
+
 def _process(app, job_id: int):
     job = db.session.get(DownloadJob, job_id)
     if not job or job.status == "done":
         return
+
+    # Already have this source? Skip the download + LLM + art entirely; just link
+    # it (and add it to the target tape if one was requested).
+    existing = _find_existing(job.url)
+    if existing is not None:
+        _link_playlist(job, existing)
+        job.track_id = existing.id
+        job.progress = 100
+        job.status = "done"
+        job.message = f"already in library: {existing.title}"
+        db.session.commit()
+        return
+
     job.status = "running"
     job.progress = 0
     job.message = ""
@@ -152,15 +205,7 @@ def _process(app, job_id: int):
     job.progress = 100
     job.status = "done"
     job.message = (track.title if track else "done")
-    if job.playlist_id and track:
-        exists = PlaylistTrack.query.filter_by(
-            playlist_id=job.playlist_id, track_id=track.id
-        ).first()
-        if not exists:
-            pos = PlaylistTrack.query.filter_by(playlist_id=job.playlist_id).count()
-            db.session.add(PlaylistTrack(
-                playlist_id=job.playlist_id, track_id=track.id, position=pos
-            ))
+    _link_playlist(job, track)
     db.session.commit()
 
 
