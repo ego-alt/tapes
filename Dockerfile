@@ -4,7 +4,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # ffmpeg: required by yt-dlp audio extraction.
-# libchromaprint-tools: provides `fpcalc` for AcoustID acoustic-fingerprint dedup.
+# libchromaprint-tools: provides `fpcalc` for acoustic-fingerprint dedup.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libchromaprint-tools \
     && rm -rf /var/lib/apt/lists/*
 

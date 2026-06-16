@@ -17,8 +17,9 @@ to the current song.
 - **Rip** any URL to MP3 with cover art via `yt-dlp` + `ffmpeg`, with live
   progress over SSE; paste a YouTube playlist to rip it into a new tape. The
   original source URL is saved with each track. Re-ripping a URL you already have
-  is skipped, and acoustic fingerprinting (AcoustID) catches the same recording
-  even from a different URL — adding it to your tape without making a duplicate.
+  is skipped, and acoustic fingerprinting (Chromaprint) catches the same
+  recording even from a different URL — adding it to your tape without making a
+  duplicate.
 - **Tidy metadata** — ripped tags are cleaned automatically (YouTube cruft
   stripped, `Artist - Title` split). With `ANTHROPIC_API_KEY` set, a Claude
   (Haiku) pass then refines title/artist and fills in a blank album when it's
@@ -26,7 +27,7 @@ to the current song.
   fields as signals; without a key it falls back to the deterministic cleanup.
 - **Cover art** — on rip, the weak YouTube thumbnail is replaced with real album
   art from **MusicBrainz** + the Cover Art Archive when a confident
-  artist/album match exists (no API key). `flask art` backfills the library.
+  artist/album match exists. `flask art` backfills the library.
   `flask retag` re-cleans an existing library (`--llm` to use Claude in bulk).
 
 ## Run it — standalone
@@ -39,11 +40,11 @@ uv run flask --app app:create_app run --port 5003
 # open http://127.0.0.1:5003
 ```
 
-`ffmpeg` must be on your `PATH` for ripping (and `fpcalc` — Debian
-`libchromaprint-tools` — for acoustic dedup). Set `ANTHROPIC_API_KEY` to enable
-the LLM tag pass and `ACOUSTID_API_KEY` (free, from acoustid.org) for content
-dedup — both optional; rips work without them. `LLM_CLEANING=0` / `ART_LOOKUP=0`
-/ `ACOUSTID_DEDUP=0` turn off each pass. There's no login in standalone mode
+`ffmpeg` must be on your `PATH` for ripping, and `fpcalc` (Debian
+`libchromaprint-tools`) for the acoustic dedup. Set
+`ANTHROPIC_API_KEY` to enable the LLM tag pass (optional — rips work without it).
+`LLM_CLEANING=0` / `ART_LOOKUP=0` / `FINGERPRINT_DEDUP=0` turn off each pass.
+There's no login in standalone mode
 — a single local user is attached automatically. To try it without your own
 music, `uv run python scripts/generate_samples.py` writes tagged demo tracks
 into `./music`.
@@ -78,7 +79,7 @@ cd ../dashboard && uv run python scripts/sync_household_users.py
 uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
 uv run flask --app app:create_app retag [--write] [--llm] [--pending]  # clean (and enrich) tags
 uv run flask --app app:create_app art [--write] [--all]     # fetch cover art (MusicBrainz)
-uv run flask --app app:create_app fingerprint [--all]       # backfill AcoustID dedup ids
+uv run flask --app app:create_app fingerprint [--all]       # backfill acoustic fingerprints
 ```
 
 `scan` is incremental (mtime/size cache); `--full` re-reads every file, `--prune`
@@ -102,7 +103,7 @@ app.py          create_app: db, login, blueprints, static cache-busting
 cleaning.py     deterministic title/artist cleanup for rips
 llm_cleaning.py Claude (Haiku) tag correction + album fill; sync per-rip, Batches for retag
 art.py          MusicBrainz + Cover Art Archive lookup
-fingerprint.py  Chromaprint/AcoustID acoustic fingerprint for content dedup
+fingerprint.py  Chromaprint acoustic fingerprint + local match for content dedup
 scan.py         flask scan / flask retag — mutagen tags + Pillow thumbnails
 downloader.py   yt-dlp worker, playlist expansion, tag cleanup
 routes/         index · stream · library (shelves/tapes/albums/artists) · downloads · auth

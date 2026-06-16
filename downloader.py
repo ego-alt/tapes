@@ -130,6 +130,20 @@ def _link_playlist(job, track):
     db.session.add(PlaylistTrack(playlist_id=job.playlist_id, track_id=track.id, position=pos))
 
 
+def _find_dup(duration: int, fp: list):
+    """A library track whose stored fingerprint matches `fp`, or None. Pre-filtered
+    by duration so we only fuzzy-compare similar-length tracks."""
+    import fingerprint as fpr
+    q = Track.query.filter(Track.fingerprint.isnot(None))
+    if duration:
+        q = q.filter(Track.duration_s.between(duration - 15, duration + 15))
+    for t in q:
+        other = fpr.decode(t.fingerprint)
+        if other and fpr.similarity(fp, other) >= fpr.DUP_THRESHOLD:
+            return t
+    return None
+
+
 def _process(app, job_id: int):
     job = db.session.get(DownloadJob, job_id)
     if not job or job.status == "done":
@@ -200,12 +214,13 @@ def _process(app, job_id: int):
 
     # Content dedup: a different URL but the same recording? Fingerprint the audio
     # and, if we already have it, discard this copy instead of re-tagging it.
-    fpid = None
-    if app.config.get("ACOUSTID_DEDUP", True):
-        from fingerprint import fingerprint_id
-        fpid = fingerprint_id(final_mp3)
-        if fpid:
-            dup = Track.query.filter_by(acoust_id=fpid).first()
+    fp = None
+    if app.config.get("FINGERPRINT_DEDUP", True):
+        import fingerprint as fpr
+        computed = fpr.compute(final_mp3)
+        if computed:
+            duration, fp = computed
+            dup = _find_dup(duration, fp)
             if dup:
                 _discard(final_mp3)
                 _link_playlist(job, dup)
@@ -226,8 +241,9 @@ def _process(app, job_id: int):
     track = Track.query.filter_by(file_path=rel).first()
     if track:
         track.source_url = source.get("url") or job.url
-        if fpid:
-            track.acoust_id = fpid
+        if fp:
+            import fingerprint as fpr
+            track.fingerprint = fpr.encode(fp)
         if llm_ok is not None:
             track.needs_llm = not llm_ok  # flag misses for `retag --llm --pending`
     job.track_id = track.id if track else None

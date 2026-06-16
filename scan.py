@@ -318,25 +318,25 @@ def register_cli(app):
 
     @app.cli.command("fingerprint")
     @click.option("--all", "do_all", is_flag=True,
-                  help="Re-fingerprint every track, not just those missing an acoust_id.")
+                  help="Re-fingerprint every track, not just those missing one.")
     def fingerprint(do_all):
-        """Backfill AcoustID fingerprints so existing tracks dedupe against new rips.
+        """Backfill acoustic fingerprints so existing tracks dedupe against new rips.
 
-        Needs `fpcalc` + ACOUSTID_API_KEY; throttled to ~3 lookups/sec. Stores the
-        AcoustID id on each track (the same key the rip-time content dedup uses).
+        Needs the `fpcalc` binary (no API key). Stores each track's Chromaprint
+        fingerprint — the same data the rip-time content dedup compares against.
         """
-        from fingerprint import fingerprint_id
+        import fingerprint as fpr
 
         music_dir = pathlib.Path(app.config["MUSIC_DIR"])
         tracks = Track.query.order_by(Track.artist, Track.title).all()
         done = 0
         for t in tracks:
-            if t.acoust_id and not do_all:
+            if t.fingerprint and not do_all:
                 continue
-            fpid = fingerprint_id(str(music_dir / t.file_path))
-            click.echo(f"[{'ID' if fpid else ' -'}] {t.artist or '?'} — {t.title}")
-            if fpid:
-                t.acoust_id = fpid
+            computed = fpr.compute(str(music_dir / t.file_path))
+            click.echo(f"[{'fp' if computed else ' -'}] {t.artist or '?'} — {t.title}")
+            if computed:
+                t.fingerprint = fpr.encode(computed[1])
                 done += 1
         db.session.commit()
         click.echo(f"\nfingerprinted {done} track(s)")

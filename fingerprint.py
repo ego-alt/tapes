@@ -1,47 +1,33 @@
-"""Acoustic-fingerprint identity via Chromaprint (`fpcalc`) + AcoustID.
+"""Acoustic fingerprinting via Chromaprint (`fpcalc`).
 
-`fpcalc` computes a fingerprint from the audio itself, and AcoustID maps it to a
-cluster id that is stable across re-encodes and different uploads of the *same
-recording* — while a live take, remix, or remaster fingerprints differently, so
-distinct versions stay distinct. That cluster id is the content-dedup key.
+`fpcalc` turns audio into a fingerprint: a list of 32-bit sub-fingerprints, one
+per ~0.12s frame, derived from the music's harmonic content. It's robust to
+re-encoding / bitrate / loudness, but differs for a different performance (live,
+remix, cover). We store it per track and compare new rips against the library
+ourselves — `similarity()` slides one fingerprint over the other and counts
+frames that match within a few bits. Requires the `fpcalc` binary
+(Debian: libchromaprint-tools).
 
-Needs the `fpcalc` binary (Debian: libchromaprint-tools) and a free
-ACOUSTID_API_KEY. Returns None on anything missing/failing so the caller just
-rips normally.
+Different songs essentially never match (random 32-bit frames agreeing within 3
+bits is a ~1e-6 event), so the match fraction is near 0 for unrelated audio and
+high for the same recording — a wide, safe margin around DUP_THRESHOLD.
 """
-import json
 import logging
-import os
 import subprocess
-import threading
-import time
-import urllib.parse
-import urllib.request
 
 log = logging.getLogger("tapes.fpr")
 
-_LOOKUP = "https://api.acoustid.org/v2/lookup"
-_MIN_SCORE = 0.5          # AcoustID match confidence (0–1)
-_MIN_INTERVAL = 0.34      # AcoustID allows ~3 lookups/sec
-
-_lock = threading.Lock()
-_last_call = 0.0
+_BIT_THRESH = 3       # a frame "matches" if <= this many of its 32 bits differ
+_MAX_OFFSET = 80      # alignment search window in frames (~0.12s each, so ~10s)
+_MIN_OVERLAP = 50     # need at least this many overlapping frames to judge
+DUP_THRESHOLD = 0.30  # min matching-frame fraction to call it the same recording
 
 
-def _throttle():
-    global _last_call
-    with _lock:
-        wait = _MIN_INTERVAL - (time.monotonic() - _last_call)
-        if wait > 0:
-            time.sleep(wait)
-        _last_call = time.monotonic()
-
-
-def _fpcalc(path: str):
-    """Return (duration, fingerprint) from fpcalc, or None."""
+def compute(path: str):
+    """Return (duration_seconds, [uint32, ...]) for the file, or None on failure."""
     try:
         out = subprocess.run(
-            ["fpcalc", "-json", path], capture_output=True, text=True, timeout=30
+            ["fpcalc", "-raw", path], capture_output=True, text=True, timeout=30
         )
     except FileNotFoundError:
         log.warning("fpcalc not installed — acoustic dedup disabled")
@@ -52,43 +38,44 @@ def _fpcalc(path: str):
     if out.returncode != 0:
         log.warning("fpcalc error: %s", (out.stderr or "").strip()[:200])
         return None
+
+    duration, fp = 0, None
+    for line in out.stdout.splitlines():
+        if line.startswith("DURATION="):
+            try:
+                duration = int(line[len("DURATION="):])
+            except ValueError:
+                pass
+        elif line.startswith("FINGERPRINT="):
+            try:
+                fp = [int(x) for x in line[len("FINGERPRINT="):].split(",") if x]
+            except ValueError:
+                fp = None
+    return (duration, fp) if fp else None
+
+
+def encode(fp: list) -> str:
+    """Serialize a fingerprint for DB storage."""
+    return ",".join(map(str, fp))
+
+
+def decode(s: str):
+    if not s:
+        return None
     try:
-        data = json.loads(out.stdout)
-        return int(data["duration"]), data["fingerprint"]
-    except (ValueError, KeyError):
+        return [int(x) for x in s.split(",") if x]
+    except ValueError:
         return None
 
 
-def fingerprint_id(path: str) -> str | None:
-    """The AcoustID cluster id for this file, or None (no key / no match / failure)."""
-    key = os.getenv("ACOUSTID_API_KEY")
-    if not key:
-        return None
-    fp = _fpcalc(path)
-    if fp is None:
-        return None
-    duration, fingerprint = fp
-
-    body = urllib.parse.urlencode({
-        "client": key,
-        "duration": duration,
-        "fingerprint": fingerprint,
-        "meta": "recordingids",
-    }).encode()
-    try:
-        _throttle()
-        req = urllib.request.Request(
-            _LOOKUP, data=body, headers={"User-Agent": "tapes/0.1"}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-    except Exception as e:  # noqa: BLE001
-        log.warning("AcoustID lookup failed (%s)", e)
-        return None
-
-    if data.get("status") != "ok":
-        return None
-    results = data.get("results") or []
-    if results and (results[0].get("score") or 0) >= _MIN_SCORE:
-        return results[0].get("id")
-    return None
+def similarity(a: list, b: list) -> float:
+    """Best-offset fraction of frames that match within _BIT_THRESH bits (0–1)."""
+    best = 0.0
+    for off in range(-_MAX_OFFSET, _MAX_OFFSET + 1):
+        aa, bb = (a[off:], b) if off >= 0 else (a, b[-off:])
+        n = min(len(aa), len(bb))
+        if n < _MIN_OVERLAP:
+            continue
+        matches = sum(1 for x, y in zip(aa, bb) if (x ^ y).bit_count() <= _BIT_THRESH)
+        best = max(best, matches / n)
+    return best
