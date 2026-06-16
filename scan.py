@@ -280,10 +280,12 @@ def register_cli(app):
                 continue
             img = fetch_cover(t.artist, t.album)
             click.echo(f"[{'FOUND' if img else '  -  '}] {t.artist} — {t.album} :: {t.title}")
-            if img and write:
+            if not img:
+                continue
+            found += 1
+            if write:
                 try:
                     embed_cover(str(music_dir / t.file_path), img)
-                    found += 1
                 except Exception as e:  # noqa: BLE001
                     click.echo(f"    ! embed failed: {e}")
         click.echo(
