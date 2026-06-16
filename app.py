@@ -83,6 +83,7 @@ def create_app(config=None):
         for stmt in (
             "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
+            "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
         ):
             try:
                 db.session.execute(db.text(stmt))

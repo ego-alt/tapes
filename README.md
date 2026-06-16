@@ -72,7 +72,7 @@ cd ../dashboard && uv run python scripts/sync_household_users.py
 
 ```sh
 uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
-uv run flask --app app:create_app retag [--write] [--llm]   # clean (and enrich) tags
+uv run flask --app app:create_app retag [--write] [--llm] [--pending]  # clean (and enrich) tags
 uv run flask --app app:create_app art [--write] [--all]     # fetch cover art (MusicBrainz)
 ```
 
@@ -85,7 +85,10 @@ cleanup in place and rescans. `--llm` routes the (already deterministically
 cleaned) tags through Claude via the **Message Batches API** to correct
 title/artist and fill in a blank album — needs `ANTHROPIC_API_KEY`, costs ~half
 the standard rate, and takes up to ~an hour for a large library. Enrichment only
-fills an empty album; it never overwrites existing tags.
+fills an empty album; it never overwrites existing tags. If the LLM pass is
+skipped on a rip (no key / API error) the track is flagged `needs_llm`;
+`retag --llm --pending` sweeps up just those misses in one batch and clears the
+flag — handy to schedule, or to run after topping up credit.
 
 ## Layout
 

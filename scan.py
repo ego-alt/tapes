@@ -169,19 +169,29 @@ def register_cli(app):
     @click.option("--write", is_flag=True, help="Apply changes (default: dry run / preview).")
     @click.option("--llm", is_flag=True,
                   help="Use Claude (Batches API) to correct + enrich tags, not just deterministic cleanup.")
-    def retag(write, llm):
+    @click.option("--pending", is_flag=True,
+                  help="Only tracks flagged needs_llm (rips whose LLM pass was missed). "
+                       "The flag is cleared once the LLM call goes through.")
+    def retag(write, llm, pending):
         """Clean title/artist tags in place (and, with --llm, fill a blank album), then rescan."""
         from mutagen.easyid3 import EasyID3
 
         from cleaning import clean_meta
 
         music_dir = pathlib.Path(app.config["MUSIC_DIR"])
-        paths = sorted(music_dir.rglob("*.mp3"))
+        track_by_path = {t.file_path: t for t in Track.query.all()}
+        if pending:
+            targets = sorted(music_dir / t.file_path
+                             for t in track_by_path.values() if t.needs_llm)
+            click.echo(f"{len(targets)} track(s) flagged for LLM retry")
+            if not llm:
+                click.echo("note: --pending without --llm only re-runs deterministic cleanup")
+        else:
+            targets = sorted(music_dir.rglob("*.mp3"))
 
         # Read tags + run the deterministic pass for every file up front.
-        # entries: path -> {audio, title, artist, album, dt_title, dt_artist}
         entries = []
-        for p in paths:
+        for p in targets:
             try:
                 audio = EasyID3(str(p))
             except Exception:
@@ -193,6 +203,7 @@ def register_cli(app):
             entries.append({
                 "path": p, "audio": audio, "title": title, "artist": artist,
                 "album": album, "dt_title": dt_title, "dt_artist": dt_artist,
+                "track": track_by_path.get(str(p.relative_to(music_dir))),
             })
 
         # With --llm, send the (deterministically-cleaned) tags through Claude in one batch.
@@ -217,12 +228,17 @@ def register_cli(app):
                 click.echo("! no LLM results (key unset, or the batch failed — check the log) "
                            "— falling back to deterministic")
 
-        changed = 0
+        changed = cleared = 0
         for i, e in enumerate(entries):
             res = corrections.get(str(i))
             confident = bool(res) and res["confidence"] in ("high", "medium")
             new_title = (res["title"] if confident else None) or e["dt_title"]
             new_artist = (res["artist"] if confident else None) or e["dt_artist"]
+
+            # The LLM call went through this time → drop the retry flag.
+            if write and res is not None and e["track"] is not None and e["track"].needs_llm:
+                e["track"].needs_llm = False
+                cleared += 1
 
             diffs, writes = [], []
             if new_title and new_title != e["title"]:
@@ -250,6 +266,9 @@ def register_cli(app):
                 except Exception as ex:  # noqa: BLE001
                     click.echo(f"    ! save failed: {ex}")
 
+        if write and cleared:
+            db.session.commit()
+            click.echo(f"cleared needs_llm on {cleared} track(s)")
         click.echo(
             f"\n{changed} file(s) "
             + ("updated" if write else "would change — re-run with --write to apply")

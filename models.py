@@ -27,6 +27,9 @@ class Track(db.Model):
     # Original source (e.g. the YouTube URL the track was ripped from); NULL for
     # files added outside the ripper.
     source_url = db.Column(db.String)
+    # Set when the automatic LLM cleanup didn't run on rip (no key / API failure),
+    # so `retag --llm --pending` can sweep up all the misses later.
+    needs_llm = db.Column(db.Boolean, default=False)
     track_no = db.Column(db.Integer)
     duration_s = db.Column(db.Float)
     bitrate = db.Column(db.Integer)

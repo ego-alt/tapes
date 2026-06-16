@@ -95,27 +95,13 @@ _SYSTEM = (
 )
 
 
-_warned_no_key = False
-
-
 def _client():
-    """Anthropic client, or None when unavailable (→ caller falls back to deterministic).
-
-    Warns once (not per track) when the key or package is missing, so a
-    misconfigured deploy is visible in the log without spamming it.
-    """
-    global _warned_no_key
+    """Anthropic client, or None when unavailable (no key / package → caller falls back)."""
     if not os.getenv("ANTHROPIC_API_KEY"):
-        if not _warned_no_key:
-            log.warning("ANTHROPIC_API_KEY not set — LLM tag cleanup off, using deterministic only")
-            _warned_no_key = True
         return None
     try:
         import anthropic
     except ImportError:
-        if not _warned_no_key:
-            log.warning("anthropic package not installed — LLM tag cleanup off")
-            _warned_no_key = True
         return None
     return anthropic.Anthropic()
 

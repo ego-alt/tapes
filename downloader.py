@@ -137,7 +137,7 @@ def _process(app, job_id: int):
         final_mp3 = str(mp3s[-1])
 
     source = _read_source_meta(final_mp3, job.url)
-    _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
+    llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
     if app.config.get("ART_LOOKUP", True):
         _fetch_art(final_mp3)
     scan_library(music_dir, app.config["COVER_DIR"], full=False)
@@ -146,6 +146,8 @@ def _process(app, job_id: int):
     track = Track.query.filter_by(file_path=rel).first()
     if track:
         track.source_url = source.get("url") or job.url
+        if llm_ok is not None:
+            track.needs_llm = not llm_ok  # flag misses for `retag --llm --pending`
     job.track_id = track.id if track else None
     job.progress = 100
     job.status = "done"
@@ -210,6 +212,9 @@ def _fetch_art(path: str):
 
 
 def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
+    """Returns True/False when the LLM pass was attempted (succeeded/failed), or
+    None when it wasn't — so the caller can flag the track for a later retry."""
+    llm_ok = None
     try:
         from mutagen.easyid3 import EasyID3
         audio = EasyID3(path)
@@ -236,6 +241,7 @@ def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
                     if source.get(k):
                         meta[k] = source[k]
             result = correct_track(meta)
+            llm_ok = result is not None
             if result and result["confidence"] in ("high", "medium"):
                 new_title = result["title"] or new_title
                 new_artist = result["artist"] or new_artist
@@ -254,5 +260,6 @@ def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
             changed = True
         if changed:
             audio.save()
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
+    return llm_ok
