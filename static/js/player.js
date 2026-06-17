@@ -92,7 +92,12 @@
     titleEl.textContent = name;
     titleEl.contentEditable = "false";
     titleEl.classList.toggle("editable", kind === "user");
-    titleEl.onclick = kind === "user" ? () => startTitleEdit(key) : null;
+    titleEl.onclick = kind === "user" ? () => startTitleEdit((name) =>
+      jsend(`api/playlists/${key}`, "PATCH", { name }).then(() => {
+        if (currentTape) currentTape.name = name;
+        loadShelf();
+        return name;
+      })) : null;
     $("tapeDelBtn").hidden = kind !== "user";
     $("search").value = "";
     $("backBtn").textContent = "‹ Tapes";
@@ -161,8 +166,19 @@
     const titleEl = $("tapeTitle");
     titleEl.textContent = title;
     titleEl.contentEditable = "false";
-    titleEl.classList.remove("editable");
-    titleEl.onclick = null;
+    const renamable = parent === "artists";
+    titleEl.classList.toggle("editable", renamable);
+    titleEl.onclick = renamable ? () => startTitleEdit((name, orig) =>
+      jsend("api/artists", "PATCH", { old: orig, new: name })
+        .then((r) => { if (!r.ok) throw new Error("rename failed"); return r.json(); })
+        .then(async (r) => {
+          // Refresh the (now-hidden) Artists list so going back reflects the
+          // rename/merge, then reload this artist's tracks under the final name.
+          browseRows = await jget("api/artists");
+          renderBrowse(browseRows);
+          openArtistTracks(r.name);
+          return r.name;
+        })) : null;
     $("tapeDelBtn").hidden = true;
     $("sortBar").hidden = true;
     $("backBtn").textContent = backLabel;
@@ -171,7 +187,10 @@
     showView("tracks");
   }
 
-  function startTitleEdit(key) {
+  // Inline-edit the track-list header. `save(name, orig)` does the persistence and
+  // resolves to the final name to display (which may differ from what was typed —
+  // an artist rename can merge onto an existing spelling). On reject we revert.
+  function startTitleEdit(save) {
     const el = $("tapeTitle");
     if (el.contentEditable === "true") return;
     const orig = el.textContent;
@@ -179,17 +198,16 @@
     el.focus();
     document.execCommand("selectAll", false, null);
 
-    function commit(save) {
+    function commit(doSave) {
       el.onblur = null;
       el.onkeydown = null;
-      const name = save ? el.innerText.trim() : orig;
+      const name = doSave ? el.innerText.trim() : orig;
       el.contentEditable = "false";
       el.textContent = name || orig;
-      if (save && name && name !== orig) {
-        jsend(`api/playlists/${key}`, "PATCH", { name }).then(() => {
-          if (currentTape) currentTape.name = name;
-          loadShelf();
-        }).catch(() => { el.textContent = orig; });
+      if (doSave && name && name !== orig) {
+        Promise.resolve(save(name, orig))
+          .then((finalName) => { el.textContent = finalName || name; })
+          .catch(() => { el.textContent = orig; });
       }
     }
 
@@ -680,7 +698,7 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") upnext.classList.remove("expanded");
-    if (e.target.tagName === "INPUT") return;
+    if (e.target.tagName === "INPUT" || e.target.isContentEditable) return;
     if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     if (e.key === "ArrowRight" && e.shiftKey) next(true);
     if (e.key === "ArrowLeft" && e.shiftKey) prev();

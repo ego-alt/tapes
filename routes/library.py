@@ -1,6 +1,7 @@
 import json
+import pathlib
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
@@ -208,6 +209,45 @@ def artists():
             .filter(Track.artist.isnot(None), Track.artist != "")
             .group_by(Track.artist).order_by(Track.artist).all())
     return jsonify([{"name": a, "count": c} for a, c in rows])
+
+
+@library_blueprint.route("/api/artists", methods=["PATCH"])
+@login_required
+def rename_artist():
+    """Rename one artist across the whole library: rewrite every matching track's
+    file tag (so a later `scan --full` can't revert it) and DB row. If the new
+    name normalizes to an artist that already exists, it merges onto that
+    spelling — the manual canonical override for a bad first-seen name."""
+    body = request.json or {}
+    old = (body.get("old") or "").strip()
+    new = (body.get("new") or "").strip()
+    if not old or not new:
+        abort(400, "old and new required")
+    tracks = Track.query.filter(Track.artist == old).all()
+    if not tracks:
+        abort(404, "unknown artist")
+
+    # Snap onto an existing spelling (excluding the one we're renaming away from).
+    from cleaning import reconcile_artist
+    from models import distinct_artists
+    new = reconcile_artist(new, [a for a in distinct_artists() if a != old])
+    if new == old:
+        return jsonify({"name": old, "updated": 0})
+
+    from mutagen.easyid3 import EasyID3
+    music_dir = pathlib.Path(current_app.config["MUSIC_DIR"])
+    written = 0
+    for t in tracks:
+        try:
+            audio = EasyID3(str(music_dir / t.file_path))
+            audio["artist"] = new
+            audio.save()
+            written += 1
+        except Exception:  # noqa: BLE001 — DB stays the source of truth either way
+            pass
+        t.artist = new
+    db.session.commit()
+    return jsonify({"name": new, "updated": len(tracks), "files_written": written})
 
 
 @library_blueprint.route("/api/albums/tracks")
