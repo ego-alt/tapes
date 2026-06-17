@@ -22,11 +22,11 @@ class Track(db.Model):
     file_path = db.Column(db.String, unique=True, nullable=False)
     file_hash = db.Column(db.String, index=True)
     title = db.Column(db.String, nullable=False)
-    artist = db.Column(db.String)
-    album = db.Column(db.String)
+    artist = db.Column(db.String, index=True)
+    album = db.Column(db.String, index=True)
     # Original source (e.g. the YouTube URL the track was ripped from); NULL for
-    # files added outside the ripper.
-    source_url = db.Column(db.String)
+    # files added outside the ripper. Indexed for the re-rip exact-match dedup.
+    source_url = db.Column(db.String, index=True)
     # Set when the automatic LLM cleanup didn't run on rip (no key / API failure),
     # so `retag --llm --pending` can sweep up all the misses later.
     needs_llm = db.Column(db.Boolean, default=False)

@@ -87,6 +87,11 @@ def create_app(config=None):
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
             "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",
+            # Indexes for shelf grouping (artist/album) and the re-rip dedup
+            # lookup — create_all() won't add these to a pre-existing table.
+            "CREATE INDEX IF NOT EXISTS ix_tracks_artist ON tracks (artist)",
+            "CREATE INDEX IF NOT EXISTS ix_tracks_album ON tracks (album)",
+            "CREATE INDEX IF NOT EXISTS ix_tracks_source_url ON tracks (source_url)",
         ):
             try:
                 db.session.execute(db.text(stmt))
