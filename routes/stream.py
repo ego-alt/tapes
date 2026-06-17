@@ -34,5 +34,9 @@ def cover(track_id):
     if track.has_cover and track.file_hash:
         p = pathlib.Path(current_app.config["COVER_DIR"]) / f"{track.file_hash}.jpg"
         if p.exists():
-            return send_file(p, mimetype="image/jpeg")
+            resp = send_file(p, mimetype="image/jpeg")
+            # Thumbnails are stable per file; cache for a week. The ETag send_file
+            # sets still lets the browser revalidate cheaply if it does change.
+            resp.headers["Cache-Control"] = "public, max-age=604800"
+            return resp
     abort(404)
