@@ -58,7 +58,6 @@
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
   };
 
-  let allMap = {};        // id -> track
   let shelf = [];         // tapes
   let view = [];          // tracks currently shown (browsing)
   let queue = [];         // tracks being played (play order)
@@ -528,8 +527,13 @@
 
   // ---------- favorites ----------
   async function toggleFav(t) {
-    const { fav } = await jsend(`api/favorites/${t.id}`, "POST").then((r) => r.json());
-    [allMap[t.id], ...view, ...queue].forEach((x) => { if (x && x.id === t.id) x.fav = fav; });
+    let fav;
+    try {
+      ({ fav } = await jsend(`api/favorites/${t.id}`, "POST").then((r) => r.json()));
+    } catch (e) {
+      console.error(e); toast("Couldn't update favorite."); return;
+    }
+    [...view, ...queue].forEach((x) => { if (x && x.id === t.id) x.fav = fav; });
     applySearch();
     const cur = currentTrack();
     if (cur && cur.id === t.id) { favBtn.innerHTML = fav ? ICONS.heartFill : ICONS.heart; favBtn.classList.toggle("on", fav); }
@@ -720,8 +724,6 @@
     });
   }
   async function onDownloadDone() {
-    const allArr = await jget("api/playlists/all/tracks");
-    allArr.forEach((t) => (allMap[t.id] = t));
     await loadShelf();
     if (!$("tracksView").hidden) {
       const s = shelf.find((x) => x.name === $("tapeTitle").textContent);
@@ -739,7 +741,7 @@
   async function restorePlaystate() {
     const ps = await jget("api/playstate");
     if (!ps.queue || !ps.queue.length) return;
-    queue = ps.queue.map((id) => allMap[id]).filter(Boolean);
+    queue = ps.queue;   // already hydrated server-side
     baseQueue = queue.slice();
     qi = Math.min(ps.index || 0, queue.length - 1);
     if (qi < 0 || !queue[qi]) return;
@@ -838,8 +840,6 @@
   });
   (async () => {
     try {
-      const all = await jget("api/playlists/all/tracks");
-      all.forEach((t) => (allMap[t.id] = t));
       await loadShelf();
       await restorePlaystate();
       updateUpNext();

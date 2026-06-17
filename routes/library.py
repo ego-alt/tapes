@@ -23,6 +23,16 @@ def _serialize(tracks):
     return [t.to_dict(fav=t.id in favs) for t in tracks]
 
 
+def _tracks_by_ids(ids):
+    """Serialize the given track ids, preserving order and dropping any that no
+    longer exist. One query — lets the client hydrate a list of ids without us
+    shipping the whole catalog."""
+    if not ids:
+        return []
+    by_id = {t.id: t for t in Track.query.filter(Track.id.in_(ids)).all()}
+    return _serialize([by_id[i] for i in ids if i in by_id])
+
+
 # ---- shelf ----
 
 @library_blueprint.route("/api/playlists")
@@ -268,6 +278,15 @@ def artist_tracks():
     return jsonify(_serialize(tracks))
 
 
+@library_blueprint.route("/api/tracks/by-ids", methods=["POST"])
+@login_required
+def tracks_by_ids():
+    """Hydrate a list of track ids into full track objects (for playstate/queue
+    restore) without fetching the entire library."""
+    ids = (request.get_json(silent=True) or {}).get("ids") or []
+    return jsonify(_tracks_by_ids([i for i in ids if isinstance(i, int)]))
+
+
 # ---- favorites / plays / playstate ----
 
 @library_blueprint.route("/api/favorites/<int:track_id>", methods=["POST"])
@@ -302,7 +321,7 @@ def playstate():
         if not ps:
             return jsonify({"queue": [], "index": 0, "position": 0})
         return jsonify({
-            "queue": json.loads(ps.queue_json or "[]"),
+            "queue": _tracks_by_ids(json.loads(ps.queue_json or "[]")),
             "index": ps.index or 0,
             "position": ps.position_s or 0,
         })
