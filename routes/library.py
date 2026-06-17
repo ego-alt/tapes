@@ -1,5 +1,7 @@
 import json
+import logging
 import pathlib
+import threading
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
@@ -8,6 +10,25 @@ from sqlalchemy import or_
 from models import Favorite, Play, Playlist, PlaylistTrack, PlayState, Track, db
 
 library_blueprint = Blueprint("library", __name__)
+log = logging.getLogger("tapes.library")
+
+
+def _write_artist_tags(music_dir, paths, new):
+    """Rewrite the ID3 artist tag across many files. Runs off the request thread
+    (file I/O only, no DB) so a multi-hundred-track rename doesn't block the HTTP
+    response — the DB row is already updated and authoritative."""
+    from mutagen.easyid3 import EasyID3
+    base = pathlib.Path(music_dir)
+    ok = 0
+    for rel in paths:
+        try:
+            audio = EasyID3(str(base / rel))
+            audio["artist"] = new
+            audio.save()
+            ok += 1
+        except Exception as e:  # noqa: BLE001 — DB stays the source of truth
+            log.warning("artist retag failed for %s: %s", rel, e)
+    log.info("artist rename: wrote tag to %d/%d files", ok, len(paths))
 
 
 def _uid():
@@ -244,20 +265,18 @@ def rename_artist():
     if new == old:
         return jsonify({"name": old, "updated": 0})
 
-    from mutagen.easyid3 import EasyID3
-    music_dir = pathlib.Path(current_app.config["MUSIC_DIR"])
-    written = 0
+    paths = [t.file_path for t in tracks]
     for t in tracks:
-        try:
-            audio = EasyID3(str(music_dir / t.file_path))
-            audio["artist"] = new
-            audio.save()
-            written += 1
-        except Exception:  # noqa: BLE001 — DB stays the source of truth either way
-            pass
         t.artist = new
     db.session.commit()
-    return jsonify({"name": new, "updated": len(tracks), "files_written": written})
+    # Defer the (potentially hundreds of) file-tag writes so the request returns
+    # promptly; the rescan reads tags, but the DB is already canonical here.
+    threading.Thread(
+        target=_write_artist_tags,
+        args=(current_app.config["MUSIC_DIR"], paths, new),
+        daemon=True,
+    ).start()
+    return jsonify({"name": new, "updated": len(paths)})
 
 
 @library_blueprint.route("/api/albums/tracks")
