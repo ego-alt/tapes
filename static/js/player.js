@@ -12,10 +12,28 @@
   const fmt = (s) => (!s || !isFinite(s)) ? "0:00"
     : Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 
-  const jget = (u) => fetch(u).then((r) => r.json());
-  const jsend = (u, m, b) => fetch(u, {
-    method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : null,
-  });
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3200);
+  }
+  // Both throw on a non-2xx or network failure so callers (and the global
+  // unhandledrejection handler) can surface it instead of silently dying.
+  async function jget(u) {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`GET ${u} → ${r.status}`);
+    return r.json();
+  }
+  async function jsend(u, m, b) {
+    const r = await fetch(u, {
+      method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : null,
+    });
+    if (!r.ok) throw new Error(`${m} ${u} → ${r.status}`);
+    return r;
+  }
 
   // ---------- icons (inline SVG, currentColor) ----------
   // Replaces the mismatched unicode glyphs. Stroke icons by default; `filled`
@@ -37,6 +55,7 @@
     repeatOne: svgIcon('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/>'),
     list: svgIcon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
     chevronUp: svgIcon('<path d="m6 15 6-6 6 6"/>'),
+    moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
   };
 
   let allMap = {};        // id -> track
@@ -556,9 +575,99 @@
     if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
     menu.style.top = top + "px";
     menu.style.left = left + "px";
+    // Grow from the corner that's pinned to the click (accounting for any flip).
+    menu.style.transformOrigin = `${top < e.clientY ? "bottom" : "top"} ${left < e.clientX ? "right" : "left"}`;
   }
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+
+  // ---------- sleep timer ----------
+  // Client-only: arm a duration (or "end of track"), fade out and pause when it
+  // fires, restore volume so the next manual play is normal. In-memory only — a
+  // timer surviving a page reload would be surprising, not helpful.
+  const sleepBtn = $("sleepBtn"), sleepMenu = $("sleepMenu");
+  let sleepTimeoutId = null, sleepTickId = null, sleepDeadline = 0, sleepEndOfTrack = false;
+
+  function renderSleepBtn() {
+    const active = sleepTimeoutId !== null || sleepEndOfTrack;
+    sleepBtn.classList.toggle("active", active);
+    sleepBtn.setAttribute("aria-pressed", String(active));
+    if (sleepTimeoutId !== null) {
+      const left = Math.max(0, Math.round((sleepDeadline - Date.now()) / 1000));
+      sleepBtn.innerHTML = `<span class="sleep-count">${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}</span>`;
+      sleepBtn.title = "Sleep timer running — tap to change";
+    } else {
+      sleepBtn.innerHTML = ICONS.moon;
+      sleepBtn.title = sleepEndOfTrack ? "Sleep: stop at end of track" : "Sleep timer";
+    }
+  }
+
+  function clearSleep() {
+    if (sleepTimeoutId !== null) clearTimeout(sleepTimeoutId);
+    if (sleepTickId !== null) clearInterval(sleepTickId);
+    sleepTimeoutId = sleepTickId = null;
+    sleepEndOfTrack = false;
+    renderSleepBtn();
+  }
+
+  function sleepFire() {
+    clearSleep();
+    const startVol = audio.volume, steps = 40, span = 8000;
+    let i = 0;
+    const fade = setInterval(() => {
+      audio.volume = Math.max(0, startVol * (1 - ++i / steps));
+      if (i >= steps) { clearInterval(fade); audio.pause(); audio.volume = startVol; }
+    }, span / steps);
+  }
+
+  function setSleep(val) {
+    clearSleep();
+    if (val === "track") {
+      sleepEndOfTrack = true;
+    } else if (val) {
+      sleepDeadline = Date.now() + val * 60000;
+      sleepTimeoutId = setTimeout(sleepFire, val * 60000);
+      sleepTickId = setInterval(renderSleepBtn, 1000);
+    }
+    renderSleepBtn();
+  }
+
+  function openSleepMenu() {
+    sleepMenu.innerHTML = "";
+    [["15 min", 15], ["30 min", 30], ["45 min", 45], ["1 hour", 60], ["End of track", "track"]]
+      .forEach(([label, val]) => {
+        const item = document.createElement("div");
+        item.className = "menu-item";
+        item.textContent = label;
+        item.addEventListener("click", () => { setSleep(val); sleepMenu.hidden = true; });
+        sleepMenu.appendChild(item);
+      });
+    if (sleepTimeoutId !== null || sleepEndOfTrack) {
+      const sep = document.createElement("div"); sep.className = "menu-sep"; sleepMenu.appendChild(sep);
+      const off = document.createElement("div");
+      off.className = "menu-item";
+      off.textContent = "Turn off";
+      off.addEventListener("click", () => { clearSleep(); sleepMenu.hidden = true; });
+      sleepMenu.appendChild(off);
+    }
+    sleepMenu.hidden = false;   // show first so we can measure, then place above the button
+    const pad = 8, r = sleepBtn.getBoundingClientRect();
+    const mh = sleepMenu.offsetHeight, mw = sleepMenu.offsetWidth;
+    let top = r.top - mh - 6;
+    if (top < pad) top = r.bottom + 6;   // flip below if there's no room above
+    let left = Math.min(Math.max(pad, r.left + r.width / 2 - mw / 2), window.innerWidth - mw - pad);
+    sleepMenu.style.top = top + "px";
+    sleepMenu.style.left = left + "px";
+    sleepMenu.style.transformOrigin = (top < r.top ? "bottom" : "top") + " center";  // grow toward the button
+  }
+
+  sleepBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    sleepMenu.hidden ? openSleepMenu() : (sleepMenu.hidden = true);
+  });
+  document.addEventListener("click", (e) => {
+    if (!sleepMenu.hidden && !sleepMenu.contains(e.target)) sleepMenu.hidden = true;
+  });
 
   // ---------- downloads ----------
   let dlEvt = null, dlPrev = {};
@@ -684,7 +793,10 @@
     if (t && t.id !== lastPlayed) { lastPlayed = t.id; jsend("api/plays", "POST", { track_id: t.id }); }
   });
   audio.addEventListener("pause", () => { cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; savePlaystate(); });
-  audio.addEventListener("ended", () => next(false));
+  audio.addEventListener("ended", () => {
+    if (sleepEndOfTrack) { clearSleep(); audio.pause(); return; }  // sleep: stop, don't advance
+    next(false);
+  });
   audio.addEventListener("loadedmetadata", () => { durTime.textContent = fmt(audio.duration); });
   audio.addEventListener("timeupdate", () => {
     curTime.textContent = fmt(audio.currentTime);
@@ -710,6 +822,7 @@
   playBtn.innerHTML = ICONS.play;
   $("nextBtn").innerHTML = ICONS.next;
   favBtn.innerHTML = ICONS.heart;
+  renderSleepBtn();
   $("shuffleBtn").innerHTML = ICONS.shuffle;
   $("newTapeBtn").innerHTML = ICONS.plus;
   $("upnextIco").innerHTML = ICONS.list;
@@ -719,11 +832,20 @@
   updateRepeatBtn();
   enableReorder($("trackList"), onTrackReorder);
   enableReorder($("queueList"), onQueueReorder);
+  window.addEventListener("unhandledrejection", (e) => {
+    console.error(e.reason);
+    toast("Something went wrong — please try again.");
+  });
   (async () => {
-    const all = await jget("api/playlists/all/tracks");
-    all.forEach((t) => (allMap[t.id] = t));
-    await loadShelf();
-    await restorePlaystate();
-    updateUpNext();
+    try {
+      const all = await jget("api/playlists/all/tracks");
+      all.forEach((t) => (allMap[t.id] = t));
+      await loadShelf();
+      await restorePlaystate();
+      updateUpNext();
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't load your library.");
+    }
   })();
 })();
