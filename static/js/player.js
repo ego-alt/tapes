@@ -71,6 +71,7 @@
   let trackParent = "shelf";  // where tracks-view "back" returns: shelf | albums | artists
   let browseRows = [];        // current album/artist browse list
   let currentBrowse = null;   // "albums" | "artists" | null
+  let navToken = 0;           // bumped per view-open; a slow load bails if superseded
 
   // ---------- shelf ----------
   async function loadShelf() {
@@ -100,12 +101,15 @@
   }
 
   async function openTape(key, name, kind) {
-    currentTape = { key, name, kind };
+    const tok = ++navToken;
     const sortable = key === "all" || key === "singles";
     currentSort = "default";
+    const data = await jget(`api/playlists/${key}/tracks?sort=${currentSort}`);
+    if (tok !== navToken) return;   // a newer view opened while we waited
+    currentTape = { key, name, kind };
+    view = data;
     $("sortSelect").value = "default";
     $("sortBar").hidden = !sortable;
-    view = await jget(`api/playlists/${key}/tracks?sort=${currentSort}`);
     const titleEl = $("tapeTitle");
     titleEl.textContent = name;
     titleEl.contentEditable = "false";
@@ -133,8 +137,11 @@
 
   // ---------- album / artist browse ----------
   async function openBrowse(kind) {
+    const tok = ++navToken;
+    const rows = await jget(kind === "albums" ? "api/albums" : "api/artists");
+    if (tok !== navToken) return;
     currentBrowse = kind;
-    browseRows = await jget(kind === "albums" ? "api/albums" : "api/artists");
+    browseRows = rows;
     $("browseTitle").textContent = kind === "albums" ? "Albums" : "Artists";
     $("browseSearch").value = "";
     renderBrowse(browseRows);
@@ -171,11 +178,17 @@
       (r.name + " " + (r.artist || "")).toLowerCase().includes(q)) : browseRows);
   }
   async function openAlbumTracks(album) {
-    view = await jget(`api/albums/tracks?album=${encodeURIComponent(album)}`);
+    const tok = ++navToken;
+    const data = await jget(`api/albums/tracks?album=${encodeURIComponent(album)}`);
+    if (tok !== navToken) return;
+    view = data;
     openTrackList(album, "albums", "‹ Albums");
   }
   async function openArtistTracks(artist) {
-    view = await jget(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
+    const tok = ++navToken;
+    const data = await jget(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
+    if (tok !== navToken) return;
+    view = data;
     openTrackList(artist, "artists", "‹ Artists");
   }
   function openTrackList(title, parent, backLabel) {
@@ -540,20 +553,32 @@
     loadShelf();
   }
 
-  // ---------- add-to-tape menu ----------
-  const menu = $("plMenu");
-  function menuItem(label, fn) {
+  // ---------- popover menus (add-to-tape, sleep timer) ----------
+  // Measure-then-clamp into the viewport; the caller picks the tentative top/left
+  // and the grow-from corner. Shared by both menus.
+  function placeMenu(el, top, left, origin) {
+    const pad = 8, mw = el.offsetWidth;
+    el.style.top = Math.max(pad, top) + "px";
+    el.style.left = Math.min(Math.max(pad, left), window.innerWidth - mw - pad) + "px";
+    el.style.transformOrigin = origin;
+  }
+  function menuItem(label, fn, close) {
     const item = document.createElement("div");
     item.className = "menu-item";
+    item.setAttribute("role", "menuitem");
+    item.tabIndex = -1;
     item.textContent = label;
-    item.addEventListener("click", () => { fn(); closeMenu(); });
+    item.addEventListener("click", () => { fn(); close(); });
     return item;
   }
+
+  // ---------- add-to-tape menu ----------
+  const menu = $("plMenu");
   function openMenu(e, t) {
     menu.dataset.for = t.id;
     menu.innerHTML = "";
-    menu.appendChild(menuItem("Play next", () => playNext(t)));
-    menu.appendChild(menuItem("Add to queue", () => addToQueue(t)));
+    menu.appendChild(menuItem("Play next", () => playNext(t), closeMenu));
+    menu.appendChild(menuItem("Add to queue", () => addToQueue(t), closeMenu));
     const sep = document.createElement("div");
     sep.className = "menu-sep";
     menu.appendChild(sep);
@@ -568,19 +593,15 @@
     tapes.forEach((s) => menu.appendChild(menuItem(s.name, async () => {
       await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
       loadShelf();
-    })));
+    }, closeMenu)));
 
     menu.hidden = false;   // show first so we can measure it, then place it
-    const pad = 8;
-    const mh = menu.offsetHeight, mw = menu.offsetWidth;
-    let top = e.clientY;
-    if (top + mh > window.innerHeight - pad) top = Math.max(pad, e.clientY - mh);  // flip up
-    let left = e.clientX;
-    if (left + mw > window.innerWidth - pad) left = window.innerWidth - mw - pad;
-    menu.style.top = top + "px";
-    menu.style.left = left + "px";
-    // Grow from the corner that's pinned to the click (accounting for any flip).
-    menu.style.transformOrigin = `${top < e.clientY ? "bottom" : "top"} ${left < e.clientX ? "right" : "left"}`;
+    const pad = 8, mh = menu.offsetHeight;
+    const flipUp = e.clientY + mh > window.innerHeight - pad;
+    const flipLeft = e.clientX + menu.offsetWidth > window.innerWidth - pad;
+    // Grow from the corner pinned to the click (accounting for any flip).
+    placeMenu(menu, flipUp ? e.clientY - mh : e.clientY, e.clientX,
+      `${flipUp ? "bottom" : "top"} ${flipLeft ? "right" : "left"}`);
   }
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
@@ -636,41 +657,29 @@
     renderSleepBtn();
   }
 
+  const closeSleep = () => { sleepMenu.hidden = true; };
   function openSleepMenu() {
     sleepMenu.innerHTML = "";
     [["15 min", 15], ["30 min", 30], ["45 min", 45], ["1 hour", 60], ["End of track", "track"]]
-      .forEach(([label, val]) => {
-        const item = document.createElement("div");
-        item.className = "menu-item";
-        item.textContent = label;
-        item.addEventListener("click", () => { setSleep(val); sleepMenu.hidden = true; });
-        sleepMenu.appendChild(item);
-      });
+      .forEach(([label, val]) => sleepMenu.appendChild(menuItem(label, () => setSleep(val), closeSleep)));
     if (sleepTimeoutId !== null || sleepEndOfTrack) {
       const sep = document.createElement("div"); sep.className = "menu-sep"; sleepMenu.appendChild(sep);
-      const off = document.createElement("div");
-      off.className = "menu-item";
-      off.textContent = "Turn off";
-      off.addEventListener("click", () => { clearSleep(); sleepMenu.hidden = true; });
-      sleepMenu.appendChild(off);
+      sleepMenu.appendChild(menuItem("Turn off", clearSleep, closeSleep));
     }
     sleepMenu.hidden = false;   // show first so we can measure, then place above the button
-    const pad = 8, r = sleepBtn.getBoundingClientRect();
-    const mh = sleepMenu.offsetHeight, mw = sleepMenu.offsetWidth;
-    let top = r.top - mh - 6;
-    if (top < pad) top = r.bottom + 6;   // flip below if there's no room above
-    let left = Math.min(Math.max(pad, r.left + r.width / 2 - mw / 2), window.innerWidth - mw - pad);
-    sleepMenu.style.top = top + "px";
-    sleepMenu.style.left = left + "px";
-    sleepMenu.style.transformOrigin = (top < r.top ? "bottom" : "top") + " center";  // grow toward the button
+    const r = sleepBtn.getBoundingClientRect(), mh = sleepMenu.offsetHeight;
+    let top = r.top - mh - 6, below = false;
+    if (top < 8) { top = r.bottom + 6; below = true; }   // flip below if no room above
+    placeMenu(sleepMenu, top, r.left + r.width / 2 - sleepMenu.offsetWidth / 2,
+      (below ? "top" : "bottom") + " center");           // grow toward the button
   }
 
   sleepBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    sleepMenu.hidden ? openSleepMenu() : (sleepMenu.hidden = true);
+    sleepMenu.hidden ? openSleepMenu() : closeSleep();
   });
   document.addEventListener("click", (e) => {
-    if (!sleepMenu.hidden && !sleepMenu.contains(e.target)) sleepMenu.hidden = true;
+    if (!sleepMenu.hidden && !sleepMenu.contains(e.target)) closeSleep();
   });
 
   // ---------- downloads ----------
@@ -811,7 +820,7 @@
     savePlaystate();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") upnext.classList.remove("expanded");
+    if (e.key === "Escape") { upnext.classList.remove("expanded"); closeMenu(); closeSleep(); }
     if (e.target.tagName === "INPUT" || e.target.isContentEditable) return;
     if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     if (e.key === "ArrowRight" && e.shiftKey) next(true);
