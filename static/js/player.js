@@ -149,7 +149,7 @@
       li.className = "browse-row";
       if (currentBrowse === "albums") {
         const art = r.cover_id
-          ? `<img class="browse-cover" src="${coverUrl(r.cover_id)}" alt="">`
+          ? `<img class="browse-cover" src="${coverUrl(r.cover_id)}" alt="" loading="lazy" decoding="async">`
           : `<span class="browse-cover browse-cover--blank">♪</span>`;
         li.innerHTML = `${art}<span class="browse-meta">
           <span class="browse-name"></span><span class="browse-sub"></span></span>
