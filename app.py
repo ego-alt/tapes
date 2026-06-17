@@ -1,9 +1,11 @@
+import gzip
 import os
 import pathlib
 import secrets
 
-from flask import Flask
+from flask import Flask, request
 from flask_login import LoginManager
+from sqlalchemy import event
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from downloader import start_worker
@@ -78,7 +80,39 @@ def create_app(config=None):
     def healthz():
         return "", 200
 
+    @app.after_request
+    def _gzip(resp):
+        # Compress JSON/text payloads (e.g. the All Tracks list) when the client
+        # accepts it. Skips streamed responses (SSE) and the X-Accel audio path.
+        if resp.direct_passthrough or resp.status_code != 200:
+            return resp
+        ctype = resp.content_type or ""
+        if "event-stream" in ctype or not (
+            "application/json" in ctype or ctype.startswith("text/") or "javascript" in ctype
+        ):
+            return resp
+        if "gzip" not in request.headers.get("Accept-Encoding", ""):
+            return resp
+        data = resp.get_data()
+        if len(data) < 1024:
+            return resp
+        resp.set_data(gzip.compress(data, 6))
+        resp.headers["Content-Encoding"] = "gzip"
+        resp.headers["Vary"] = "Accept-Encoding"
+        return resp
+
     with app.app_context():
+        # SQLite tuning: WAL lets the rip worker / SSE poller write while readers
+        # browse — the default rollback journal serializes them ("database is
+        # locked"). synchronous=NORMAL is safe under WAL; busy_timeout retries.
+        @event.listens_for(db.engine, "connect")
+        def _sqlite_pragmas(dbapi_conn, _record):
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA synchronous=NORMAL")
+            cur.execute("PRAGMA busy_timeout=5000")
+            cur.close()
+
         db.create_all()
         # Lightweight column adds for existing DBs (SQLite ignores IF NOT EXISTS
         # for columns, so each is best-effort and rolls back if already present).
