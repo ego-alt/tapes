@@ -91,6 +91,29 @@ def _same_artist(a, b):
     return na == nb or na.startswith(nb) or nb.startswith(na)
 
 
+def reconcile_artist(name: str, existing) -> str:
+    """Snap an artist name onto an existing library spelling when the two normalize
+    identically — so casing/punctuation variants ("my little airport" vs
+    "My Little Airport") collapse onto one artist instead of splitting the shelf.
+
+    `existing` is an iterable of current artist strings, earliest-seen first; the
+    first normalized-exact match wins, which keeps the result stable and idempotent
+    (first-seen spelling becomes canonical). Returns `name` unchanged when nothing
+    matches. Normalized-exact only — no fuzzy matching, so genuinely distinct
+    artists are never merged by accident. The caller supplies the candidates, so
+    this stays a pure function with no DB dependency.
+    """
+    if not name:
+        return name
+    key = _norm_artist(name)
+    if not key:
+        return name
+    for other in existing:
+        if other and other != name and _norm_artist(other) == key:
+            return other
+    return name
+
+
 def clean_meta(title: str, artist: str):
     """Return cleaned (title, artist).
 

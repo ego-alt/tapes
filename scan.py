@@ -176,7 +176,8 @@ def register_cli(app):
         """Clean title/artist tags in place (and, with --llm, fill a blank album), then rescan."""
         from mutagen.easyid3 import EasyID3
 
-        from cleaning import clean_meta
+        from cleaning import clean_meta, reconcile_artist
+        from models import distinct_artists
 
         music_dir = pathlib.Path(app.config["MUSIC_DIR"])
         track_by_path = {t.file_path: t for t in Track.query.all()}
@@ -228,12 +229,19 @@ def register_cli(app):
                 click.echo("! no LLM results (key unset, or the batch failed — check the log) "
                            "— falling back to deterministic")
 
+        # Snapped against the library as it stands at the start of the run, so the
+        # first-seen spelling wins and casing variants across the library collapse
+        # onto it — `flask retag --write` doubles as the dedup-existing cleanup.
+        existing = distinct_artists()
+
         changed = cleared = 0
         for i, e in enumerate(entries):
             res = corrections.get(str(i))
             confident = bool(res) and res["confidence"] in ("high", "medium")
             new_title = (res["title"] if confident else None) or e["dt_title"]
             new_artist = (res["artist"] if confident else None) or e["dt_artist"]
+            if new_artist:
+                new_artist = reconcile_artist(new_artist, existing)
 
             # The LLM call went through this time → drop the retry flag.
             if write and res is not None and e["track"] is not None and e["track"].needs_llm:

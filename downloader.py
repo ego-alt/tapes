@@ -7,7 +7,7 @@ import sys
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from cleaning import clean_meta, clean_title
+from cleaning import clean_meta, clean_title, reconcile_artist
 from models import DownloadJob, PlaylistTrack, Track, db
 from scan import scan_library
 
@@ -336,6 +336,13 @@ def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
                 new_title = result["title"] or new_title
                 new_artist = result["artist"] or new_artist
                 enrich = result
+
+        # Snap the artist onto an existing library spelling (a casing/punctuation
+        # variant) so the same act doesn't split into two shelves. This new rip
+        # isn't in the DB yet, so the candidates are every *other* track's artist.
+        if new_artist:
+            from models import distinct_artists
+            new_artist = reconcile_artist(new_artist, distinct_artists())
 
         changed = False
         if new_title and new_title != title:

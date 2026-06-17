@@ -54,6 +54,16 @@ class Track(db.Model):
         }
 
 
+def distinct_artists():
+    """Distinct non-empty artist spellings, earliest-seen first — the candidate
+    list for canonical-artist snapping (see cleaning.reconcile_artist). Ordering
+    by first appearance makes first-seen the canonical spelling."""
+    rows = (db.session.query(Track.artist, func.min(Track.id).label("seen"))
+            .filter(Track.artist.isnot(None), Track.artist != "")
+            .group_by(Track.artist).order_by("seen").all())
+    return [r[0] for r in rows]
+
+
 class Playlist(db.Model):
     __tablename__ = "playlists"
 
