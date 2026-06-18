@@ -227,7 +227,12 @@
     const orig = el.textContent;
     el.contentEditable = "true";
     el.focus();
-    document.execCommand("selectAll", false, null);
+    // Select all of the title (execCommand is deprecated).
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
 
     function commit(doSave) {
       el.onblur = null;
