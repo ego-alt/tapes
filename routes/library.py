@@ -54,13 +54,19 @@ def _tracks_by_ids(ids):
     return _serialize([by_id[i] for i in ids if i in by_id])
 
 
+def _is_single():
+    """The 'single' rule (no album) in one place, so the shelf count and the
+    Singles track list can't drift apart."""
+    return or_(Track.album.is_(None), Track.album == "")
+
+
 # ---- shelf ----
 
 @library_blueprint.route("/api/playlists")
 @login_required
 def playlists():
     uid = _uid()
-    singles_q = Track.query.filter(or_(Track.album.is_(None), Track.album == ""))
+    singles_q = Track.query.filter(_is_single())
     shelf = [
         {"key": "all", "name": "All Tracks", "kind": "builtin", "count": Track.query.count()},
         {"key": "singles", "name": "Singles", "kind": "builtin", "count": singles_q.count()},
@@ -150,7 +156,7 @@ def playlist_tracks(key):
     if key == "all":
         tracks = _apply_sort(Track.query, sort, _uid())
     elif key == "singles":
-        base = Track.query.filter(or_(Track.album.is_(None), Track.album == ""))
+        base = Track.query.filter(_is_single())
         tracks = _apply_sort(base, sort, _uid())
     elif key == "favorites":
         tracks = (Track.query.join(Favorite, Favorite.track_id == Track.id)
