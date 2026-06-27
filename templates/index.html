@@ -19,13 +19,18 @@
     <aside class="sidebar">
       <div class="sidebar-head">
         <h1><span class="accent">▰▰</span> TAPES</h1>
-        <button class="btn btn-ghost" id="dlToggle" title="Download a track">⬇</button>
+        <button class="btn btn-ghost" id="dlToggle" title="Add">⬇</button>
+      </div>
+
+      <div class="mode-toggle" role="tablist">
+        <button class="mode-btn active" id="modeMusic" role="tab" aria-selected="true">♪ Music</button>
+        <button class="mode-btn" id="modePods" role="tab" aria-selected="false">◎ Podcasts</button>
       </div>
 
       <div class="dl-panel" id="dlPanel" hidden>
         <form class="dl-form" id="dlForm">
           <input class="input" id="dlUrl" type="url" placeholder="Paste a URL to rip…" autocomplete="off">
-          <button class="btn btn-primary" type="submit">Get</button>
+          <button class="btn btn-primary" id="dlSubmit" type="submit">Get</button>
         </form>
         <ul class="dl-list" id="dlList"></ul>
       </div>
@@ -64,6 +69,25 @@
           </select>
         </div>
         <ul class="track-list" id="trackList"></ul>
+      </div>
+
+      <!-- podcasts: shows list (the add form lives in the shared dl-panel) -->
+      <div class="podcasts-view" id="podcastsView" hidden>
+        <ul class="shelf-list" id="showList"></ul>
+      </div>
+
+      <!-- episodes within a show -->
+      <div class="episodes-view" id="episodesView" hidden>
+        <div class="tape-nav">
+          <button class="btn btn-ghost back-btn" id="epBack">‹ Podcasts</button>
+          <button class="btn btn-ghost" id="showRefreshBtn" hidden>Refresh</button>
+          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Delete</button>
+        </div>
+        <div class="search-wrap">
+          <input class="input" id="epSearch" type="search" placeholder="Search…" autocomplete="off">
+        </div>
+        <div class="tape-title-row"><div class="tape-title" id="showTitle"></div></div>
+        <ul class="episode-list" id="episodeList"></ul>
       </div>
 
       <!-- album / artist browse list -->
@@ -230,6 +254,9 @@
     window.MUSIC = {
       streamBase: "{{ url_for('stream.stream', track_id=0) }}".slice(0, -1),
       coverBase: "{{ url_for('stream.cover', track_id=0) }}".slice(0, -1),
+      epStreamBase: "{{ url_for('podcasts.stream', eid=0) }}".slice(0, -1),
+      epShowCoverBase: "{{ url_for('podcasts.show_cover', sid=0) }}".slice(0, -1),
+      epEpisodeCoverBase: "{{ url_for('podcasts.episode_cover', eid=0) }}".slice(0, -1),
     };
   </script>
   <script src="{{ url_for('static', filename='js/player.js') }}"></script>

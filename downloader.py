@@ -5,10 +5,11 @@ import re
 import subprocess
 import sys
 import threading
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 from cleaning import clean_meta, clean_title, reconcile_artist
-from models import DownloadJob, Playlist, PlaylistTrack, Track, db
+from models import DownloadJob, Episode, Playlist, PlaylistTrack, Track, db
 from scan import scan_library
 
 _job_queue: "queue.Queue[int]" = queue.Queue()
@@ -147,6 +148,10 @@ def _find_dup(duration: int, fp: list):
 def _process(app, job_id: int):
     job = db.session.get(DownloadJob, job_id)
     if not job or job.status == "done":
+        return
+
+    if job.kind == "podcast":
+        _process_podcast(app, job)
         return
 
     # Already have this source? Skip the download + LLM + art entirely; just link
@@ -367,3 +372,115 @@ def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
     except Exception:  # noqa: BLE001
         pass
     return llm_ok
+
+
+# ---------- podcasts (download-on-play) ----------
+
+def _process_podcast(app, job):
+    """Fetch one episode's audio on demand: RSS enclosure over HTTP, or a YouTube
+    video via yt-dlp. Metadata-only passes (LLM/art/fingerprint/scan) are skipped —
+    episodes live outside the music catalog."""
+    import podcasts
+
+    ep = db.session.get(Episode, job.episode_id)
+    if ep is None:
+        job.status = "error"
+        job.message = "episode gone"
+        db.session.commit()
+        return
+
+    music_dir = pathlib.Path(app.config["MUSIC_DIR"])
+    podcast_dir = pathlib.Path(app.config["PODCAST_DIR"])
+
+    # Already downloaded (e.g. a second play queued it again)? Just finish.
+    if ep.status == "ready" and ep.file_path and (music_dir / ep.file_path).exists():
+        job.progress = 100
+        job.status = "done"
+        job.message = ep.title
+        db.session.commit()
+        return
+
+    ep.status = "downloading"
+    job.status = "running"
+    job.progress = 0
+    job.message = ep.title
+    db.session.commit()
+
+    target = podcasts.episode_target(podcast_dir, ep)
+    if ep.source_type == "youtube":
+        final = _download_youtube_audio(ep.source_url, target, job)
+    else:
+        final = _download_enclosure(ep.source_url, target, job)
+
+    duration = None
+    try:
+        from mutagen import File as MutagenFile
+        mf = MutagenFile(str(final))
+        if mf is not None and mf.info is not None:
+            duration = getattr(mf.info, "length", None)
+    except Exception:  # noqa: BLE001
+        pass
+
+    ep.file_path = str(final.relative_to(music_dir))
+    if duration:
+        ep.duration_s = duration
+    ep.status = "ready"
+    job.progress = 100
+    job.status = "done"
+    job.message = ep.title
+    db.session.commit()
+
+
+def _download_enclosure(url: str, target: pathlib.Path, job) -> pathlib.Path:
+    """Stream an RSS enclosure to disk, updating job.progress from Content-Length."""
+    req = urllib.request.Request(url, headers={"User-Agent": "tapes-podcast/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 — user-supplied feed
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        last = -1
+        tmp = target.with_suffix(target.suffix + ".part")
+        with open(tmp, "wb") as f:
+            while True:
+                chunk = r.read(262144)
+                if not chunk:
+                    break
+                f.write(chunk)
+                done += len(chunk)
+                if total:
+                    pct = done * 100 // total
+                    if pct != last:
+                        last = pct
+                        job.progress = pct
+                        db.session.commit()
+    tmp.replace(target)
+    return target
+
+
+def _download_youtube_audio(url: str, target: pathlib.Path, job) -> pathlib.Path:
+    """Extract a YouTube video's audio to mp3 at `target` (no thumbnail/metadata
+    passes — episodes don't get the music rip treatment)."""
+    out_tmpl = str(target.with_suffix("")) + ".%(ext)s"
+    cmd = [
+        sys.executable, "-m", "yt_dlp",
+        "-x", "--audio-format", "mp3", "--audio-quality", "0",
+        "--no-playlist", "--newline", "-o", out_tmpl, url,
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    last = -1
+    for line in proc.stdout:
+        m = re.search(r"\[download\]\s+([\d.]+)%", line)
+        if m:
+            pct = int(float(m.group(1)))
+            if pct != last:
+                last = pct
+                job.progress = pct
+                db.session.commit()
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError("yt-dlp failed (see server log)")
+    if not target.exists():  # paranoia: find the produced file by stem
+        cands = sorted(target.parent.glob(target.stem + ".*"))
+        if not cands:
+            raise RuntimeError("no audio produced")
+        return cands[-1]
+    return target

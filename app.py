@@ -16,6 +16,7 @@ from routes import (
     downloads_blueprint,
     index_blueprint,
     library_blueprint,
+    podcasts_blueprint,
     stream_blueprint,
 )
 from scan import register_cli
@@ -36,6 +37,11 @@ def create_app(config=None):
     music_dir = os.environ.get("MUSIC_DIR") or str(pathlib.Path(app.root_path) / "music")
     app.config["MUSIC_DIR"] = music_dir
     app.config["COVER_DIR"] = str(instance / "covers")
+    # Podcast episodes live in a reserved subdir INSIDE MUSIC_DIR so the existing
+    # nginx /_audio/ X-Accel alias serves them too; scan_library skips this dir.
+    app.config["PODCAST_REL"] = "_podcasts"
+    app.config["PODCAST_DIR"] = os.environ.get("PODCAST_DIR") or str(
+        pathlib.Path(music_dir) / "_podcasts")
 
     app.config["USE_X_ACCEL"] = os.environ.get("USE_X_ACCEL", "").lower() in ("1", "true", "yes")
     # LLM tag correction on rip (needs ANTHROPIC_API_KEY; falls back to deterministic without it).
@@ -54,6 +60,7 @@ def create_app(config=None):
         app.config.update(config)
 
     pathlib.Path(app.config["COVER_DIR"]).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(app.config["PODCAST_DIR"]).mkdir(parents=True, exist_ok=True)
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 
@@ -75,6 +82,7 @@ def create_app(config=None):
     app.register_blueprint(stream_blueprint)
     app.register_blueprint(library_blueprint)
     app.register_blueprint(downloads_blueprint)
+    app.register_blueprint(podcasts_blueprint)
 
     @app.get("/healthz")
     def healthz():
@@ -118,6 +126,8 @@ def create_app(config=None):
         # for columns, so each is best-effort and rolls back if already present).
         for stmt in (
             "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
+            "ALTER TABLE download_jobs ADD COLUMN kind VARCHAR DEFAULT 'music'",
+            "ALTER TABLE download_jobs ADD COLUMN episode_id INTEGER REFERENCES episodes(id)",
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
             "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",

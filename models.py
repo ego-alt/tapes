@@ -109,6 +109,65 @@ class PlayState(db.Model):
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class Show(db.Model):
+    """A podcast subscription — an RSS feed or a YouTube channel/playlist. Per-user
+    (mirrors Playlist), so each household member curates their own shows."""
+    __tablename__ = "shows"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    title = db.Column(db.String, nullable=False)
+    source_type = db.Column(db.String, nullable=False)  # rss | youtube
+    source_url = db.Column(db.String, nullable=False)    # feed URL / channel|playlist URL
+    description = db.Column(db.Text)
+    has_image = db.Column(db.Boolean, default=False)     # cover cached at shows/<id>.jpg
+    created_at = db.Column(db.DateTime, server_default=func.now())
+    last_refreshed_at = db.Column(db.DateTime)
+
+
+class Episode(db.Model):
+    """One podcast episode. Catalogued from the feed as metadata first (status
+    'new'); the audio is fetched on demand the first time it's played
+    (download-on-play). Per-user, so resume position / played live right here."""
+    __tablename__ = "episodes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    # Null = a "loose" episode (a one-off video, not part of a subscribed show).
+    show_id = db.Column(db.Integer, db.ForeignKey("shows.id"), nullable=True, index=True)
+    # Stable per-show key for refresh dedup: RSS guid, or the YouTube video id.
+    guid = db.Column(db.String, index=True)
+    title = db.Column(db.String, nullable=False)
+    # Enclosure URL (rss) or watch URL (youtube) — what we download from.
+    source_url = db.Column(db.String, nullable=False)
+    source_type = db.Column(db.String, nullable=False)  # rss | youtube
+    # Relative to MUSIC_DIR (under the reserved _podcasts/ subdir); null until fetched.
+    file_path = db.Column(db.String)
+    status = db.Column(db.String, nullable=False, default="new")  # new|downloading|ready|error
+    duration_s = db.Column(db.Float)
+    description = db.Column(db.Text)
+    published_at = db.Column(db.DateTime, index=True)
+    added_at = db.Column(db.DateTime, server_default=func.now())
+    # Per-user playback state (episodes are already per-user — no separate table).
+    position_s = db.Column(db.Float, default=0)
+    played = db.Column(db.Boolean, default=False, index=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "kind": "episode",
+            "show_id": self.show_id,
+            "title": self.title,
+            "status": self.status,
+            "duration": self.duration_s or 0,
+            "position": self.position_s or 0,
+            "played": bool(self.played),
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "source_url": self.source_url or "",
+            "has_cover": True,  # cover endpoint falls back to the show image
+        }
+
+
 class DownloadJob(db.Model):
     __tablename__ = "download_jobs"
 
@@ -118,8 +177,10 @@ class DownloadJob(db.Model):
     status = db.Column(db.String, nullable=False, default="queued")  # queued|running|done|error
     progress = db.Column(db.Float, default=0)
     message = db.Column(db.String)
+    kind = db.Column(db.String, nullable=False, default="music")  # music | podcast
     track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"))
     playlist_id = db.Column(db.Integer, db.ForeignKey("playlists.id"), nullable=True)
+    episode_id = db.Column(db.Integer, db.ForeignKey("episodes.id"), nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
 
     def to_dict(self):
@@ -129,6 +190,8 @@ class DownloadJob(db.Model):
             "status": self.status,
             "progress": round(self.progress or 0, 1),
             "message": self.message or "",
+            "kind": self.kind,
             "track_id": self.track_id,
             "playlist_id": self.playlist_id,
+            "episode_id": self.episode_id,
         }

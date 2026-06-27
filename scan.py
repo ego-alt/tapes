@@ -9,6 +9,9 @@ from models import Track, db
 
 AUDIO_EXTS = {".mp3"}
 COVER_NAMES = ("cover.jpg", "cover.png", "folder.jpg", "folder.png")
+# Reserved subdir of MUSIC_DIR holding podcast episodes — not part of the music
+# catalog (kept in sync with app.config["PODCAST_REL"]).
+PODCAST_DIRNAME = "_podcasts"
 
 
 def partial_hash(path: str, size: int) -> str:
@@ -103,7 +106,9 @@ def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
     seen_rel = set()
     added = updated = skipped = pruned = 0
 
-    for root, _, files in os.walk(music_dir):
+    for root, dirs, files in os.walk(music_dir):
+        # Don't descend into the reserved podcast subdir — episodes aren't music.
+        dirs[:] = [d for d in dirs if d != PODCAST_DIRNAME]
         for name in files:
             if pathlib.Path(name).suffix.lower() not in AUDIO_EXTS:
                 continue
@@ -188,7 +193,8 @@ def register_cli(app):
             if not llm:
                 click.echo("note: --pending without --llm only re-runs deterministic cleanup")
         else:
-            targets = sorted(music_dir.rglob("*.mp3"))
+            targets = sorted(p for p in music_dir.rglob("*.mp3")
+                             if PODCAST_DIRNAME not in p.relative_to(music_dir).parts)
 
         # Read tags + run the deterministic pass for every file up front.
         entries = []

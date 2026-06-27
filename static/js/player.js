@@ -9,8 +9,21 @@
 
   const streamUrl = (id) => M.streamBase + id;
   const coverUrl = (id) => M.coverBase + id;
-  const fmt = (s) => (!s || !isFinite(s)) ? "0:00"
-    : Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  // Polymorphic source/art: a track plays from the music endpoints, an episode
+  // (kind === "episode") from the podcast ones. Everything else in the player
+  // works on these two helpers so the queue/deck can hold either.
+  const srcUrl = (t) => t.kind === "episode" ? M.epStreamBase + t.id : streamUrl(t.id);
+  const artUrl = (t) => t.kind === "episode"
+    ? (t.show_id ? M.epEpisodeCoverBase + t.id : null)
+    : (t.has_cover ? coverUrl(t.id) : null);
+  const fmt = (s) => {
+    if (!s || !isFinite(s)) return "0:00";
+    s = Math.floor(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    // Hours only when needed, so 3-min songs stay "3:14" and long episodes read "4:14:13".
+    return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  };
 
   function toast(msg) {
     const t = document.createElement("div");
@@ -72,6 +85,10 @@
   let browseRows = [];        // current album/artist browse list
   let currentBrowse = null;   // "albums" | "artists" | null
   let navToken = 0;           // bumped per view-open; a slow load bails if superseded
+  let showsData = null;       // last /api/podcast/shows payload
+  let currentShow = null;     // show whose episodes are open (null = loose)
+  let episodes = [];          // episodes currently shown
+  const pendingPlays = {};    // episode_id -> {list, i} awaiting download-then-play
 
   // ---------- shelf ----------
   async function loadShelf() {
@@ -98,6 +115,21 @@
         s.kind === "browse" ? openBrowse(s.key) : openTape(s.key, s.name, s.kind));
       list.appendChild(li);
     });
+  }
+
+  // ---------- top-level Music / Podcasts mode ----------
+  let mode = "music";
+  function setMode(m) {
+    mode = m;
+    $("modeMusic").classList.toggle("active", m === "music");
+    $("modePods").classList.toggle("active", m === "podcasts");
+    $("modeMusic").setAttribute("aria-selected", String(m === "music"));
+    $("modePods").setAttribute("aria-selected", String(m === "podcasts"));
+    // The one add input re-skins to the mode; the submit handler routes on it.
+    $("dlUrl").placeholder = m === "music" ? "Paste a URL to rip…" : "RSS or YouTube URL…";
+    $("dlSubmit").textContent = m === "music" ? "Get" : "Add";
+    if (m === "music") showView("shelf");
+    else openPodcasts();
   }
 
   async function openTape(key, name, kind) {
@@ -133,6 +165,8 @@
     $("shelfView").hidden = name !== "shelf";
     $("browseView").hidden = name !== "browse";
     $("tracksView").hidden = name !== "tracks";
+    $("podcastsView").hidden = name !== "podcasts";
+    $("episodesView").hidden = name !== "episodes";
   }
 
   // ---------- album / artist browse ----------
@@ -216,6 +250,201 @@
     $("search").value = "";
     renderTracks(view);
     showView("tracks");
+  }
+
+  // ---------- podcasts ----------
+  async function openPodcasts() {
+    const tok = ++navToken;
+    let data;
+    try { data = await jget("api/podcast/shows"); }
+    catch (e) { console.error(e); toast("Couldn't load podcasts."); return; }
+    if (tok !== navToken) return;
+    showsData = data;
+    renderShows(data);
+    showView("podcasts");
+  }
+  function renderShows(data) {
+    const el = $("showList");
+    el.innerHTML = "";
+    if (!data.shows.length && !data.loose_count) {
+      el.innerHTML = `<div class="empty-note">No podcasts yet. Paste an RSS or YouTube URL above.</div>`;
+      return;
+    }
+    data.shows.forEach((s) => {
+      const li = document.createElement("li");
+      li.className = "browse-row";
+      const art = s.has_image
+        ? `<img class="browse-cover" src="${M.epShowCoverBase + s.id}" alt="" loading="lazy" decoding="async">`
+        : `<span class="browse-cover browse-cover--blank">◎</span>`;
+      li.innerHTML = `${art}<span class="browse-meta">
+        <span class="browse-name"></span><span class="browse-sub"></span></span>
+        <span class="shelf-count">${s.unplayed ? s.unplayed + " new" : s.count}</span>`;
+      li.querySelector(".browse-name").textContent = s.title;
+      li.querySelector(".browse-sub").textContent = s.source_type === "youtube" ? "YouTube" : "RSS";
+      li.addEventListener("click", () => openShow(s));
+      el.appendChild(li);
+    });
+    if (data.loose_count) {
+      const li = document.createElement("li");
+      li.className = "browse-row";
+      li.innerHTML = `<span class="browse-cover browse-cover--blank">◎</span>
+        <span class="browse-meta"><span class="browse-name">Loose episodes</span></span>
+        <span class="shelf-count">${data.loose_count}</span>`;
+      li.addEventListener("click", openLoose);
+      el.appendChild(li);
+    }
+  }
+  async function openShow(s) {
+    const tok = ++navToken;
+    const data = await jget(`api/podcast/shows/${s.id}/episodes`);
+    if (tok !== navToken) return;
+    currentShow = data.show;
+    episodes = data.episodes;
+    $("showTitle").textContent = data.show.title;
+    $("showRefreshBtn").hidden = false;
+    $("showDelBtn").hidden = false;
+    $("epSearch").value = "";
+    renderEpisodes(episodes);
+    showView("episodes");
+  }
+  async function openLoose() {
+    const tok = ++navToken;
+    const data = await jget("api/podcast/episodes/loose");
+    if (tok !== navToken) return;
+    currentShow = null;
+    episodes = data.episodes;
+    $("showTitle").textContent = "Loose episodes";
+    $("showRefreshBtn").hidden = true;
+    $("showDelBtn").hidden = true;
+    $("epSearch").value = "";
+    renderEpisodes(episodes);
+    showView("episodes");
+  }
+  function formatEpDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  function renderEpisodes(list) {
+    const el = $("episodeList");
+    el.innerHTML = "";
+    if (!list.length) { el.innerHTML = `<div class="empty-note">No episodes.</div>`; return; }
+    list.forEach((e, i) => {
+      const li = document.createElement("li");
+      li.dataset.id = e.id;
+      li.className = "ep-row" + (e.played ? " played" : "");
+      const pct = (!e.played && e.duration && e.position)
+        ? Math.min(100, (e.position / e.duration) * 100) : 0;
+      const sub = [
+        formatEpDate(e.published_at),
+        e.duration ? fmt(e.duration) : (e.status === "new" ? "not downloaded" : ""),
+        e.status === "downloading" ? "downloading…" : "",
+      ].filter(Boolean).join(" · ");
+      li.innerHTML = `<span class="ep-meta">
+          <div class="ep-title"></div><div class="ep-sub"></div>
+          <div class="ep-prog"${pct ? "" : " hidden"}><div class="ep-prog-fill" style="width:${pct}%"></div></div>
+        </span>
+        <button class="ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>`;
+      li.querySelector(".ep-title").textContent = e.title;
+      li.querySelector(".ep-sub").textContent = sub;
+      li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
+      li.addEventListener("click", () => playEpisode(list, i));
+      el.appendChild(li);
+    });
+    markActive();
+  }
+  function applyEpisodeSearch() {
+    const q = $("epSearch").value.toLowerCase().trim();
+    renderEpisodes(q ? episodes.filter((e) => e.title.toLowerCase().includes(q)) : episodes);
+  }
+  async function playEpisode(list, i) {
+    const e = list[i];
+    if (e.status === "ready") { startEpisodePlayback(list, i); return; }
+    let res;
+    try { res = await jsend(`api/podcast/episodes/${e.id}/play`, "POST").then((r) => r.json()); }
+    catch (err) { console.error(err); toast("Couldn't start the episode."); return; }
+    if (res.ready) { e.status = "ready"; startEpisodePlayback(list, i); return; }
+    // Downloading — reveal the progress panel and auto-play when its job finishes.
+    pendingPlays[e.id] = { list, i };
+    e.status = "downloading";
+    applyEpisodeSearch();
+    $("dlPanel").hidden = false;
+    openDlStream();
+    toast("Downloading episode…");
+  }
+  function startEpisodePlayback(list, i) {
+    baseQueue = list.slice();
+    queue = list.slice();
+    qi = i;
+    loadCurrent(true);
+    if (isMobile()) closeNav();
+  }
+  // Show a "downloading…" deck state and fetch an episode that was reached before
+  // it was downloaded; onPodcastJobDone plays it once the job completes.
+  function loadPendingEpisode(t) {
+    cassette.classList.add("loaded");
+    labelTitle.textContent = t.title;
+    labelArtist.textContent = (t.show || "Podcast") + " · downloading…";
+    labelArt.removeAttribute("src");
+    favBtn.style.display = "none";
+    markActive();
+    updateUpNext();
+    pendingPlays[t.id] = { list: queue, i: qi };
+    jsend(`api/podcast/episodes/${t.id}/play`, "POST").then((r) => r.json()).then((res) => {
+      if (res.ready) { t.status = "ready"; loadCurrent(true); }
+      else { $("dlPanel").hidden = false; openDlStream(); }
+    }).catch((e) => { console.error(e); toast("Couldn't load episode."); });
+  }
+  // A podcast download job finished (or errored — it just drops off the stream).
+  // Re-sync the open view's statuses, then play if this episode was awaited.
+  async function onPodcastJobDone(epId) {
+    const pend = pendingPlays[epId];
+    delete pendingPlays[epId];
+    if (!$("episodesView").hidden) {
+      try {
+        const data = currentShow
+          ? await jget(`api/podcast/shows/${currentShow.id}/episodes`)
+          : await jget("api/podcast/episodes/loose");
+        episodes = data.episodes;
+        applyEpisodeSearch();
+      } catch (e) { console.error(e); }
+    }
+    if (!pend) return;
+    const e = episodes.find((x) => x.id === epId);
+    if (e && e.status === "ready") startEpisodePlayback(episodes, episodes.indexOf(e));
+    else toast("Episode download failed.");
+  }
+  async function togglePlayed(e) {
+    const played = !e.played;
+    try { await jsend(`api/podcast/episodes/${e.id}/played`, "POST", { played }); }
+    catch (err) { console.error(err); toast("Couldn't update."); return; }
+    e.played = played;
+    if (played) e.position = 0;
+    applyEpisodeSearch();
+  }
+  function markEpisodePlayed(t) {
+    t.played = true; t.position = 0;
+    jsend(`api/podcast/episodes/${t.id}/progress`, "PUT", { position: 0, played: true }).catch(() => {});
+    const e = episodes.find((x) => x.id === t.id);
+    if (e) { e.played = true; e.position = 0; }
+    if (!$("episodesView").hidden) applyEpisodeSearch();
+  }
+  async function refreshCurrentShow() {
+    if (!currentShow) return;
+    const btn = $("showRefreshBtn"), orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      const r = await jsend(`api/podcast/shows/${currentShow.id}/refresh`, "POST").then((x) => x.json());
+      toast(r.added ? `Added ${r.added} new episode${r.added > 1 ? "s" : ""}` : "No new episodes");
+      if (r.added) await openShow(currentShow);
+    } catch (e) { console.error(e); toast("Refresh failed."); }
+    finally { btn.disabled = false; btn.textContent = orig; }
+  }
+  async function deleteCurrentShow() {
+    if (!currentShow || !confirm(`Delete "${currentShow.title}" and its downloads?`)) return;
+    await jsend(`api/podcast/shows/${currentShow.id}`, "DELETE");
+    currentShow = null;
+    openPodcasts();
   }
 
   // Inline-edit the track-list header. `save(name, orig)` does the persistence and
@@ -319,18 +548,35 @@
   function loadCurrent(autoplay) {
     const t = queue[qi];
     if (!t) return;
-    audio.src = streamUrl(t.id);
+    const isEp = t.kind === "episode";
+    // Reached an episode that isn't downloaded yet (e.g. auto-advance / queue jump):
+    // kick off the fetch and let onPodcastJobDone resume playback when it's ready.
+    if (isEp && t.status !== "ready") { loadPendingEpisode(t); return; }
+    audio.src = srcUrl(t);
+    // Resume an episode where you left off (music resume rides the playstate path).
+    if (isEp && t.position) {
+      audio.addEventListener("loadedmetadata", function once() {
+        audio.currentTime = t.position || 0;
+        audio.removeEventListener("loadedmetadata", once);
+      });
+    }
     if (autoplay) audio.play().catch(() => {});
     cassette.classList.add("loaded");
     labelTitle.textContent = t.title;
-    labelArtist.textContent = [t.artist, t.album].filter(Boolean).join(" — ");
-    if (t.has_cover) labelArt.src = coverUrl(t.id); else labelArt.removeAttribute("src");
-    favBtn.innerHTML = t.fav ? ICONS.heartFill : ICONS.heart;
-    favBtn.classList.toggle("on", !!t.fav);
-    document.title = t.title + (t.artist ? " · " + t.artist : "");
+    labelArtist.textContent = isEp
+      ? (t.show || "Podcast")
+      : [t.artist, t.album].filter(Boolean).join(" — ");
+    const art = artUrl(t);
+    if (art) labelArt.src = art; else labelArt.removeAttribute("src");
+    favBtn.style.display = isEp ? "none" : "";   // episodes aren't favoritable in v1
+    if (!isEp) {
+      favBtn.innerHTML = t.fav ? ICONS.heartFill : ICONS.heart;
+      favBtn.classList.toggle("on", !!t.fav);
+    }
+    document.title = t.title + (isEp ? (t.show ? " · " + t.show : "") : (t.artist ? " · " + t.artist : ""));
     setMediaSession(t);
     markActive();
-    savePlaystate();
+    if (!isEp) savePlaystate();   // episode progress saves on play/seek/end, not load
     prefetchNext();
     updateUpNext();
   }
@@ -343,13 +589,22 @@
     prefetchId = next.id;
     prefetchEl = new Audio();
     prefetchEl.preload = "auto";
-    prefetchEl.src = streamUrl(next.id);
+    // Don't warm an undownloaded episode — its stream 404s until it's fetched.
+    if (next.kind === "episode" && next.status !== "ready") { prefetchEl = null; prefetchId = null; return; }
+    prefetchEl.src = srcUrl(next);
   }
   const currentTrack = () => queue[qi] || null;
+  // The active deck queue is kind-pure: when an episode is playing, music's
+  // shuffle/repeat don't apply and music "add to queue" starts a fresh music
+  // queue rather than mixing songs into the podcast queue.
+  const activeIsEpisode = () => { const c = currentTrack(); return !!c && c.kind === "episode"; };
   function markActive() {
     const cur = currentTrack();
+    const isEp = !!cur && cur.kind === "episode";
     [...$("trackList").children].forEach((li) =>
-      li.classList?.toggle("active", !!cur && Number(li.dataset.id) === cur.id));
+      li.classList?.toggle("active", !isEp && !!cur && Number(li.dataset.id) === cur.id));
+    [...$("episodeList").children].forEach((li) =>
+      li.classList?.toggle("active", isEp && !!cur && Number(li.dataset.id) === cur.id));
   }
   function togglePlay() {
     if (qi < 0) { if (view.length) playFromList(view, 0); return; }
@@ -357,9 +612,13 @@
   }
   function setMediaSession(t) {
     if (!("mediaSession" in navigator)) return;
+    const isEp = t.kind === "episode";
+    const art = artUrl(t);
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: t.title, artist: t.artist || "", album: t.album || "",
-      artwork: t.has_cover ? [{ src: coverUrl(t.id), sizes: "500x500", type: "image/jpeg" }] : [],
+      title: t.title,
+      artist: isEp ? (t.show || "Podcast") : (t.artist || ""),
+      album: isEp ? "" : (t.album || ""),
+      artwork: art ? [{ src: art, sizes: "500x500", type: "image/jpeg" }] : [],
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => prev());
     navigator.mediaSession.setActionHandler("nexttrack", () => next(true));
@@ -368,15 +627,16 @@
   // `manual` = user pressed next (vs. a track ending). Repeat-one only loops on
   // natural end, so pressing next still advances.
   function next(manual) {
-    if (!manual && repeatMode === "one") { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+    const ep = activeIsEpisode();
+    if (!ep && !manual && repeatMode === "one") { audio.currentTime = 0; audio.play().catch(() => {}); return; }
     if (qi + 1 < queue.length) go(qi + 1, true);
-    else if (repeatMode === "all") go(0, true);
-    // else: end of queue — stop.
+    else if (!ep && repeatMode === "all") go(0, true);
+    // else: end of queue — stop. (Episodes never repeat/shuffle.)
   }
   function prev() {
     if (qi >= 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }  // restart current first
     if (qi > 0) go(qi - 1, true);
-    else if (repeatMode === "all") go(queue.length - 1, true);
+    else if (!activeIsEpisode() && repeatMode === "all") go(queue.length - 1, true);
   }
 
   // ---------- shuffle / repeat ----------
@@ -414,7 +674,9 @@
 
   // ---------- queue editing ----------
   function playNext(t) {
-    if (qi < 0) { playFromList([t], 0); return; }
+    // Nothing playing, or an episode holds the deck → start a fresh music queue
+    // rather than splicing a song into the podcast queue.
+    if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); return; }
     queue.splice(qi + 1, 0, t);
     baseQueue = queue.slice();   // manual edits define the new source order
     prefetchNext();
@@ -422,7 +684,7 @@
     updateUpNext();
   }
   function addToQueue(t) {
-    if (qi < 0) { playFromList([t], 0); return; }
+    if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); return; }
     queue.push(t);
     baseQueue = queue.slice();
     savePlaystate();
@@ -698,10 +960,24 @@
     e.preventDefault();
     const url = $("dlUrl").value.trim();
     if (!url) return;
+    if (mode === "podcasts") { await addPodcast(url); return; }
     await jsend("api/downloads", "POST", { url });
     $("dlUrl").value = "";
     openDlStream();
   });
+  async function addPodcast(url) {
+    const btn = $("dlSubmit");
+    btn.disabled = true;
+    try {
+      const r = await jsend("api/podcast/add", "POST", { url }).then((x) => x.json());
+      $("dlUrl").value = "";
+      toast(r.created === false ? `Added ${r.added} new episode${r.added === 1 ? "" : "s"}`
+        : r.loose ? "Added episode" : `Added "${r.title}"`);
+      openPodcasts();
+    } catch (err) {
+      console.error(err); toast("Couldn't add that — check the URL.");
+    } finally { btn.disabled = false; }
+  }
   function openDlStream() {
     if (dlEvt) return;  // already streaming
     dlEvt = new EventSource("api/downloads/stream");
@@ -714,14 +990,19 @@
   }
   function handleJobs(jobs) {
     const activeIds = new Set(jobs.map((j) => j.id));
-    // A job we were tracking has disappeared from the active list → it finished.
-    let anyCompleted = false;
+    // A job we were tracking dropped out of the active list → it finished. Route
+    // music completions to the shelf refresh, podcast ones to the play-on-ready.
+    let musicCompleted = false;
     for (const id of Object.keys(dlPrev)) {
-      if (!activeIds.has(Number(id))) { anyCompleted = true; break; }
+      if (!activeIds.has(Number(id))) {
+        const prev = dlPrev[id];
+        if (prev.kind === "podcast") onPodcastJobDone(prev.episode_id);
+        else musicCompleted = true;
+      }
     }
     dlPrev = {};
-    jobs.forEach((j) => { dlPrev[j.id] = j.status; });
-    if (anyCompleted) onDownloadDone();
+    jobs.forEach((j) => { dlPrev[j.id] = { kind: j.kind, episode_id: j.episode_id }; });
+    if (musicCompleted) onDownloadDone();
 
     const el = $("dlList");
     el.innerHTML = "";
@@ -748,9 +1029,27 @@
   // ---------- playstate persistence ----------
   let saveTimer = null;
   function savePlaystate() {
+    const cur = currentTrack();
+    if (cur && cur.kind === "episode") { saveEpisodeProgress(cur); return; }
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => jsend("api/playstate", "PUT",
       { queue: queue.map((t) => t.id), index: qi, position: audio.currentTime || 0 }), 400);
+  }
+  // Per-episode resume — debounced, separate from the music playstate so podcast
+  // listening never clobbers the music queue (and vice versa).
+  let epSaveTimer = null, lastEpSave = 0;
+  function saveEpisodeProgress(t) {
+    const pos = audio.currentTime || 0;
+    t.position = pos;
+    clearTimeout(epSaveTimer);
+    epSaveTimer = setTimeout(() =>
+      jsend(`api/podcast/episodes/${t.id}/progress`, "PUT", { position: pos }).catch(() => {}), 800);
+  }
+  function maybeSaveEpisodeTick(t) {
+    const now = Date.now();
+    if (now - lastEpSave < 5000) return;   // throttle the timeupdate firehose
+    lastEpSave = now;
+    saveEpisodeProgress(t);
   }
   async function restorePlaystate() {
     const ps = await jget("api/playstate");
@@ -783,6 +1082,16 @@
     showView(trackParent === "albums" || trackParent === "artists" ? "browse" : "shelf"));
   $("browseBack").addEventListener("click", () => showView("shelf"));
   $("browseSearch").addEventListener("input", applyBrowseSearch);
+  $("modeMusic").addEventListener("click", () => setMode("music"));
+  $("modePods").addEventListener("click", () => setMode("podcasts"));
+  $("epBack").addEventListener("click", () => showView("podcasts"));
+  $("epSearch").addEventListener("input", applyEpisodeSearch);
+  $("showRefreshBtn").addEventListener("click", refreshCurrentShow);
+  $("showDelBtn").addEventListener("click", deleteCurrentShow);
+  audio.addEventListener("error", () => {
+    const t = currentTrack();
+    if (t && t.kind === "episode") toast("Couldn't play this episode.");
+  });
   $("upnextBar").addEventListener("click", toggleUpNext);
   $("tapeDelBtn").addEventListener("click", async () => {
     if (!currentTape || !confirm(`Delete tape "${currentTape.name}"?`)) return;
@@ -806,17 +1115,24 @@
   audio.addEventListener("play", () => {
     cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause;
     const t = currentTrack();
-    if (t && t.id !== lastPlayed) { lastPlayed = t.id; jsend("api/plays", "POST", { track_id: t.id }); }
+    // Play counts are a music-catalog thing (no Play row for episodes).
+    if (t && t.kind !== "episode" && t.id !== lastPlayed) {
+      lastPlayed = t.id; jsend("api/plays", "POST", { track_id: t.id });
+    }
   });
   audio.addEventListener("pause", () => { cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; savePlaystate(); });
   audio.addEventListener("ended", () => {
     if (sleepEndOfTrack) { clearSleep(); audio.pause(); return; }  // sleep: stop, don't advance
+    const t = currentTrack();
+    if (t && t.kind === "episode") markEpisodePlayed(t);
     next(false);
   });
   audio.addEventListener("loadedmetadata", () => { durTime.textContent = fmt(audio.duration); });
   audio.addEventListener("timeupdate", () => {
     curTime.textContent = fmt(audio.currentTime);
     if (audio.duration) scrubFill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
+    const t = currentTrack();
+    if (t && t.kind === "episode") maybeSaveEpisodeTick(t);
   });
   scrub.addEventListener("click", (e) => {
     if (!audio.duration) return;

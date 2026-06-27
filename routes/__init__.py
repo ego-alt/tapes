@@ -2,6 +2,7 @@ from .auth import auth_blueprint
 from .downloads import downloads_blueprint
 from .index import index_blueprint
 from .library import library_blueprint
+from .podcasts import podcasts_blueprint
 from .stream import stream_blueprint
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "downloads_blueprint",
     "index_blueprint",
     "library_blueprint",
+    "podcasts_blueprint",
     "stream_blueprint",
 ]

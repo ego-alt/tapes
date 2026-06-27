@@ -353,3 +353,83 @@ body {
     z-index: 100; pointer-events: none; max-width: 80vw; text-align: center;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Music / Podcasts mode toggle ---- */
+.mode-toggle {
+    display: flex;
+    gap: 3px;
+    margin: 0 var(--space-4) var(--space-2);
+    padding: 3px;
+    background: var(--color-bg-inset);
+    border-radius: var(--radius-md);
+}
+.mode-btn {
+    flex: 1;
+    padding: var(--space-2);
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    border-radius: calc(var(--radius-md) - 2px);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--text-sm);
+}
+.mode-btn.active {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    box-shadow: 0 1px 2px var(--color-shadow);
+}
+
+/* ---- podcasts: shows + episodes ---- */
+.episode-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 var(--space-2) var(--space-3);
+    overflow-y: auto;
+}
+.ep-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+.ep-row:hover { background: var(--track-hover); }
+.ep-row.active { background: var(--color-bg-inset); }
+.ep-row.active .ep-title { color: var(--track-active); }
+.ep-row.played .ep-title { color: var(--color-text-muted); }
+.ep-meta { flex: 1; min-width: 0; overflow: hidden; }
+.ep-title {
+    font-size: var(--text-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ep-sub {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ep-prog {
+    margin-top: 5px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-bg-inset);
+    overflow: hidden;
+}
+.ep-prog[hidden] { display: none; }
+.ep-prog-fill { height: 100%; background: var(--color-accent); }
+.ep-played {
+    flex: none;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: var(--text-base);
+    line-height: 1;
+    padding: 4px;
+}
+.ep-row.played .ep-played { color: var(--color-accent); }
