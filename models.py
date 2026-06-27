@@ -41,7 +41,7 @@ class Track(db.Model):
     mtime = db.Column(db.Float)
     added_at = db.Column(db.DateTime, server_default=func.now())
 
-    def to_dict(self, fav=False):
+    def to_dict(self):
         return {
             "id": self.id,
             "title": self.title,
@@ -50,7 +50,6 @@ class Track(db.Model):
             "duration": self.duration_s or 0,
             "has_cover": bool(self.has_cover),
             "source_url": self.source_url or "",
-            "fav": fav,
         }
 
 
@@ -80,14 +79,6 @@ class PlaylistTrack(db.Model):
     playlist_id = db.Column(db.Integer, db.ForeignKey("playlists.id"), nullable=False, index=True)
     track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"), nullable=False)
     position = db.Column(db.Integer, nullable=False, default=0)
-
-
-class Favorite(db.Model):
-    __tablename__ = "favorites"
-
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
-    track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"), primary_key=True)
-    created_at = db.Column(db.DateTime, server_default=func.now())
 
 
 class Play(db.Model):

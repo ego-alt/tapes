@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const audio = $("audio"), cassette = $("cassette");
   const labelArt = $("labelArt"), labelTitle = $("labelTitle"), labelArtist = $("labelArtist");
-  const playBtn = $("playBtn"), favBtn = $("favBtn");
+  const playBtn = $("playBtn");
   const scrub = $("scrub"), scrubFill = $("scrubFill"), curTime = $("curTime"), durTime = $("durTime");
   const app = $("app");
 
@@ -60,9 +60,8 @@
     pause: svgIcon('<rect x="6.5" y="5" width="3.8" height="14" rx="1.3"/><rect x="13.7" y="5" width="3.8" height="14" rx="1.3"/>', true),
     prev: svgIcon('<rect x="5.5" y="5" width="2.6" height="14" rx="1"/><path d="M20 5.7a.7.7 0 0 0-1.08-.59L9.8 11.4a.7.7 0 0 0 0 1.2l9.12 6.3A.7.7 0 0 0 20 18.3z"/>', true),
     next: svgIcon('<path d="M4 5.7a.7.7 0 0 1 1.08-.59l9.12 6.29a.7.7 0 0 1 0 1.2l-9.12 6.3A.7.7 0 0 1 4 18.3z"/><rect x="15.9" y="5" width="2.6" height="14" rx="1"/>', true),
-    heart: svgIcon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>'),
-    heartFill: svgIcon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>', true),
     plus: svgIcon('<path d="M12 5v14M5 12h14"/>'),
+    more: svgIcon('<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>', true),
     shuffle: svgIcon('<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/>'),
     repeat: svgIcon('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>'),
     repeatOne: svgIcon('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/>'),
@@ -95,7 +94,7 @@
     shelf = await jget("api/playlists");
     const list = $("shelfList");
     list.innerHTML = "";
-    const icon = { all: "▤", singles: "♪", favorites: "♥", albums: "◉", artists: "♫" };
+    const icon = { all: "▤", singles: "♪", albums: "◉", artists: "♫" };
     let sepDone = false;
     shelf.forEach((s) => {
       // Subtle divider between the auto shelves and the user's own tapes.
@@ -345,7 +344,7 @@
           <div class="ep-prog"${pct ? "" : " hidden"}><div class="ep-prog-fill" style="width:${pct}%"></div></div>
         </span>
         <button class="tl-add ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>
-        <button class="tl-add ep-menu" title="More">⋯</button>`;
+        <button class="tl-add ep-menu" title="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = e.title;
       li.querySelector(".tl-sub").textContent = sub;
       li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
@@ -457,7 +456,6 @@
     labelTitle.textContent = t.title;
     labelArtist.textContent = (t.show || "Podcast") + " · downloading…";
     labelArt.removeAttribute("src");
-    favBtn.style.display = "none";
     markActive();
     updateUpNext();
     pendingPlays[t.id] = { list: queue, i: qi };
@@ -567,12 +565,12 @@
       const handle = reorderable ? `<span class="tl-drag drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>` : "";
       li.innerHTML = `${handle}<span class="tl-num">${i + 1}</span>
         <span class="tl-meta"><div class="tl-title"></div><div class="tl-sub"></div></span>
-        <button class="tl-fav" title="Favorite">${t.fav ? ICONS.heartFill : ICONS.heart}</button>
-        <button class="tl-add" title="Add to tape">${ICONS.plus}</button>`;
+        <button class="tl-add tl-addto" title="Add to…">${ICONS.plus}</button>
+        <button class="tl-add tl-more" title="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = t.title;
       li.querySelector(".tl-sub").textContent = [t.artist, t.album].filter(Boolean).join(" · ");
-      li.querySelector(".tl-fav").addEventListener("click", (e) => { e.stopPropagation(); toggleFav(t); });
-      li.querySelector(".tl-add").addEventListener("click", (e) => {
+      li.querySelector(".tl-addto").addEventListener("click", (e) => { e.stopPropagation(); openAddMenu(e, t); });
+      li.querySelector(".tl-more").addEventListener("click", (e) => {
         e.stopPropagation();
         if (!menu.hidden && menu.dataset.for === String(t.id)) closeMenu();
         else openMenu(e, t);
@@ -639,11 +637,6 @@
       : [t.artist, t.album].filter(Boolean).join(" — ");
     const art = artUrl(t);
     if (art) labelArt.src = art; else labelArt.removeAttribute("src");
-    favBtn.style.display = isEp ? "none" : "";   // episodes aren't favoritable in v1
-    if (!isEp) {
-      favBtn.innerHTML = t.fav ? ICONS.heartFill : ICONS.heart;
-      favBtn.classList.toggle("on", !!t.fav);
-    }
     document.title = t.title + (isEp ? (t.show ? " · " + t.show : "") : (t.artist ? " · " + t.artist : ""));
     setMediaSession(t);
     markActive();
@@ -866,21 +859,6 @@
     updateUpNext(); markActive(); prefetchNext(); savePlaystate();
   }
 
-  // ---------- favorites ----------
-  async function toggleFav(t) {
-    let fav;
-    try {
-      ({ fav } = await jsend(`api/favorites/${t.id}`, "POST").then((r) => r.json()));
-    } catch (e) {
-      console.error(e); toast("Couldn't update favorite."); return;
-    }
-    [...view, ...queue].forEach((x) => { if (x && x.id === t.id) x.fav = fav; });
-    applySearch();
-    const cur = currentTrack();
-    if (cur && cur.id === t.id) { favBtn.innerHTML = fav ? ICONS.heartFill : ICONS.heart; favBtn.classList.toggle("on", fav); }
-    loadShelf();
-  }
-
   // ---------- track edit / delete ----------
   let editing = null;
   function openEdit(t) {
@@ -967,17 +945,15 @@
   function openMenu(e, t) {
     menu.dataset.for = t.id;
     menu.innerHTML = "";
-    menu.appendChild(submenuItem("Add to…", () => openAddMenu(e, t)));
-    const sep = document.createElement("div");
-    sep.className = "menu-sep";
-    menu.appendChild(sep);
     menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
     menu.hidden = false;   // show first so we can measure it, then place it
     placeAtClick(e);
   }
-  // "Add to…" picker: the queue, or any tape (mirrors the podcast "Add to show…").
+  // "Add to…" picker (the + button): the queue, or any tape. Distinct dataset key
+  // so it doesn't clash with the ⋯ more-menu's open/close toggle on the same row.
   function openAddMenu(e, t) {
+    menu.dataset.for = "add" + t.id;
     menu.innerHTML = "";
     menu.appendChild(menuItem("Queue", () => addToQueue(t), closeMenu));
     const tapes = shelf.filter((s) => s.kind === "user");
@@ -1203,7 +1179,6 @@
     view = await jget(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
     applySearch();   // re-render, honouring any active search text
   });
-  favBtn.addEventListener("click", () => { const t = currentTrack(); if (t) toggleFav(t); });
   $("backBtn").addEventListener("click", () =>
     showView(trackParent === "albums" || trackParent === "artists" ? "browse" : "shelf"));
   $("browseBack").addEventListener("click", () => showView("shelf"));
@@ -1300,7 +1275,6 @@
   $("prevBtn").innerHTML = ICONS.prev;
   playBtn.innerHTML = ICONS.play;
   $("nextBtn").innerHTML = ICONS.next;
-  favBtn.innerHTML = ICONS.heart;
   renderSleepBtn();
   $("shuffleBtn").innerHTML = ICONS.shuffle;
   $("newTapeBtn").innerHTML = ICONS.plus;

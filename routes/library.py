@@ -7,7 +7,7 @@ from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
-from models import Favorite, Play, Playlist, PlaylistTrack, PlayState, Track, db
+from models import Play, Playlist, PlaylistTrack, PlayState, Track, db
 
 library_blueprint = Blueprint("library", __name__)
 log = logging.getLogger("tapes.library")
@@ -35,13 +35,8 @@ def _uid():
     return current_user.id
 
 
-def _fav_ids():
-    return {f.track_id for f in Favorite.query.filter_by(user_id=_uid()).all()}
-
-
 def _serialize(tracks):
-    favs = _fav_ids()
-    return [t.to_dict(fav=t.id in favs) for t in tracks]
+    return [t.to_dict() for t in tracks]
 
 
 def _tracks_by_ids(ids):
@@ -70,8 +65,6 @@ def playlists():
     shelf = [
         {"key": "all", "name": "All Tracks", "kind": "builtin", "count": Track.query.count()},
         {"key": "singles", "name": "Singles", "kind": "builtin", "count": singles_q.count()},
-        {"key": "favorites", "name": "Favorites", "kind": "builtin",
-         "count": Favorite.query.filter_by(user_id=uid).count()},
     ]
     album_count = (db.session.query(db.func.count(db.func.distinct(Track.album)))
                    .filter(Track.album.isnot(None), Track.album != "").scalar()) or 0
@@ -158,10 +151,6 @@ def playlist_tracks(key):
     elif key == "singles":
         base = Track.query.filter(_is_single())
         tracks = _apply_sort(base, sort, _uid())
-    elif key == "favorites":
-        tracks = (Track.query.join(Favorite, Favorite.track_id == Track.id)
-                  .filter(Favorite.user_id == _uid())
-                  .order_by(Favorite.created_at.desc()).all())
     else:
         p = Playlist.query.filter_by(id=int(key), user_id=_uid()).first_or_404()
         rows = (db.session.query(Track).join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
@@ -367,44 +356,28 @@ def update_track(track_id):
     except Exception as e:  # noqa: BLE001 — DB is authoritative
         log.warning("tag write failed for %s: %s", t.file_path, e)
 
-    fav = Favorite.query.filter_by(user_id=_uid(), track_id=t.id).first() is not None
-    return jsonify(t.to_dict(fav=fav))
+    return jsonify(t.to_dict())
 
 
 @library_blueprint.route("/api/tracks/<int:track_id>", methods=["DELETE"])
 @login_required
 def delete_track(track_id):
-    """Remove a track from the library entirely — its file, tape links, favorites,
-    and play history. (The cover thumbnail is left; it's keyed by file hash and may
-    be shared.)"""
+    """Remove a track from the library entirely — its file, tape links, and play
+    history. (The cover thumbnail is left; it's keyed by file hash and may be
+    shared.)"""
     t = Track.query.get_or_404(track_id)
     try:
         (pathlib.Path(current_app.config["MUSIC_DIR"]) / t.file_path).unlink(missing_ok=True)
     except OSError as e:
         log.warning("file delete failed for %s: %s", t.file_path, e)
     PlaylistTrack.query.filter_by(track_id=track_id).delete()
-    Favorite.query.filter_by(track_id=track_id).delete()
     Play.query.filter_by(track_id=track_id).delete()
     db.session.delete(t)
     db.session.commit()
     return "", 204
 
 
-# ---- favorites / plays / playstate ----
-
-@library_blueprint.route("/api/favorites/<int:track_id>", methods=["POST"])
-@login_required
-def toggle_favorite(track_id):
-    existing = Favorite.query.filter_by(user_id=_uid(), track_id=track_id).first()
-    if existing:
-        db.session.delete(existing)
-        fav = False
-    else:
-        db.session.add(Favorite(user_id=_uid(), track_id=track_id))
-        fav = True
-    db.session.commit()
-    return jsonify({"fav": fav})
-
+# ---- plays / playstate ----
 
 @library_blueprint.route("/api/plays", methods=["POST"])
 @login_required

@@ -186,11 +186,8 @@ body {
 /* On touch (no hover), surface the per-row actions that otherwise only
  * appear on hover — they're unreachable with a finger otherwise. */
 @media (hover: none) {
-    .tl-add,
-    .track-list li:hover .tl-add { opacity: 1; }
-    .tl-fav,
-    .track-list li:not(:hover) .tl-fav:not(.on) { opacity: 1; }
-    .tl-fav, .tl-add, .shelf-del { padding: var(--space-2); }
+    .tl-add, .track-list li:hover .tl-add { opacity: 1; }
+    .tl-add, .shelf-del { padding: var(--space-2); }
 }
 
 /* ---- shelf ---- */
@@ -282,17 +279,15 @@ body {
 .tape-mode.active { color: var(--color-accent); }
 .tape-mode:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
 .tape-mode .icn { width: 20px; height: 20px; }
-.tl-fav, .tl-add {
+.tl-add {
     display: inline-flex; align-items: center; justify-content: center;
     background: none; border: 0; color: var(--color-text-muted); cursor: pointer;
     line-height: 1; padding: 4px; flex-shrink: 0;
     opacity: 0; transition: opacity 0.12s;
 }
-.tl-fav .icn, .tl-add .icn { width: 16px; height: 16px; }
-.track-list li:hover .tl-fav, .track-list li:hover .tl-add { opacity: 1; }
-.tl-fav { color: var(--color-accent); opacity: 1; }
-.track-list li:not(:hover) .tl-fav:not(.on) { opacity: 0; }
-.tl-fav:hover, .tl-add:hover { color: var(--color-text-primary); }
+.tl-add .icn { width: 16px; height: 16px; }
+.track-list li:hover .tl-add { opacity: 1; }
+.tl-add:hover { color: var(--color-text-primary); }
 
 /* ---- download panel ---- */
 .dl-panel { border-bottom: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); }
@@ -335,10 +330,6 @@ body {
 /* ---- sort selector (All Tracks / Singles) ---- */
 .sort-bar { padding: 0 var(--space-4) var(--space-2); }
 .sort-bar .sort-select { width: 100%; cursor: pointer; }
-
-/* deck favorite button */
-.tbtn.fav { width: 40px; height: 40px; font-size: 1.1rem; }
-.tbtn.fav.on { color: var(--color-accent); border-color: var(--color-accent); }
 
 /* sleep timer button */
 .tbtn.sleep { width: 40px; height: 40px; }
