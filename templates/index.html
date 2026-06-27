@@ -89,12 +89,14 @@
         <div class="search-wrap">
           <input class="input" id="epSearch" type="search" placeholder="Search…" autocomplete="off">
         </div>
-        <div class="tape-title-row"><div class="tape-title" id="showTitle"></div></div>
+        <div class="tape-title-row">
+          <div class="tape-title" id="showTitle"></div>
+          <button class="btn btn-ghost ep-refresh" id="showRefreshBtn" hidden>Refresh</button>
+        </div>
         <div class="ep-filter">
           <button class="ep-filter-btn active" data-f="all">All</button>
           <button class="ep-filter-btn" data-f="unplayed">Unplayed</button>
           <button class="ep-filter-btn" data-f="downloaded">Downloaded</button>
-          <button class="btn btn-ghost ep-refresh" id="showRefreshBtn" hidden>Refresh</button>
         </div>
         <ul class="track-list" id="episodeList"></ul>
       </div>
