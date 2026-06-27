@@ -188,6 +188,32 @@ def set_played(eid):
     return jsonify({"played": ep.played})
 
 
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/remove-download", methods=["POST"])
+@login_required
+def remove_download(eid):
+    """Drop the cached audio file but keep the episode (status back to 'new', so it
+    can be re-downloaded). For reclaiming disk without losing the episode."""
+    ep = _episode_or_404(eid)
+    _delete_episode_file(pathlib.Path(current_app.config["MUSIC_DIR"]), ep)
+    ep.file_path = None
+    ep.status = "new"
+    db.session.commit()
+    return jsonify({"status": ep.status})
+
+
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>", methods=["DELETE"])
+@login_required
+def delete_episode(eid):
+    """Remove an episode entirely — its file, jobs, and row. Note: for a subscribed
+    show, a later refresh re-catalogues it from the feed (as 'new')."""
+    ep = _episode_or_404(eid)
+    _delete_episode_file(pathlib.Path(current_app.config["MUSIC_DIR"]), ep)
+    DownloadJob.query.filter_by(episode_id=ep.id).delete()
+    db.session.delete(ep)
+    db.session.commit()
+    return "", 204
+
+
 # ---------- audio + cover ----------
 
 @podcasts_blueprint.route("/podcast/stream/<int:eid>")

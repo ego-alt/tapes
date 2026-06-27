@@ -344,18 +344,59 @@
           <div class="ep-title"></div><div class="ep-sub"></div>
           <div class="ep-prog"${pct ? "" : " hidden"}><div class="ep-prog-fill" style="width:${pct}%"></div></div>
         </span>
-        <button class="ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>`;
+        <button class="ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>
+        <button class="ep-menu" title="More">⋯</button>`;
       li.querySelector(".ep-title").textContent = e.title;
       li.querySelector(".ep-sub").textContent = sub;
       li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
+      li.querySelector(".ep-menu").addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (!menu.hidden && menu.dataset.for === "ep" + e.id) closeMenu();
+        else openEpisodeMenu(ev, e);
+      });
       li.addEventListener("click", () => playEpisode(list, i));
       el.appendChild(li);
     });
     markActive();
   }
+  let epFilter = localStorage.getItem("tapes-ep-filter") || "all";  // all | unplayed
   function applyEpisodeSearch() {
     const q = $("epSearch").value.toLowerCase().trim();
-    renderEpisodes(q ? episodes.filter((e) => e.title.toLowerCase().includes(q)) : episodes);
+    let list = epFilter === "unplayed" ? episodes.filter((e) => !e.played) : episodes;
+    if (q) list = list.filter((e) => e.title.toLowerCase().includes(q));
+    renderEpisodes(list);
+  }
+  function updateEpFilterBtns() {
+    [...document.querySelectorAll(".ep-filter-btn")].forEach((b) =>
+      b.classList.toggle("active", b.dataset.f === epFilter));
+  }
+  // ---- per-episode menu (remove download / delete) ----
+  function openEpisodeMenu(e, ep) {
+    menu.dataset.for = "ep" + ep.id;
+    menu.innerHTML = "";
+    if (ep.status === "ready")
+      menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
+    menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
+    menu.hidden = false;   // show to measure, then place at the click
+    const pad = 8, mh = menu.offsetHeight;
+    const flipUp = e.clientY + mh > window.innerHeight - pad;
+    const flipLeft = e.clientX + menu.offsetWidth > window.innerWidth - pad;
+    placeMenu(menu, flipUp ? e.clientY - mh : e.clientY, e.clientX,
+      `${flipUp ? "bottom" : "top"} ${flipLeft ? "right" : "left"}`);
+  }
+  async function removeDownload(ep) {
+    try { await jsend(`api/podcast/episodes/${ep.id}/remove-download`, "POST"); }
+    catch (err) { console.error(err); toast("Couldn't remove the download."); return; }
+    ep.status = "new"; ep.file_path = null;
+    applyEpisodeSearch();
+    toast("Download removed");
+  }
+  async function deleteEpisode(ep) {
+    if (!confirm(`Delete "${ep.title}"?`)) return;
+    try { await jsend(`api/podcast/episodes/${ep.id}`, "DELETE"); }
+    catch (err) { console.error(err); toast("Couldn't delete."); return; }
+    episodes = episodes.filter((x) => x.id !== ep.id);
+    applyEpisodeSearch();
   }
   async function playEpisode(list, i) {
     const e = list[i];
@@ -1085,6 +1126,13 @@
   $("modeMusic").addEventListener("click", () => setMode("music"));
   $("modePods").addEventListener("click", () => setMode("podcasts"));
   $("epBack").addEventListener("click", () => showView("podcasts"));
+  [...document.querySelectorAll(".ep-filter-btn")].forEach((b) =>
+    b.addEventListener("click", () => {
+      epFilter = b.dataset.f;
+      localStorage.setItem("tapes-ep-filter", epFilter);
+      updateEpFilterBtns();
+      applyEpisodeSearch();
+    }));
   $("epSearch").addEventListener("input", applyEpisodeSearch);
   $("showRefreshBtn").addEventListener("click", refreshCurrentShow);
   $("showDelBtn").addEventListener("click", deleteCurrentShow);
@@ -1162,6 +1210,7 @@
   $("shuffleBtn").classList.toggle("active", shuffleOn);
   $("shuffleBtn").setAttribute("aria-pressed", String(shuffleOn));
   updateRepeatBtn();
+  updateEpFilterBtns();
   enableReorder($("trackList"), onTrackReorder);
   enableReorder($("queueList"), onQueueReorder);
   window.addEventListener("unhandledrejection", (e) => {
