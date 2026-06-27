@@ -114,9 +114,11 @@ def shows():
 def _episodes_query(show_id):
     q = Episode.query.filter_by(user_id=_uid())
     q = q.filter_by(show_id=show_id) if show_id is not None else q.filter(Episode.show_id.is_(None))
-    # Newest first; episodes without a date (YouTube) fall back to insert order.
+    # RSS sorts newest-first by real date. YouTube has no per-video dates, so it
+    # follows the order YouTube returned (id asc) — newest-first for a channel's
+    # uploads, playlist order for a playlist — rather than reversed.
     return q.order_by(Episode.published_at.is_(None), Episode.published_at.desc(),
-                      Episode.id.desc()).all()
+                      Episode.id.asc()).all()
 
 
 @podcasts_blueprint.route("/api/podcast/shows/<int:sid>/episodes")

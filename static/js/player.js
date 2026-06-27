@@ -357,10 +357,12 @@
     });
     markActive();
   }
-  let epFilter = localStorage.getItem("tapes-ep-filter") || "all";  // all | unplayed
+  let epFilter = localStorage.getItem("tapes-ep-filter") || "all";  // all | unplayed | downloaded
   function applyEpisodeSearch() {
     const q = $("epSearch").value.toLowerCase().trim();
-    let list = epFilter === "unplayed" ? episodes.filter((e) => !e.played) : episodes;
+    let list = episodes;
+    if (epFilter === "unplayed") list = list.filter((e) => !e.played);
+    else if (epFilter === "downloaded") list = list.filter((e) => e.status === "ready");
     if (q) list = list.filter((e) => e.title.toLowerCase().includes(q));
     renderEpisodes(list);
   }
