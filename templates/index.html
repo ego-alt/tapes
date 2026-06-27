@@ -75,8 +75,8 @@
       <div class="podcasts-view" id="podcastsView" hidden>
         <ul class="shelf-list" id="showList"></ul>
         <form class="new-tape" id="newShowForm">
-          <input class="input" id="newShowName" placeholder="New show…" autocomplete="off">
-          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create show" aria-label="Create show"></button>
+          <input class="input" id="newShowName" placeholder="New tape…" autocomplete="off">
+          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create tape" aria-label="Create tape"></button>
         </form>
       </div>
 
@@ -84,8 +84,7 @@
       <div class="episodes-view" id="episodesView" hidden>
         <div class="tape-nav">
           <button class="btn btn-ghost back-btn" id="epBack">‹ Podcasts</button>
-          <button class="btn btn-ghost" id="showRefreshBtn" hidden>Refresh</button>
-          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Delete</button>
+          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Delete tape</button>
         </div>
         <div class="search-wrap">
           <input class="input" id="epSearch" type="search" placeholder="Search…" autocomplete="off">
@@ -94,6 +93,7 @@
         <div class="ep-filter">
           <button class="ep-filter-btn active" data-f="all">All</button>
           <button class="ep-filter-btn" data-f="unplayed">Unplayed</button>
+          <button class="btn btn-ghost ep-refresh" id="showRefreshBtn" hidden>Refresh</button>
         </div>
         <ul class="track-list" id="episodeList"></ul>
       </div>

@@ -429,7 +429,8 @@ body {
 .ep-played { opacity: 1; }
 .track-list li.played .ep-played { color: var(--color-accent); }
 
-.ep-filter { display: flex; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
+.ep-filter { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
+.ep-refresh { margin-left: auto; }   /* push Refresh to the right of All | Unplayed */
 .ep-filter-btn {
     background: none;
     border: 1px solid var(--color-border);

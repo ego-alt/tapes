@@ -298,23 +298,22 @@
     const data = await jget(`api/podcast/shows/${s.id}/episodes`);
     if (tok !== navToken) return;
     currentShow = data.show;
-    episodes = data.episodes;
-    $("showTitle").textContent = data.show.title;
-    $("showRefreshBtn").hidden = !data.show.refreshable;   // manual shows can't refresh
-    $("showDelBtn").hidden = false;
-    $("epSearch").value = "";
-    renderEpisodes(episodes);
-    showView("episodes");
+    // manual tapes can't refresh; only real shows can be deleted from here
+    enterEpisodes(data.show.title, data.episodes, { refreshable: data.show.refreshable, deletable: true });
   }
   async function openLoose() {
     const tok = ++navToken;
     const data = await jget("api/podcast/episodes/loose");
     if (tok !== navToken) return;
     currentShow = null;
-    episodes = data.episodes;
-    $("showTitle").textContent = "Loose episodes";
-    $("showRefreshBtn").hidden = true;
-    $("showDelBtn").hidden = true;
+    enterEpisodes("Loose episodes", data.episodes, { refreshable: false, deletable: false });
+  }
+  // Shared tail for the two episode views (a tape's episodes, or Loose episodes).
+  function enterEpisodes(title, eps, { refreshable, deletable }) {
+    episodes = eps;
+    $("showTitle").textContent = title;
+    $("showRefreshBtn").hidden = !refreshable;
+    $("showDelBtn").hidden = !deletable;
     $("epSearch").value = "";
     renderEpisodes(episodes);
     showView("episodes");
@@ -380,34 +379,30 @@
   function openEpisodeMenu(e, ep) {
     menu.dataset.for = "ep" + ep.id;
     menu.innerHTML = "";
-    // Loose episodes can be filed into a show (in-place picker — see submenuItem).
+    // Loose episodes can be filed into a tape (in-place picker — see submenuItem).
     if (ep.show_id == null)
-      menu.appendChild(submenuItem("Add to show…", () => openAssignMenu(e, ep)));
+      menu.appendChild(submenuItem("Add to tape…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
     menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
-    menu.hidden = false;   // show to measure, then place at the click
-    placeAtClick(e);
+    showMenuAt(e);
   }
   async function openAssignMenu(e, ep) {
     if (!showsData) { try { showsData = await jget("api/podcast/shows"); } catch (_) { /* ignore */ } }
     menu.innerHTML = "";
     (showsData?.shows || []).forEach((s) =>
       menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
-    const sep = document.createElement("div");
-    sep.className = "menu-sep";
-    menu.appendChild(sep);
-    menu.appendChild(menuItem("New show…", () => {
-      const name = prompt("New show name:");
+    menu.appendChild(menuSep());
+    menu.appendChild(menuItem("New tape…", () => {
+      const name = prompt("New tape name:");
       if (name && name.trim()) assignEpisode(ep, { new_show_name: name.trim() });
     }, closeMenu));
-    menu.hidden = false;
-    placeAtClick(e);
+    showMenuAt(e);
   }
   async function assignEpisode(ep, body) {
     let res;
     try { res = await jsend(`api/podcast/episodes/${ep.id}/assign`, "POST", body).then((r) => r.json()); }
-    catch (err) { console.error(err); toast("Couldn't add to show."); return; }
+    catch (err) { console.error(err); toast("Couldn't add to tape."); return; }
     episodes = episodes.filter((x) => x.id !== ep.id);   // it left Loose episodes
     applyEpisodeSearch();
     showsData = null;   // counts/new show changed — refetch on next open
@@ -939,6 +934,13 @@
     item.addEventListener("click", (ev) => { ev.stopPropagation(); opener(); });
     return item;
   }
+  function menuSep() {
+    const s = document.createElement("div");
+    s.className = "menu-sep";
+    return s;
+  }
+  // Reveal the popover then place it at the click (placement measures it visible).
+  function showMenuAt(e) { menu.hidden = false; placeAtClick(e); }
 
   // ---------- add-to-tape menu ----------
   const menu = $("plMenu");
@@ -947,8 +949,7 @@
     menu.innerHTML = "";
     menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
-    menu.hidden = false;   // show first so we can measure it, then place it
-    placeAtClick(e);
+    showMenuAt(e);
   }
   // "Add to…" picker (the + button): the queue, or any tape. Distinct dataset key
   // so it doesn't clash with the ⋯ more-menu's open/close toggle on the same row.
@@ -958,16 +959,13 @@
     menu.appendChild(menuItem("Queue", () => addToQueue(t), closeMenu));
     const tapes = shelf.filter((s) => s.kind === "user");
     if (tapes.length) {
-      const sep = document.createElement("div");
-      sep.className = "menu-sep";
-      menu.appendChild(sep);
+      menu.appendChild(menuSep());
       tapes.forEach((s) => menu.appendChild(menuItem(s.name, async () => {
         await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
         loadShelf();
       }, closeMenu)));
     }
-    menu.hidden = false;
-    placeAtClick(e);
+    showMenuAt(e);
   }
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
@@ -1219,19 +1217,21 @@
   $("navToggle").addEventListener("click", () => app.classList.toggle("nav-collapsed"));
   $("scrim").addEventListener("click", closeNav);
   $("search").addEventListener("input", applySearch);
-  $("newTapeForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = $("newTapeName").value.trim();
-    if (!name) return;
-    await jsend("api/playlists", "POST", { name });
-    $("newTapeName").value = ""; loadShelf();
+  // Both "New tape" forms (music + podcast) share the create boilerplate.
+  function wireCreateForm(formId, inputId, onSubmit) {
+    $(formId).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = $(inputId).value.trim();
+      if (!name) return;
+      await onSubmit(name);
+      $(inputId).value = "";
+    });
+  }
+  wireCreateForm("newTapeForm", "newTapeName", async (name) => {
+    await jsend("api/playlists", "POST", { name }); loadShelf();
   });
-  $("newShowForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = $("newShowName").value.trim();
-    if (!name) return;
-    await jsend("api/podcast/shows", "POST", { name });
-    $("newShowName").value = ""; showsData = null; openPodcasts();
+  wireCreateForm("newShowForm", "newShowName", async (name) => {
+    await jsend("api/podcast/shows", "POST", { name }); showsData = null; openPodcasts();
   });
 
   audio.addEventListener("play", () => {
