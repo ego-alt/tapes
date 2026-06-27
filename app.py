@@ -128,6 +128,8 @@ def create_app(config=None):
             "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
             "ALTER TABLE download_jobs ADD COLUMN kind VARCHAR DEFAULT 'music'",
             "ALTER TABLE download_jobs ADD COLUMN episode_id INTEGER REFERENCES episodes(id)",
+            "ALTER TABLE shows ADD COLUMN channel_id VARCHAR",
+            "ALTER TABLE episodes ADD COLUMN channel_id VARCHAR",
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
             "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",

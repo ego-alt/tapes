@@ -118,7 +118,10 @@ class Show(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     title = db.Column(db.String, nullable=False)
     source_type = db.Column(db.String, nullable=False)  # rss | youtube
-    source_url = db.Column(db.String, nullable=False)    # feed URL / channel|playlist URL
+    source_url = db.Column(db.String, nullable=False)  # feed/channel/playlist URL ("" = manual)
+    # Linked YouTube channel: when set, future single videos from this channel
+    # auto-file into this show instead of landing in Loose episodes.
+    channel_id = db.Column(db.String, index=True)
     description = db.Column(db.Text)
     has_image = db.Column(db.Boolean, default=False)     # cover cached at shows/<id>.jpg
     created_at = db.Column(db.DateTime, server_default=func.now())
@@ -141,6 +144,9 @@ class Episode(db.Model):
     # Enclosure URL (rss) or watch URL (youtube) — what we download from.
     source_url = db.Column(db.String, nullable=False)
     source_type = db.Column(db.String, nullable=False)  # rss | youtube
+    # YouTube channel of this video, captured at add time so a loose episode can be
+    # assigned to a show and that channel linked for future auto-routing.
+    channel_id = db.Column(db.String)
     # Relative to MUSIC_DIR (under the reserved _podcasts/ subdir); null until fetched.
     file_path = db.Column(db.String)
     status = db.Column(db.String, nullable=False, default="new")  # new|downloading|ready|error

@@ -31,6 +31,8 @@ def _show_dict(s):
     return {
         "id": s.id, "title": s.title, "source_type": s.source_type,
         "has_image": bool(s.has_image), "count": total, "unplayed": unplayed,
+        # Manual shows (built from loose episodes) have no feed URL → can't refresh.
+        "refreshable": bool(s.source_url),
     }
 
 
@@ -48,14 +50,19 @@ def add():
     except Exception as e:  # noqa: BLE001 — surface a clean message to the client
         abort(400, f"couldn't read that feed: {e}")
 
-    # Single YouTube video → a loose episode (no show).
+    # Single YouTube video → a loose episode, unless its channel is already linked
+    # to a show (opt-in auto-routing), in which case it files into that show.
     if show_meta is None:
         if not eps:
             abort(400, "nothing to add")
         for m in eps:
             m["source_url"] = podcasts.normalize_video_url(m["source_url"])
-        added = podcasts.upsert_episodes(_uid(), None, eps)
+        ch = eps[0].get("channel_id")
+        target = Show.query.filter_by(user_id=_uid(), channel_id=ch).first() if ch else None
+        added = podcasts.upsert_episodes(_uid(), target.id if target else None, eps)
         db.session.commit()
+        if target:
+            return jsonify({"assigned": _show_dict(target), "added": added}), 201
         return jsonify({"loose": True, "added": added}), 201
 
     show = Show.query.filter_by(user_id=_uid(), source_url=url).first()
@@ -186,6 +193,38 @@ def set_played(eid):
     ep.played = bool((request.json or {}).get("played", True))
     db.session.commit()
     return jsonify({"played": ep.played})
+
+
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/assign", methods=["POST"])
+@login_required
+def assign_episode(eid):
+    """File a loose episode into a show — an existing one (show_id) or a new one
+    (new_show_name). For a YouTube episode this links the show to the video's
+    channel, so future videos from it auto-route here (opt-in)."""
+    ep = _episode_or_404(eid)
+    data = request.json or {}
+    sid = data.get("show_id")
+    name = (data.get("new_show_name") or "").strip()
+
+    if sid is not None:
+        show = Show.query.filter_by(id=sid, user_id=_uid()).first_or_404()
+    elif name:
+        # A manual show; if we can link a channel, give it that channel's URL so it
+        # also becomes refreshable like a real subscription.
+        src = f"https://www.youtube.com/channel/{ep.channel_id}" if ep.channel_id else ""
+        show = Show(user_id=_uid(), title=name, source_type="youtube", source_url=src)
+        db.session.add(show)
+        db.session.flush()
+    else:
+        abort(400, "show_id or new_show_name required")
+
+    ep.show_id = show.id
+    if ep.channel_id and not show.channel_id:
+        show.channel_id = ep.channel_id
+        if not show.source_url:
+            show.source_url = f"https://www.youtube.com/channel/{ep.channel_id}"
+    db.session.commit()
+    return jsonify({"show": _show_dict(show)})
 
 
 @podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/remove-download", methods=["POST"])

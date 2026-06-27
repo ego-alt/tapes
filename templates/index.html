@@ -254,6 +254,20 @@
   <div class="menu" id="plMenu" role="menu" hidden></div>
   <div class="menu" id="sleepMenu" role="menu" hidden></div>
 
+  <div class="modal-scrim" id="editModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit track">
+      <div class="modal-head">Edit track</div>
+      <label class="modal-field">Title<input class="input" id="edTitle" autocomplete="off"></label>
+      <label class="modal-field">Artist<input class="input" id="edArtist" autocomplete="off"></label>
+      <label class="modal-field">Album<input class="input" id="edAlbum" autocomplete="off"></label>
+      <label class="modal-field">Track #<input class="input" id="edTrackNo" type="number" min="0" autocomplete="off"></label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="edCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="edSave" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.MUSIC = {
       streamBase: "{{ url_for('stream.stream', track_id=0) }}".slice(0, -1),

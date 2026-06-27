@@ -312,6 +312,84 @@ def tracks_by_ids():
     return jsonify(_tracks_by_ids([i for i in ids if isinstance(i, int)]))
 
 
+# ---- per-track edit / delete ----
+
+@library_blueprint.route("/api/tracks/<int:track_id>", methods=["PATCH"])
+@login_required
+def update_track(track_id):
+    """Edit a single track's title/artist/album/track number in both the file tag
+    (so a later `scan --full` keeps it) and the DB row. The DB is authoritative if
+    the tag write fails. Unlike the global artist rename, this writes exactly what
+    the user typed (no canonical-spelling reconcile) — they're in explicit control."""
+    t = Track.query.get_or_404(track_id)
+    data = request.json or {}
+
+    def _clean(key):
+        v = data.get(key)
+        return v.strip() if isinstance(v, str) else None
+
+    title = _clean("title")
+    if "title" in data and not title:
+        abort(400, "title can't be empty")
+    artist = _clean("artist") if "artist" in data else None
+    album = _clean("album") if "album" in data else None
+    track_no = None
+    if "track_no" in data:
+        raw = data.get("track_no")
+        try:
+            track_no = int(raw) if raw not in (None, "") else None
+        except (TypeError, ValueError):
+            abort(400, "track number must be a number")
+
+    if title is not None:
+        t.title = title
+    if "artist" in data:
+        t.artist = artist or None
+    if "album" in data:
+        t.album = album or None
+    if "track_no" in data:
+        t.track_no = track_no
+    db.session.commit()
+
+    # Mirror into the file tag (best-effort; DB stays the source of truth).
+    try:
+        from mutagen.easyid3 import EasyID3
+        audio = EasyID3(str(pathlib.Path(current_app.config["MUSIC_DIR"]) / t.file_path))
+        if title is not None:
+            audio["title"] = title
+        if "artist" in data:
+            audio["artist"] = artist or ""
+        if "album" in data:
+            audio["album"] = album or ""
+        if "track_no" in data:
+            audio["tracknumber"] = str(track_no) if track_no else ""
+        audio.save()
+    except Exception as e:  # noqa: BLE001 — DB is authoritative
+        log.warning("tag write failed for %s: %s", t.file_path, e)
+
+    fav = Favorite.query.filter_by(user_id=_uid(), track_id=t.id).first() is not None
+    return jsonify(t.to_dict(fav=fav))
+
+
+@library_blueprint.route("/api/tracks/<int:track_id>", methods=["DELETE"])
+@login_required
+def delete_track(track_id):
+    """Remove a track from the library entirely — its file, tape links, favorites,
+    and play history. (The cover thumbnail is left; it's keyed by file hash and may
+    be shared.)"""
+    t = Track.query.get_or_404(track_id)
+    try:
+        (pathlib.Path(current_app.config["MUSIC_DIR"]) / t.file_path).unlink(missing_ok=True)
+    except OSError as e:
+        log.warning("file delete failed for %s: %s", t.file_path, e)
+    PlaylistTrack.query.filter_by(track_id=track_id).delete()
+    Favorite.query.filter_by(track_id=track_id).delete()
+    Play.query.filter_by(track_id=track_id).delete()
+    db.session.delete(t)
+    db.session.commit()
+    return "", 204
+
+
 # ---- favorites / plays / playstate ----
 
 @library_blueprint.route("/api/favorites/<int:track_id>", methods=["POST"])

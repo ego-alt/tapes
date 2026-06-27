@@ -147,6 +147,7 @@ def parse_youtube(url: str):
             "duration_s": entry.get("duration"),
             "description": entry.get("description") or "",
             "published_at": None,
+            "channel_id": entry.get("channel_id"),
         }
 
     if data.get("_type") == "playlist":
@@ -204,6 +205,7 @@ def upsert_episodes(user_id: int, show_id, ep_metas) -> int:
         db.session.add(Episode(
             user_id=user_id, show_id=show_id, guid=m["guid"], title=m["title"],
             source_url=m["source_url"], source_type=m["source_type"],
+            channel_id=m.get("channel_id"),
             duration_s=m.get("duration_s"), description=m.get("description") or "",
             published_at=m.get("published_at"), status="new",
         ))

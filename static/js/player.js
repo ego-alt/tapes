@@ -301,7 +301,7 @@
     currentShow = data.show;
     episodes = data.episodes;
     $("showTitle").textContent = data.show.title;
-    $("showRefreshBtn").hidden = false;
+    $("showRefreshBtn").hidden = !data.show.refreshable;   // manual shows can't refresh
     $("showDelBtn").hidden = false;
     $("epSearch").value = "";
     renderEpisodes(episodes);
@@ -370,19 +370,49 @@
     [...document.querySelectorAll(".ep-filter-btn")].forEach((b) =>
       b.classList.toggle("active", b.dataset.f === epFilter));
   }
-  // ---- per-episode menu (remove download / delete) ----
-  function openEpisodeMenu(e, ep) {
-    menu.dataset.for = "ep" + ep.id;
-    menu.innerHTML = "";
-    if (ep.status === "ready")
-      menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
-    menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
-    menu.hidden = false;   // show to measure, then place at the click
+  // ---- per-episode menu (assign to show / remove download / delete) ----
+  function placeAtClick(e) {
     const pad = 8, mh = menu.offsetHeight;
     const flipUp = e.clientY + mh > window.innerHeight - pad;
     const flipLeft = e.clientX + menu.offsetWidth > window.innerWidth - pad;
     placeMenu(menu, flipUp ? e.clientY - mh : e.clientY, e.clientX,
       `${flipUp ? "bottom" : "top"} ${flipLeft ? "right" : "left"}`);
+  }
+  function openEpisodeMenu(e, ep) {
+    menu.dataset.for = "ep" + ep.id;
+    menu.innerHTML = "";
+    // Loose episodes can be filed into a show (keep menu open → assign picker).
+    if (ep.show_id == null)
+      menu.appendChild(menuItem("Add to show…", () => openAssignMenu(e, ep), () => {}));
+    if (ep.status === "ready")
+      menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
+    menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
+    menu.hidden = false;   // show to measure, then place at the click
+    placeAtClick(e);
+  }
+  async function openAssignMenu(e, ep) {
+    if (!showsData) { try { showsData = await jget("api/podcast/shows"); } catch (_) { /* ignore */ } }
+    menu.innerHTML = "";
+    (showsData?.shows || []).forEach((s) =>
+      menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
+    const sep = document.createElement("div");
+    sep.className = "menu-sep";
+    menu.appendChild(sep);
+    menu.appendChild(menuItem("New show…", () => {
+      const name = prompt("New show name:");
+      if (name && name.trim()) assignEpisode(ep, { new_show_name: name.trim() });
+    }, closeMenu));
+    menu.hidden = false;
+    placeAtClick(e);
+  }
+  async function assignEpisode(ep, body) {
+    let res;
+    try { res = await jsend(`api/podcast/episodes/${ep.id}/assign`, "POST", body).then((r) => r.json()); }
+    catch (err) { console.error(err); toast("Couldn't add to show."); return; }
+    episodes = episodes.filter((x) => x.id !== ep.id);   // it left Loose episodes
+    applyEpisodeSearch();
+    showsData = null;   // counts/new show changed — refetch on next open
+    toast(`Added to "${res.show.title}"`);
   }
   async function removeDownload(ep) {
     try { await jsend(`api/podcast/episodes/${ep.id}/remove-download`, "POST"); }
@@ -861,6 +891,56 @@
     loadShelf();
   }
 
+  // ---------- track edit / delete ----------
+  let editing = null;
+  function openEdit(t) {
+    editing = t;
+    $("edTitle").value = t.title || "";
+    $("edArtist").value = t.artist || "";
+    $("edAlbum").value = t.album || "";
+    $("edTrackNo").value = t.track_no || "";
+    $("editModal").hidden = false;
+    $("edTitle").focus();
+  }
+  function closeEdit() { $("editModal").hidden = true; editing = null; }
+  async function saveEdit() {
+    if (!editing) return;
+    const id = editing.id;
+    let updated;
+    try {
+      updated = await jsend(`api/tracks/${id}`, "PATCH", {
+        title: $("edTitle").value, artist: $("edArtist").value,
+        album: $("edAlbum").value, track_no: $("edTrackNo").value,
+      }).then((r) => r.json());
+    } catch (e) { console.error(e); toast("Couldn't save changes."); return; }
+    // Patch every in-memory copy of this track (view, queue, source order).
+    [...view, ...queue, ...baseQueue].forEach((x) => {
+      if (x && x.id === id) {
+        x.title = updated.title; x.artist = updated.artist;
+        x.album = updated.album; x.track_no = updated.track_no;
+      }
+    });
+    closeEdit();
+    applySearch();
+    const cur = currentTrack();
+    if (cur && cur.id === id) {   // refresh the deck label without reloading audio
+      labelTitle.textContent = cur.title;
+      labelArtist.textContent = [cur.artist, cur.album].filter(Boolean).join(" — ");
+      document.title = cur.title + (cur.artist ? " · " + cur.artist : "");
+    }
+    loadShelf();   // album/artist counts may have shifted
+  }
+  async function deleteTrack(t) {
+    if (!confirm(`Delete "${t.title}" from the library? This removes the file.`)) return;
+    try { await jsend(`api/tracks/${t.id}`, "DELETE"); }
+    catch (e) { console.error(e); toast("Couldn't delete."); return; }
+    const idx = queue.findIndex((x) => x.id === t.id);
+    if (idx >= 0) queueRemove(idx);   // handles current-track/qi/Up Next cleanup
+    view = view.filter((x) => x.id !== t.id);
+    applySearch();
+    loadShelf();
+  }
+
   // ---------- popover menus (add-to-tape, sleep timer) ----------
   // Measure-then-clamp into the viewport; the caller picks the tentative top/left
   // and the grow-from corner. Shared by both menus.
@@ -902,6 +982,12 @@
       await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
       loadShelf();
     }, closeMenu)));
+
+    const sep2 = document.createElement("div");
+    sep2.className = "menu-sep";
+    menu.appendChild(sep2);
+    menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
+    menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
 
     menu.hidden = false;   // show first so we can measure it, then place it
     const pad = 8, mh = menu.offsetHeight;
@@ -1012,8 +1098,11 @@
     try {
       const r = await jsend("api/podcast/add", "POST", { url }).then((x) => x.json());
       $("dlUrl").value = "";
-      toast(r.created === false ? `Added ${r.added} new episode${r.added === 1 ? "" : "s"}`
-        : r.loose ? "Added episode" : `Added "${r.title}"`);
+      const msg = r.assigned ? `Added to "${r.assigned.title}"`
+        : r.loose ? "Added to Loose episodes"
+        : r.created === false ? `Added ${r.added} new episode${r.added === 1 ? "" : "s"}`
+        : `Added "${r.title}"`;
+      toast(msg);
       openPodcasts();
     } catch (err) {
       console.error(err); toast("Couldn't add that — check the URL.");
@@ -1125,6 +1214,13 @@
   $("browseSearch").addEventListener("input", applyBrowseSearch);
   $("modeMusic").addEventListener("click", () => setMode("music"));
   $("modePods").addEventListener("click", () => setMode("podcasts"));
+  $("edCancel").addEventListener("click", closeEdit);
+  $("edSave").addEventListener("click", saveEdit);
+  $("editModal").addEventListener("click", (e) => { if (e.target === $("editModal")) closeEdit(); });
+  $("editModal").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+    if (e.key === "Escape") closeEdit();
+  });
   $("epBack").addEventListener("click", () => showView("podcasts"));
   [...document.querySelectorAll(".ep-filter-btn")].forEach((b) =>
     b.addEventListener("click", () => {
