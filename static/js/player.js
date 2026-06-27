@@ -381,9 +381,18 @@
   function openEpisodeMenu(e, ep) {
     menu.dataset.for = "ep" + ep.id;
     menu.innerHTML = "";
-    // Loose episodes can be filed into a show (keep menu open → assign picker).
-    if (ep.show_id == null)
-      menu.appendChild(menuItem("Add to show…", () => openAssignMenu(e, ep), () => {}));
+    // Loose episodes can be filed into a show. This item swaps the menu in place
+    // for the show picker, so its click must NOT bubble to the close-on-outside
+    // handler (which would otherwise see the detached item and close the menu).
+    if (ep.show_id == null) {
+      const it = document.createElement("div");
+      it.className = "menu-item";
+      it.setAttribute("role", "menuitem");
+      it.tabIndex = -1;
+      it.textContent = "Add to show…";
+      it.addEventListener("click", (ev) => { ev.stopPropagation(); openAssignMenu(e, ep); });
+      menu.appendChild(it);
+    }
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
     menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
@@ -1250,6 +1259,13 @@
     await jsend("api/playlists", "POST", { name });
     $("newTapeName").value = ""; loadShelf();
   });
+  $("newShowForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("newShowName").value.trim();
+    if (!name) return;
+    await jsend("api/podcast/shows", "POST", { name });
+    $("newShowName").value = ""; showsData = null; openPodcasts();
+  });
 
   audio.addEventListener("play", () => {
     cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause;
@@ -1296,6 +1312,7 @@
   renderSleepBtn();
   $("shuffleBtn").innerHTML = ICONS.shuffle;
   $("newTapeBtn").innerHTML = ICONS.plus;
+  $("newShowBtn").innerHTML = ICONS.plus;
   $("upnextIco").innerHTML = ICONS.list;
   $("upnextCaret").innerHTML = ICONS.chevronUp;
   $("shuffleBtn").classList.toggle("active", shuffleOn);

@@ -71,9 +71,13 @@
         <ul class="track-list" id="trackList"></ul>
       </div>
 
-      <!-- podcasts: shows list (the add form lives in the shared dl-panel) -->
+      <!-- podcasts: shows list (the feed-add form lives in the shared dl-panel) -->
       <div class="podcasts-view" id="podcastsView" hidden>
         <ul class="shelf-list" id="showList"></ul>
+        <form class="new-tape" id="newShowForm">
+          <input class="input" id="newShowName" placeholder="New show…" autocomplete="off">
+          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create show" aria-label="Create show"></button>
+        </form>
       </div>
 
       <!-- episodes within a show -->

@@ -83,6 +83,21 @@ def add():
     return jsonify({**_show_dict(show), "added": added, "created": created}), 201
 
 
+@podcasts_blueprint.route("/api/podcast/shows", methods=["POST"])
+@login_required
+def create_show():
+    """Create an empty show to file loose episodes into — the podcast counterpart of
+    creating a tape. No feed (source_url ""), so it isn't refreshable until an
+    assigned YouTube episode links a channel to it."""
+    name = (request.json or {}).get("name", "").strip()
+    if not name:
+        abort(400, "name required")
+    s = Show(user_id=_uid(), title=name, source_type="manual", source_url="")
+    db.session.add(s)
+    db.session.commit()
+    return jsonify(_show_dict(s)), 201
+
+
 @podcasts_blueprint.route("/api/podcast/shows")
 @login_required
 def shows():
