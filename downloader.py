@@ -8,7 +8,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from cleaning import clean_meta, clean_title, reconcile_artist
-from models import DownloadJob, PlaylistTrack, Track, db
+from models import DownloadJob, Playlist, PlaylistTrack, Track, db
 from scan import scan_library
 
 _job_queue: "queue.Queue[int]" = queue.Queue()
@@ -232,6 +232,13 @@ def _process(app, job_id: int):
                 return
 
     source = _read_source_meta(final_mp3, job.url)
+    # A playlist rip downloads each video with --no-playlist, so the per-video
+    # info.json carries no playlist context. Supply the tape name we captured at
+    # submit time as the playlist signal so the LLM can enrich the album from it.
+    if job.playlist_id and not source.get("playlist"):
+        pl = db.session.get(Playlist, job.playlist_id)
+        if pl and pl.name:
+            source["playlist"] = pl.name
     llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
     if app.config.get("ART_LOOKUP", True):
         _fetch_art(final_mp3)
