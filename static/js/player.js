@@ -381,18 +381,9 @@
   function openEpisodeMenu(e, ep) {
     menu.dataset.for = "ep" + ep.id;
     menu.innerHTML = "";
-    // Loose episodes can be filed into a show. This item swaps the menu in place
-    // for the show picker, so its click must NOT bubble to the close-on-outside
-    // handler (which would otherwise see the detached item and close the menu).
-    if (ep.show_id == null) {
-      const it = document.createElement("div");
-      it.className = "menu-item";
-      it.setAttribute("role", "menuitem");
-      it.tabIndex = -1;
-      it.textContent = "Add to show…";
-      it.addEventListener("click", (ev) => { ev.stopPropagation(); openAssignMenu(e, ep); });
-      menu.appendChild(it);
-    }
+    // Loose episodes can be filed into a show (in-place picker — see submenuItem).
+    if (ep.show_id == null)
+      menu.appendChild(submenuItem("Add to show…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
     menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
@@ -753,16 +744,6 @@
   }
 
   // ---------- queue editing ----------
-  function playNext(t) {
-    // Nothing playing, or an episode holds the deck → start a fresh music queue
-    // rather than splicing a song into the podcast queue.
-    if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); return; }
-    queue.splice(qi + 1, 0, t);
-    baseQueue = queue.slice();   // manual edits define the new source order
-    prefetchNext();
-    savePlaystate();
-    updateUpNext();
-  }
   function addToQueue(t) {
     if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); return; }
     queue.push(t);
@@ -968,37 +949,48 @@
     item.addEventListener("click", () => { fn(); close(); });
     return item;
   }
+  // A menu item that swaps the menu in place for a sub-picker. Its click must NOT
+  // bubble to the close-on-outside handler (the rebuild detaches this element,
+  // which would otherwise read as an outside click and close the menu).
+  function submenuItem(label, opener) {
+    const item = document.createElement("div");
+    item.className = "menu-item";
+    item.setAttribute("role", "menuitem");
+    item.tabIndex = -1;
+    item.textContent = label;
+    item.addEventListener("click", (ev) => { ev.stopPropagation(); opener(); });
+    return item;
+  }
 
   // ---------- add-to-tape menu ----------
   const menu = $("plMenu");
   function openMenu(e, t) {
     menu.dataset.for = t.id;
     menu.innerHTML = "";
-    menu.appendChild(menuItem("Play next", () => playNext(t), closeMenu));
-    menu.appendChild(menuItem("Add to queue", () => addToQueue(t), closeMenu));
+    menu.appendChild(submenuItem("Add to…", () => openAddMenu(e, t)));
     const sep = document.createElement("div");
     sep.className = "menu-sep";
     menu.appendChild(sep);
-
-    const tapes = shelf.filter((s) => s.kind === "user");
-    if (!tapes.length) {
-      const empty = document.createElement("div");
-      empty.className = "menu-empty";
-      empty.textContent = "No tapes yet";
-      menu.appendChild(empty);
-    }
-    tapes.forEach((s) => menu.appendChild(menuItem(s.name, async () => {
-      await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
-      loadShelf();
-    }, closeMenu)));
-
-    const sep2 = document.createElement("div");
-    sep2.className = "menu-sep";
-    menu.appendChild(sep2);
     menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
-
     menu.hidden = false;   // show first so we can measure it, then place it
+    placeAtClick(e);
+  }
+  // "Add to…" picker: the queue, or any tape (mirrors the podcast "Add to show…").
+  function openAddMenu(e, t) {
+    menu.innerHTML = "";
+    menu.appendChild(menuItem("Queue", () => addToQueue(t), closeMenu));
+    const tapes = shelf.filter((s) => s.kind === "user");
+    if (tapes.length) {
+      const sep = document.createElement("div");
+      sep.className = "menu-sep";
+      menu.appendChild(sep);
+      tapes.forEach((s) => menu.appendChild(menuItem(s.name, async () => {
+        await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
+        loadShelf();
+      }, closeMenu)));
+    }
+    menu.hidden = false;
     placeAtClick(e);
   }
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
