@@ -1,13 +1,14 @@
 import pathlib
 from datetime import datetime
-from urllib.parse import quote
 
-from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 import podcasts
 from downloader import enqueue
 from models import DownloadJob, Episode, Show, db
+
+from .serving import accel_audio, cached_jpeg
 
 podcasts_blueprint = Blueprint("podcasts", __name__)
 
@@ -265,22 +266,14 @@ def stream(eid):
     if not path.exists():
         abort(404)
     ctype = _CTYPES.get(path.suffix.lower(), "audio/mpeg")
-    if current_app.config.get("USE_X_ACCEL"):
-        resp = Response()
-        resp.headers["X-Accel-Redirect"] = "/_audio/" + quote(ep.file_path)
-        resp.headers["Content-Type"] = ctype
-        resp.headers["Accept-Ranges"] = "bytes"
-        return resp
-    return send_file(path, conditional=True, mimetype=ctype)
+    return accel_audio(ep.file_path, ctype)
 
 
 def _serve_show_cover(show_id):
     p = pathlib.Path(current_app.config["COVER_DIR"]) / "shows" / f"{show_id}.jpg"
     if not p.exists():
         abort(404)
-    resp = send_file(p, mimetype="image/jpeg")
-    resp.headers["Cache-Control"] = "public, max-age=604800"
-    return resp
+    return cached_jpeg(p)
 
 
 @podcasts_blueprint.route("/podcast/cover/show/<int:sid>")

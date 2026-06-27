@@ -1,10 +1,11 @@
 import pathlib
-from urllib.parse import quote
 
-from flask import Blueprint, Response, abort, current_app, send_file
+from flask import Blueprint, abort, current_app
 from flask_login import login_required
 
 from models import Track
+
+from .serving import accel_audio, cached_jpeg
 
 stream_blueprint = Blueprint("stream", __name__)
 
@@ -16,15 +17,7 @@ def stream(track_id):
     path = pathlib.Path(current_app.config["MUSIC_DIR"]) / track.file_path
     if not path.exists():
         abort(404)
-
-    if current_app.config.get("USE_X_ACCEL"):
-        resp = Response()
-        resp.headers["X-Accel-Redirect"] = "/_audio/" + quote(track.file_path)
-        resp.headers["Content-Type"] = "audio/mpeg"
-        resp.headers["Accept-Ranges"] = "bytes"
-        return resp
-
-    return send_file(path, conditional=True, mimetype="audio/mpeg")
+    return accel_audio(track.file_path, "audio/mpeg")
 
 
 @stream_blueprint.route("/cover/<int:track_id>")
@@ -34,9 +27,5 @@ def cover(track_id):
     if track.has_cover and track.file_hash:
         p = pathlib.Path(current_app.config["COVER_DIR"]) / f"{track.file_hash}.jpg"
         if p.exists():
-            resp = send_file(p, mimetype="image/jpeg")
-            # Thumbnails are stable per file; cache for a week. The ETag send_file
-            # sets still lets the browser revalidate cheaply if it does change.
-            resp.headers["Cache-Control"] = "public, max-age=604800"
-            return resp
+            return cached_jpeg(p)
     abort(404)

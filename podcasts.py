@@ -8,30 +8,22 @@ Adding/refreshing only catalogues *metadata* (cheap). The audio is fetched on
 demand the first time an episode is played — see downloader._process_podcast.
 """
 import datetime as _dt
-import json
 import pathlib
 import re
-import subprocess
-import sys
 import time
 import urllib.request
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
+import youtube
 from models import Episode, db
 
-_YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "music.youtube.com")
 _UA = "tapes-podcast/1.0 (+https://github.com/ego-alt/tapes)"
 
 
 def detect_source(url: str) -> str:
     """Classify a pasted URL. YouTube hosts → 'youtube'; everything else is
     treated as an RSS feed (parse_rss validates and raises if it isn't one)."""
-    try:
-        host = (urlparse(url).hostname or "").lower()
-    except Exception:  # noqa: BLE001
-        return "rss"
-    host = host[4:] if host.startswith("www.") else host
-    return "youtube" if any(host == h or host.endswith("." + h) for h in _YOUTUBE_HOSTS) else "rss"
+    return "youtube" if youtube.is_youtube(url) else "rss"
 
 
 def _struct_to_dt(st) -> _dt.datetime | None:
@@ -119,15 +111,10 @@ def parse_rss(url: str):
 
 
 def _yt_json(url: str):
-    result = subprocess.run(
-        [sys.executable, "-m", "yt_dlp",
-         "--flat-playlist", "--dump-single-json", "--no-warnings",
-         "--playlist-end", "300", url],
-        capture_output=True, text=True, timeout=90,
-    )
-    if result.returncode != 0:
+    data = youtube.flat_playlist_json(url, end=300, timeout=90)
+    if data is None:
         raise ValueError("yt-dlp could not read that URL")
-    return json.loads(result.stdout)
+    return data
 
 
 def parse_youtube(url: str):
@@ -261,14 +248,4 @@ def episode_target(podcast_dir, ep) -> pathlib.Path:
 
 def normalize_video_url(url: str) -> str:
     """For a single YouTube video, reduce to a canonical watch URL (drops list= etc.)."""
-    try:
-        u = urlparse(url)
-        if "youtu.be" in (u.hostname or ""):
-            vid = u.path.lstrip("/")
-        else:
-            vid = (parse_qs(u.query).get("v") or [None])[0]
-        if vid:
-            return f"https://www.youtube.com/watch?v={vid}"
-    except Exception:  # noqa: BLE001
-        pass
-    return url
+    return youtube.canonical_watch_url(url)

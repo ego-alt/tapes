@@ -990,12 +990,7 @@
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
 
     menu.hidden = false;   // show first so we can measure it, then place it
-    const pad = 8, mh = menu.offsetHeight;
-    const flipUp = e.clientY + mh > window.innerHeight - pad;
-    const flipLeft = e.clientX + menu.offsetWidth > window.innerWidth - pad;
-    // Grow from the corner pinned to the click (accounting for any flip).
-    placeMenu(menu, flipUp ? e.clientY - mh : e.clientY, e.clientX,
-      `${flipUp ? "bottom" : "top"} ${flipLeft ? "right" : "left"}`);
+    placeAtClick(e);
   }
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });

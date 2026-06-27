@@ -6,8 +6,9 @@ import subprocess
 import sys
 import threading
 import urllib.request
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
+import youtube
 from cleaning import clean_meta, clean_title, reconcile_artist
 from models import DownloadJob, Episode, Playlist, PlaylistTrack, Track, db
 from scan import scan_library
@@ -24,20 +25,8 @@ def expand_playlist(url: str):
     except Exception:
         return [url], None
 
-    result = subprocess.run(
-        [sys.executable, "-m", "yt_dlp",
-         "--flat-playlist", "--dump-single-json", "--no-warnings",
-         "--playlist-end", "500", url],
-        capture_output=True, text=True, timeout=60,
-    )
-    if result.returncode != 0:
-        return [url], None
-    try:
-        data = json.loads(result.stdout)
-    except (json.JSONDecodeError, ValueError):
-        return [url], None
-
-    if data.get("_type") != "playlist":
+    data = youtube.flat_playlist_json(url, end=500, timeout=60)
+    if data is None or data.get("_type") != "playlist":
         return [url], None
 
     title = data.get("title") or "Playlist"
@@ -85,16 +74,7 @@ def _loop(app):
 def _norm_url(url: str) -> str:
     """Reduce a URL to a stable key — the YouTube video id when present — so that
     youtu.be / watch?v= / extra query params all dedupe to the same track."""
-    try:
-        u = urlparse(url)
-        if "youtu.be" in u.netloc:
-            return u.path.lstrip("/") or url
-        vid = parse_qs(u.query).get("v")
-        if vid:
-            return vid[0]
-    except Exception:  # noqa: BLE001
-        pass
-    return url
+    return youtube.video_id(url) or url
 
 
 def _find_existing(url: str):
