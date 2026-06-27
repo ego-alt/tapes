@@ -195,9 +195,12 @@ body {
 
 /* ---- shelf ---- */
 .sidebar-head { justify-content: space-between; }
-.shelf, .tracks-view, .browse-view { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.shelf, .tracks-view, .browse-view, .podcasts-view, .episodes-view {
+    display: flex; flex-direction: column; min-height: 0; flex: 1;
+}
 /* class display:flex would otherwise beat the `hidden` attribute */
-.shelf[hidden], .tracks-view[hidden], .browse-view[hidden], .dl-panel[hidden] { display: none !important; }
+.shelf[hidden], .tracks-view[hidden], .browse-view[hidden],
+.podcasts-view[hidden], .episodes-view[hidden], .dl-panel[hidden] { display: none !important; }
 
 /* ---- album / artist browse rows ---- */
 .browse-row {
@@ -419,39 +422,9 @@ body {
     box-shadow: 0 1px 2px var(--color-shadow);
 }
 
-/* ---- podcasts: shows + episodes ---- */
-.episode-list {
-    list-style: none;
-    margin: 0;
-    padding: 0 var(--space-2) var(--space-3);
-    overflow-y: auto;
-}
-.ep-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-}
-.ep-row:hover { background: var(--track-hover); }
-.ep-row.active { background: var(--color-bg-inset); }
-.ep-row.active .ep-title { color: var(--track-active); }
-.ep-row.played .ep-title { color: var(--color-text-muted); }
-.ep-meta { flex: 1; min-width: 0; overflow: hidden; }
-.ep-title {
-    font-size: var(--text-base);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.ep-sub {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+/* ---- podcasts: episodes reuse the .track-list row (container, .tl-meta/title/sub,
+   and the .tl-add button base); only these extras are episode-specific ---- */
+.track-list li.played .tl-title { color: var(--color-text-muted); }   /* finished */
 .ep-prog {
     margin-top: 5px;
     height: 3px;
@@ -461,27 +434,9 @@ body {
 }
 .ep-prog[hidden] { display: none; }
 .ep-prog-fill { height: 100%; background: var(--color-accent); }
-.ep-played {
-    flex: none;
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    font-size: var(--text-base);
-    line-height: 1;
-    padding: 4px;
-}
-.ep-row.played .ep-played { color: var(--color-accent); }
-.ep-menu {
-    flex: none;
-    background: none;
-    border: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    font-size: var(--text-base);
-    line-height: 1;
-    padding: 4px;
-}
+/* the played toggle shares .tl-add but stays visible (not hover-revealed) */
+.ep-played { opacity: 1; }
+.track-list li.played .ep-played { color: var(--color-accent); }
 
 .ep-filter { display: flex; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
 .ep-filter-btn {

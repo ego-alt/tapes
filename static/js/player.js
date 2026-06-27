@@ -332,7 +332,7 @@
     list.forEach((e, i) => {
       const li = document.createElement("li");
       li.dataset.id = e.id;
-      li.className = "ep-row" + (e.played ? " played" : "");
+      li.className = e.played ? "played" : "";   // layout comes from .track-list li
       const pct = (!e.played && e.duration && e.position)
         ? Math.min(100, (e.position / e.duration) * 100) : 0;
       const sub = [
@@ -340,14 +340,14 @@
         e.duration ? fmt(e.duration) : (e.status === "new" ? "not downloaded" : ""),
         e.status === "downloading" ? "downloading…" : "",
       ].filter(Boolean).join(" · ");
-      li.innerHTML = `<span class="ep-meta">
-          <div class="ep-title"></div><div class="ep-sub"></div>
+      li.innerHTML = `<span class="tl-meta">
+          <div class="tl-title"></div><div class="tl-sub"></div>
           <div class="ep-prog"${pct ? "" : " hidden"}><div class="ep-prog-fill" style="width:${pct}%"></div></div>
         </span>
-        <button class="ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>
-        <button class="ep-menu" title="More">⋯</button>`;
-      li.querySelector(".ep-title").textContent = e.title;
-      li.querySelector(".ep-sub").textContent = sub;
+        <button class="tl-add ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>
+        <button class="tl-add ep-menu" title="More">⋯</button>`;
+      li.querySelector(".tl-title").textContent = e.title;
+      li.querySelector(".tl-sub").textContent = sub;
       li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
       li.querySelector(".ep-menu").addEventListener("click", (ev) => {
         ev.stopPropagation();
