@@ -1,8 +1,10 @@
-"""One-off: set the album on the Brazzaville "In Istanbul" tracks.
+"""One-off: fix the Brazzaville "In Istanbul" tracks.
 
-These were ripped from the playlist before the ripper passed the tape name to
-the LLM as an album signal, so their album came back blank. This stamps the
-album onto every blank-album track in that tape.
+These were ripped before the ripper passed the tape name to the LLM as an album
+signal, so their album came back blank and the "(In Istanbul)" album marker was
+left stuck in the title. The tape is gone now, so we match on that title marker:
+for every track whose title contains "(In Istanbul)" this sets album="In
+Istanbul" (only when blank) and strips the marker out of the title.
 
 Standalone — stdlib only, runs straight against the SQLite file. No docker, no
 uv, no app deps:
@@ -21,10 +23,12 @@ files). If you run --full, re-run this, or write the tags via the app.
 
 import argparse
 import pathlib
+import re
 import sqlite3
 
-TAPE_NAME = "Brazzaville in Istanbul (2009)"
 ALBUM = "In Istanbul"
+# The marker in the title, anywhere, with surrounding space — collapsed away.
+MARKER = re.compile(r"\s*\(\s*In Istanbul\s*\)", re.IGNORECASE)
 
 DEFAULT_DB = pathlib.Path(__file__).resolve().parent.parent / "instance" / "music.db"
 
@@ -38,28 +42,27 @@ def main():
     con = sqlite3.connect(args.db)
     con.row_factory = sqlite3.Row
     rows = con.execute(
-        """
-        SELECT t.id, t.title, t.album
-        FROM tracks t
-        JOIN playlist_tracks pt ON pt.track_id = t.id
-        JOIN playlists p        ON p.id = pt.playlist_id
-        WHERE p.name = ?
-        """,
-        (TAPE_NAME,),
+        "SELECT id, title, album FROM tracks WHERE title LIKE '%(In Istanbul)%'"
     ).fetchall()
 
     if not rows:
-        print(f"No tracks found in a tape named {TAPE_NAME!r} (db: {args.db}).")
+        print(f"No tracks with '(In Istanbul)' in the title found (db: {args.db}).")
         return
 
     changed = 0
     for r in rows:
-        if (r["album"] or "").strip():
-            print(f"skip  (album={r['album']!r}): {r['title']}")
-            continue
-        print(f"{'set ' if args.write else 'would set'} album={ALBUM!r}: {r['title']}")
+        new_title = MARKER.sub("", r["title"]).strip()
+        set_album = not (r["album"] or "").strip()
+
+        title_note = f"{r['title']!r} -> {new_title!r}" if new_title != r["title"] else f"{r['title']!r} (title unchanged)"
+        album_note = f"album -> {ALBUM!r}" if set_album else f"album kept {r['album']!r}"
+        print(f"{'apply' if args.write else 'would'}: {title_note} | {album_note}")
+
         if args.write:
-            con.execute("UPDATE tracks SET album = ? WHERE id = ?", (ALBUM, r["id"]))
+            if set_album:
+                con.execute("UPDATE tracks SET album = ? WHERE id = ?", (ALBUM, r["id"]))
+            if new_title != r["title"]:
+                con.execute("UPDATE tracks SET title = ? WHERE id = ?", (new_title, r["id"]))
             changed += 1
 
     if args.write:
