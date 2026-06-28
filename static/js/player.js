@@ -632,7 +632,9 @@
     document.title = t.title + (isEp ? (t.show ? " · " + t.show : "") : (t.artist ? " · " + t.artist : ""));
     setMediaSession(t);
     markActive();
-    if (!isEp) savePlaystate();   // episode progress saves on play/seek/end, not load
+    // Persist the deck snapshot. For episodes, only the session (queue+cursor) —
+    // the position rides on the episode and mustn't be saved as 0 before the seek.
+    if (isEp) savePodcastSession(); else savePlaystate();
     prefetchNext();
     updateUpNext();
   }
@@ -1124,16 +1126,29 @@
   }
 
   // ---------- playstate persistence ----------
-  let saveTimer = null;
+  let saveTimer = null, sessTimer = null;
   function savePlaystate() {
     const cur = currentTrack();
-    if (cur && cur.kind === "episode") { saveEpisodeProgress(cur); return; }
+    if (cur && cur.kind === "episode") {
+      // Per-episode position is the source of truth; the session snapshot (queue +
+      // cursor) just lets a reload restore the podcast deck. Separate 'podcast'
+      // context → never clobbers the music session.
+      saveEpisodeProgress(cur);
+      savePodcastSession();
+      return;
+    }
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => jsend("api/playstate", "PUT",
-      { queue: queue.map((t) => t.id), index: qi, position: audio.currentTime || 0 }), 400);
+      { context: "music", queue: queue.map((t) => t.id), index: qi, position: audio.currentTime || 0 }), 400);
   }
-  // Per-episode resume — debounced, separate from the music playstate so podcast
-  // listening never clobbers the music queue (and vice versa).
+  // Save just the podcast deck snapshot (no position — that rides on the episode).
+  // Safe to call on load, unlike saveEpisodeProgress which would store currentTime 0.
+  function savePodcastSession() {
+    clearTimeout(sessTimer);
+    sessTimer = setTimeout(() => jsend("api/playstate", "PUT",
+      { context: "podcast", queue: queue.map((t) => t.id), index: qi }), 400);
+  }
+  // Per-episode resume — debounced; the resume point lives on the episode.
   let epSaveTimer = null, lastEpSave = 0, resumeTarget = 0;
   // Seek the loaded episode to its saved position. Handles the case where metadata
   // is already available (re-tapping a loaded episode → loadedmetadata won't fire
@@ -1166,17 +1181,26 @@
     saveEpisodeProgress(t);
   }
   async function restorePlaystate() {
+    // Restores whichever context (music or podcast) was last active — the server
+    // returns the most-recently-updated session, hydrated.
     const ps = await jget("api/playstate");
     if (!ps.queue || !ps.queue.length) return;
+    const idx = Math.min(ps.index || 0, ps.queue.length - 1);
+    const cur = ps.queue[idx];
+    if (!cur) return;
+    // Don't auto-fetch an undownloaded episode on a passive reload — you can only
+    // resume what you already have; tapping it will download as usual.
+    if (cur.kind === "episode" && cur.status !== "ready") return;
     queue = ps.queue;   // already hydrated server-side
     baseQueue = queue.slice();
-    qi = Math.min(ps.index || 0, queue.length - 1);
-    if (qi < 0 || !queue[qi]) return;
-    loadCurrent(false);
-    audio.addEventListener("loadedmetadata", function once() {
-      audio.currentTime = ps.position || 0;
-      audio.removeEventListener("loadedmetadata", once);
-    });
+    qi = idx;
+    loadCurrent(false);   // episode resume is handled inside loadCurrent
+    if (cur.kind !== "episode") {
+      audio.addEventListener("loadedmetadata", function once() {
+        audio.currentTime = ps.position || 0;
+        audio.removeEventListener("loadedmetadata", once);
+      });
+    }
   }
 
   // ---------- events ----------

@@ -90,12 +90,20 @@ class Play(db.Model):
     played_at = db.Column(db.DateTime, server_default=func.now(), index=True)
 
 
-class PlayState(db.Model):
-    __tablename__ = "playstate"
+class PlaybackSession(db.Model):
+    """The deck's 'now playing' snapshot, one row per (user, context). Keying by
+    context — 'music' | 'podcast' — keeps the two from clobbering each other; the
+    most-recently-updated row is the one to restore on reload (no separate pointer).
+
+    queue_json holds ids (track ids for music, episode ids for podcast); the items
+    are hydrated on read. position_s is the music playhead — podcast resume is read
+    from Episode.position_s (the per-item source of truth), not duplicated here."""
+    __tablename__ = "playback_sessions"
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), primary_key=True)
+    context = db.Column(db.String, primary_key=True)  # music | podcast
     queue_json = db.Column(db.Text)
-    index = db.Column(db.Integer, default=0)
+    cursor = db.Column(db.Integer, default=0)
     position_s = db.Column(db.Float, default=0)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
 

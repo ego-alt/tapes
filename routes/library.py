@@ -2,12 +2,13 @@ import json
 import logging
 import pathlib
 import threading
+from datetime import datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
-from models import Play, Playlist, PlaylistTrack, PlayState, Track, db
+from models import Episode, Play, PlaybackSession, Playlist, PlaylistTrack, Show, Track, db
 
 library_blueprint = Blueprint("library", __name__)
 log = logging.getLogger("tapes.library")
@@ -389,24 +390,55 @@ def record_play():
     return "", 204
 
 
+def _hydrate_episode_ids(ids):
+    """Hydrate episode ids → deck dicts (kind, show title, resume position), in
+    order, dropping any that no longer exist. Mirrors _tracks_by_ids for music."""
+    if not ids:
+        return []
+    rows = Episode.query.filter(Episode.id.in_(ids), Episode.user_id == _uid()).all()
+    by_id = {e.id: e for e in rows}
+    show_titles = dict(db.session.query(Show.id, Show.title)
+                       .filter(Show.user_id == _uid()).all())
+    out = []
+    for i in ids:
+        e = by_id.get(i)
+        if e:
+            out.append({**e.to_dict(), "show": show_titles.get(e.show_id, "")})
+    return out
+
+
 @library_blueprint.route("/api/playstate", methods=["GET", "PUT"])
 @login_required
 def playstate():
-    ps = db.session.get(PlayState, _uid())
     if request.method == "GET":
-        if not ps:
+        # The most-recently-updated context is what the deck last held → restore it.
+        s = (PlaybackSession.query.filter_by(user_id=_uid())
+             .order_by(PlaybackSession.updated_at.desc()).first())
+        if not s:
             return jsonify({"queue": [], "index": 0, "position": 0})
-        return jsonify({
-            "queue": _tracks_by_ids(json.loads(ps.queue_json or "[]")),
-            "index": ps.index or 0,
-            "position": ps.position_s or 0,
-        })
+        ids = json.loads(s.queue_json or "[]")
+        if s.context == "podcast":
+            queue = _hydrate_episode_ids(ids)
+            # Resume point is the current episode's own saved position.
+            cur = queue[s.cursor] if 0 <= s.cursor < len(queue) else None
+            position = cur["position"] if cur else 0
+        else:
+            queue = _tracks_by_ids(ids)
+            position = s.position_s or 0
+        return jsonify({"queue": queue, "index": s.cursor or 0, "position": position})
+
     data = request.json or {}
-    if not ps:
-        ps = PlayState(user_id=_uid())
-        db.session.add(ps)
-    ps.queue_json = json.dumps(data.get("queue", []))
-    ps.index = data.get("index", 0)
-    ps.position_s = data.get("position", 0)
+    context = "podcast" if data.get("context") == "podcast" else "music"
+    s = db.session.get(PlaybackSession, (_uid(), context))
+    if not s:
+        s = PlaybackSession(user_id=_uid(), context=context)
+        db.session.add(s)
+    s.queue_json = json.dumps(data.get("queue", []))
+    s.cursor = data.get("index", 0)
+    s.position_s = data.get("position", 0)  # music playhead; podcast resume lives on Episode
+    # Explicit microsecond stamp: SQLite's func.now() is second-resolution, so two
+    # context saves in the same second would tie and the "last active" pick on GET
+    # would be undefined.
+    s.updated_at = datetime.now()
     db.session.commit()
     return "", 204

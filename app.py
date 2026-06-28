@@ -145,6 +145,23 @@ def create_app(config=None):
             except Exception:
                 db.session.rollback()
 
+        # One-time: migrate the old single-row playstate into the per-context
+        # playback_sessions table as the 'music' context. Best-effort; the old
+        # table is left in place (harmless) once copied.
+        try:
+            from models import PlaybackSession
+            rows = db.session.execute(db.text(
+                'SELECT user_id, queue_json, "index", position_s FROM playstate')).fetchall()
+            for r in rows:
+                if db.session.get(PlaybackSession, (r[0], "music")):
+                    continue
+                db.session.add(PlaybackSession(
+                    user_id=r[0], context="music", queue_json=r[1],
+                    cursor=r[2] or 0, position_s=r[3] or 0))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     register_cli(app)
     start_worker(app)
     return app
