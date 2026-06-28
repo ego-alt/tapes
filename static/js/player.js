@@ -620,12 +620,7 @@
     if (isEp && t.status !== "ready") { loadPendingEpisode(t); return; }
     audio.src = srcUrl(t);
     // Resume an episode where you left off (music resume rides the playstate path).
-    if (isEp && t.position) {
-      audio.addEventListener("loadedmetadata", function once() {
-        audio.currentTime = t.position || 0;
-        audio.removeEventListener("loadedmetadata", once);
-      });
-    }
+    if (isEp) resumeEpisodeTo(t.position);
     if (autoplay) audio.play().catch(() => {});
     cassette.classList.add("loaded");
     labelTitle.textContent = t.title;
@@ -1139,7 +1134,18 @@
   }
   // Per-episode resume — debounced, separate from the music playstate so podcast
   // listening never clobbers the music queue (and vice versa).
-  let epSaveTimer = null, lastEpSave = 0;
+  let epSaveTimer = null, lastEpSave = 0, resumeTarget = 0;
+  // Seek the loaded episode to its saved position. Handles the case where metadata
+  // is already available (re-tapping a loaded episode → loadedmetadata won't fire
+  // again). resumeTarget gates saving until we've actually reached the point, so an
+  // early timeupdate at ~0 can't clobber the saved position back to the start.
+  function resumeEpisodeTo(pos) {
+    resumeTarget = pos || 0;
+    if (!resumeTarget) return;
+    const seek = () => { try { audio.currentTime = resumeTarget; } catch (_) { /* not seekable yet */ } };
+    if (audio.readyState >= 1) seek();
+    else audio.addEventListener("loadedmetadata", seek, { once: true });
+  }
   function saveEpisodeProgress(t) {
     const pos = audio.currentTime || 0;
     t.position = pos;
@@ -1148,6 +1154,12 @@
       jsend(`api/podcast/episodes/${t.id}/progress`, "PUT", { position: pos }).catch(() => {}), 800);
   }
   function maybeSaveEpisodeTick(t) {
+    // Hold off until playback reaches the resume point, so the first tick (at ~0,
+    // before the seek lands) can't overwrite a saved position with the start.
+    if (resumeTarget) {
+      if (audio.currentTime < resumeTarget - 2) return;
+      resumeTarget = 0;
+    }
     const now = Date.now();
     if (now - lastEpSave < 5000) return;   // throttle the timeupdate firehose
     lastEpSave = now;
