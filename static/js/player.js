@@ -686,15 +686,19 @@
   // natural end, so pressing next still advances.
   function next(manual) {
     const ep = activeIsEpisode();
-    if (!ep && !manual && repeatMode === "one") { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+    // Episodes are listed newest-first, so "forward" means newer (toward index 0)
+    // — finishing one plays the next-newer episode and stops at the newest.
+    if (ep) { if (qi - 1 >= 0) go(qi - 1, true); return; }
+    if (!manual && repeatMode === "one") { audio.currentTime = 0; audio.play().catch(() => {}); return; }
     if (qi + 1 < queue.length) go(qi + 1, true);
-    else if (!ep && repeatMode === "all") go(0, true);
-    // else: end of queue — stop. (Episodes never repeat/shuffle.)
+    else if (repeatMode === "all") go(0, true);
+    // else: end of queue — stop.
   }
   function prev() {
     if (qi >= 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }  // restart current first
+    if (activeIsEpisode()) { if (qi + 1 < queue.length) go(qi + 1, true); return; }  // back = older
     if (qi > 0) go(qi - 1, true);
-    else if (!activeIsEpisode() && repeatMode === "all") go(queue.length - 1, true);
+    else if (repeatMode === "all") go(queue.length - 1, true);
   }
 
   // ---------- shuffle / repeat ----------
