@@ -172,6 +172,9 @@ class Episode(db.Model):
     # Per-user playback state (episodes are already per-user — no separate table).
     position_s = db.Column(db.Float, default=0)
     played = db.Column(db.Boolean, default=False, index=True)
+    # Hidden from a followed show's list. The row stays, so a refresh doesn't
+    # bring the episode back as new.
+    hidden_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
         return {

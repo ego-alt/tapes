@@ -230,6 +230,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 **4.8 Podcast deletes behave unexpectedly**
 - **What:** Deleting a show deletes every downloaded episode (the confirm does say so). Deleting an episode from a followed show brings it back as new on the next refresh, which the code notes but the UI doesn't explain.
 - **Fix:** Offer *Mark as played* or *Hide* instead of delete for followed shows, and keep delete for loose episodes.
+- **Status:** Done. In a followed show, ⋯ offers **Hide episode** instead of Delete. It removes the download and hides the row, which stays in the database so the next refresh can't bring it back as new; an Undo toast restores it (new `episodes.hidden_at` column, the first migration under Flask-Migrate). Delete is kept for unsorted episodes and hand-made shows, which have no feed. Removing a followed show now reads *Unfollow “X”?* and says its episodes and downloads go too. Covered by a test (hide, refresh adds nothing, unhide).
 
 **4.9 Edits can be lost by tapping outside**
 - **What:** Tapping the backdrop closes the edit dialog and discards any changes.

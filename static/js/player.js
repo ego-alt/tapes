@@ -578,7 +578,12 @@
       menu.appendChild(submenuItem("Move to show…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
-    menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
+    // A followed show's feed would bring a deleted episode back on the next
+    // refresh, so there it's hidden instead; delete is for everything else.
+    if (ep.show_id != null && currentShow && currentShow.refreshable)
+      menu.appendChild(menuItem("Hide episode", () => hideEpisode(ep), closeMenu));
+    else
+      menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
     showMenuAt(e);
   }
   async function openAssignMenu(e, ep) {
@@ -616,6 +621,25 @@
     catch (err) { console.error(err); toast("Couldn't delete."); return; }
     episodes = episodes.filter((x) => x.id !== ep.id);
     applyEpisodeSearch();
+  }
+  async function hideEpisode(ep) {
+    try { await jsend(`api/podcast/episodes/${ep.id}/hide`, "POST"); }
+    catch (err) { console.error(err); toast(errText(err, "Couldn't hide that episode.")); return; }
+    const at = episodes.findIndex((x) => x.id === ep.id);
+    episodes = episodes.filter((x) => x.id !== ep.id);
+    showsData = null;   // counts changed
+    applyEpisodeSearch();
+    toast(`Hid “${ep.title}”`, {
+      action: "Undo",
+      onAction: async () => {
+        try {
+          const back = await jsend(`api/podcast/episodes/${ep.id}/unhide`, "POST").then((r) => r.json());
+          episodes.splice(Math.max(0, at), 0, back);
+          showsData = null;
+          applyEpisodeSearch();
+        } catch (err) { console.error(err); toast(errText(err, "Couldn't bring it back.")); }
+      },
+    });
   }
   // Start the download without the "wait for it" UI (used while streaming).
   function fetchEpisodeQuietly(t) {
@@ -706,10 +730,13 @@
   }
   async function deleteCurrentShow() {
     if (!currentShow) return;
-    if (!await askConfirm(`Delete “${currentShow.title}”?`, {
-      detail: "Its episodes and their downloads are removed.", ok: "Delete", danger: true })) return;
+    const followed = currentShow.refreshable;
+    if (!await askConfirm(followed ? `Unfollow “${currentShow.title}”?` : `Delete the show “${currentShow.title}”?`, {
+      detail: "Its episodes and any downloads are removed from Tapes.",
+      ok: followed ? "Unfollow" : "Delete", danger: true })) return;
     try { await jsend(`api/podcast/shows/${currentShow.id}`, "DELETE"); }
     catch (e) { console.error(e); toast(errText(e, "Couldn't delete the show.")); return; }
+    toast(`${followed ? "Unfollowed" : "Deleted"} “${currentShow.title}”`);
     currentShow = null;
     openPodcasts();
   }

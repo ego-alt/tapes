@@ -1,5 +1,5 @@
 import pathlib
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
@@ -27,8 +27,9 @@ def _episode_or_404(eid):
 
 
 def _show_dict(s):
-    total = Episode.query.filter_by(user_id=_uid(), show_id=s.id).count()
-    unplayed = Episode.query.filter_by(user_id=_uid(), show_id=s.id, played=False).count()
+    visible = Episode.query.filter_by(user_id=_uid(), show_id=s.id).filter(Episode.hidden_at.is_(None))
+    total = visible.count()
+    unplayed = visible.filter_by(played=False).count()
     return {
         "id": s.id, "title": s.title, "source_type": s.source_type,
         "has_image": bool(s.has_image), "count": total, "unplayed": unplayed,
@@ -113,7 +114,7 @@ def shows():
 
 
 def _episodes_query(show_id):
-    q = Episode.query.filter_by(user_id=_uid())
+    q = Episode.query.filter_by(user_id=_uid()).filter(Episode.hidden_at.is_(None))
     q = q.filter_by(show_id=show_id) if show_id is not None else q.filter(Episode.show_id.is_(None))
     # RSS sorts newest-first by real date. YouTube has no per-video dates, so it
     # follows the order YouTube returned (id asc) — newest-first for a channel's
@@ -259,6 +260,31 @@ def remove_download(eid):
     ep.status = "new"
     db.session.commit()
     return jsonify({"status": ep.status})
+
+
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/hide", methods=["POST"])
+@login_required
+def hide_episode(eid):
+    """Hide an episode of a followed show: drop its download, keep the row so a
+    refresh doesn't re-add it. Undone by /unhide."""
+    ep = _episode_or_404(eid)
+    _delete_episode_file(pathlib.Path(current_app.config["MUSIC_DIR"]), ep)
+    ep.file_path = None
+    if ep.status == "ready":
+        ep.status = "new"
+    ep.hidden_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.session.commit()
+    return jsonify({"hidden": True})
+
+
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/unhide", methods=["POST"])
+@login_required
+def unhide_episode(eid):
+    ep = _episode_or_404(eid)
+    ep.hidden_at = None
+    db.session.commit()
+    show = db.session.get(Show, ep.show_id) if ep.show_id else None
+    return jsonify({**ep.to_dict(), "show": show.title if show else ""})
 
 
 @podcasts_blueprint.route("/api/podcast/episodes/<int:eid>", methods=["DELETE"])
