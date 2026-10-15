@@ -110,7 +110,23 @@ body {
     font-size: var(--text-base);
     overflow: hidden;
     text-overflow: ellipsis;
+    /* long titles wrap to a second line before they're cut */
+    white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
 }
+.tl-dur {
+    flex-shrink: 0; font-family: var(--font-mono); font-size: var(--text-sm);
+    color: var(--color-text-muted); min-width: 3.2em; text-align: right;
+}
+.ico { display: inline-flex; vertical-align: -0.15em; }
+.ico svg { width: 1em; height: 1em; }
+.add-btn, .back-btn, .mode-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; }
+.shelf-ico, .browse-cover--blank, .tl-drag { display: inline-flex; align-items: center; justify-content: center; }
+.shelf-ico svg { width: 16px; height: 16px; }
+.browse-cover--blank svg { width: 20px; height: 20px; }
+.tl-drag svg { width: 16px; height: 16px; }
+.ep-played svg, .dl-dismiss svg { width: 16px; height: 16px; }
 .tl-sub {
     font-size: var(--text-sm);
     color: var(--color-text-muted);
@@ -149,6 +165,13 @@ body {
 @media (hover: none) {
     .tl-add, .track-list li:hover .tl-add { opacity: 1; }
     .tl-add, .shelf-del { padding: var(--space-2); }
+}
+/* With a mouse, + and ⋯ take the duration's place on hover/focus, so the
+   title isn't squeezed by invisible buttons. */
+@media (hover: hover) and (pointer: fine) and (min-width: 641px) {
+    .track-list li .tl-add:not(.ep-played) { display: none; opacity: 1; }
+    .track-list li:hover .tl-add, .track-list li:focus-within .tl-add { display: inline-flex; }
+    .track-list li:hover .tl-dur, .track-list li:focus-within .tl-dur { display: none; }
 }
 
 /* ---- shelf ---- */
@@ -552,7 +575,7 @@ body {
     .mini-play .icn { width: 22px; height: 22px; }
 
     /* 44px touch targets */
-    .tl-add { min-width: 44px; min-height: 44px; }
+    .tl-add { min-width: 44px; min-height: 44px; opacity: 1; }
     .tape-mode { width: 44px; height: 44px; }
     .back-btn, .tape-del, .ep-refresh { min-height: 44px; }
     .mode-btn { min-height: 44px; }

@@ -181,14 +181,14 @@ def add_to_playlist(pid):
     p = Playlist.query.filter_by(id=pid, user_id=_uid()).first_or_404()
     track_id = (request.json or {}).get("track_id")
     if not Track.query.get(track_id):
-        abort(404)
+        abort(404, "That song isn't in the library any more.")
     if PlaylistTrack.query.filter_by(playlist_id=p.id, track_id=track_id).first():
-        return "", 204  # already present
+        return jsonify({"added": False, "tape": p.name})   # already on it
     nxt = (db.session.query(db.func.max(PlaylistTrack.position))
            .filter_by(playlist_id=p.id).scalar() or 0) + 1
     db.session.add(PlaylistTrack(playlist_id=p.id, track_id=track_id, position=nxt))
     db.session.commit()
-    return "", 204
+    return jsonify({"added": True, "tape": p.name})
 
 
 @library_blueprint.route("/api/playlists/<int:pid>/tracks/<int:track_id>", methods=["DELETE"])

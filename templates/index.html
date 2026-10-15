@@ -17,12 +17,12 @@
     <aside class="sidebar">
       <div class="sidebar-head">
         <h1><span class="accent">▰▰</span> TAPES</h1>
-        <button class="btn btn-ghost" id="dlToggle" title="Add">⬇</button>
+        <button class="btn btn-ghost add-btn" id="dlToggle" title="Rip a song or follow a podcast" aria-expanded="false"><span class="ico" data-icon="plus"></span>Add</button>
       </div>
 
       <div class="mode-toggle" role="tablist">
-        <button class="mode-btn active" id="modeMusic" role="tab" aria-selected="true">♪ Music</button>
-        <button class="mode-btn" id="modePods" role="tab" aria-selected="false">◎ Podcasts</button>
+        <button class="mode-btn active" id="modeMusic" role="tab" aria-selected="true"><span class="ico" data-icon="note"></span>Music</button>
+        <button class="mode-btn" id="modePods" role="tab" aria-selected="false"><span class="ico" data-icon="podcast"></span>Podcasts</button>
       </div>
 
       <div class="dl-panel" id="dlPanel" hidden>
@@ -53,13 +53,13 @@
       <!-- tracks within a tape -->
       <div class="tracks-view" id="tracksView" hidden>
         <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="backBtn">‹ Tapes</button>
+          <button class="btn btn-ghost back-btn" id="backBtn"><span class="ico" data-icon="chevronLeft"></span><span class="back-label">Tapes</span></button>
           <button class="btn btn-ghost tape-del" id="tapeDelBtn" hidden>Delete tape</button>
           <button class="btn btn-ghost tape-act" id="tidyBtn" hidden>Tidy all</button>
           <button class="btn btn-ghost tape-act" id="albumEditBtn" hidden>Edit album</button>
         </div>
         <div class="search-wrap">
-          <input class="input" id="search" type="search" placeholder="Search…" autocomplete="off">
+          <input class="input" id="search" type="search" placeholder="Search this list…" autocomplete="off">
         </div>
         <div class="tape-title-row">
           <div class="tape-title" id="tapeTitle"></div>
@@ -83,19 +83,19 @@
       <div class="podcasts-view" id="podcastsView" hidden>
         <ul class="shelf-list" id="showList"></ul>
         <form class="new-tape" id="newShowForm">
-          <input class="input" id="newShowName" placeholder="New tape…" autocomplete="off">
-          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create tape" aria-label="Create tape"></button>
+          <input class="input" id="newShowName" placeholder="New show…" autocomplete="off">
+          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create show" aria-label="Create show"></button>
         </form>
       </div>
 
       <!-- episodes within a show -->
       <div class="episodes-view" id="episodesView" hidden>
         <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="epBack">‹ Podcasts</button>
-          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Delete tape</button>
+          <button class="btn btn-ghost back-btn" id="epBack"><span class="ico" data-icon="chevronLeft"></span>Podcasts</button>
+          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Unfollow</button>
         </div>
         <div class="search-wrap">
-          <input class="input" id="epSearch" type="search" placeholder="Search…" autocomplete="off">
+          <input class="input" id="epSearch" type="search" placeholder="Search episodes…" autocomplete="off">
         </div>
         <div class="tape-title-row">
           <div class="tape-title" id="showTitle"></div>
@@ -112,7 +112,7 @@
       <!-- album / artist browse list -->
       <div class="browse-view" id="browseView" hidden>
         <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="browseBack">‹ Tapes</button>
+          <button class="btn btn-ghost back-btn" id="browseBack"><span class="ico" data-icon="chevronLeft"></span>Tapes</button>
         </div>
         <div class="search-wrap">
           <input class="input" id="browseSearch" type="search" placeholder="Search…" autocomplete="off">
@@ -313,6 +313,18 @@
         <button class="btn btn-primary" id="alSave" type="button">Save</button>
       </div>
     </div>
+  </div>
+
+  <!-- In-app name field (replaces the browser's prompt()). -->
+  <div class="modal-scrim" id="nameModal" hidden>
+    <form class="modal-card" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+      <div class="modal-head" id="nameTitle"></div>
+      <label class="modal-field"><span id="nameLabel">Name</span><input class="input" id="nameInput" autocomplete="off" required></label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="nameCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="nameOk" type="submit">Create</button>
+      </div>
+    </form>
   </div>
 
   <!-- In-app confirmation (replaces the browser's confirm()). -->

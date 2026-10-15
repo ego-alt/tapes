@@ -53,6 +53,26 @@
     setTimeout(dismiss, action ? 8000 : 3200);
   }
 
+  // In-app name field: resolves the trimmed name, or null if cancelled.
+  function askName(title, { label = "Name", ok = "Create", value = "" } = {}) {
+    return new Promise((resolve) => {
+      $("nameTitle").textContent = title;
+      $("nameLabel").textContent = label;
+      $("nameOk").textContent = ok;
+      $("nameInput").value = value;
+      $("nameModal").hidden = false;
+      $("nameInput").focus();
+      const done = (v) => {
+        $("nameModal").hidden = true;
+        $("nameForm").onsubmit = $("nameCancel").onclick = $("nameModal").onclick = null;
+        resolve(v);
+      };
+      $("nameForm").onsubmit = (e) => { e.preventDefault(); const v = $("nameInput").value.trim(); if (v) done(v); };
+      $("nameCancel").onclick = () => done(null);
+      $("nameModal").onclick = (e) => { if (e.target === $("nameModal")) done(null); };
+    });
+  }
+
   // In-app confirm: resolves true/false. `danger` styles the OK button red.
   function askConfirm(text, { detail = "", ok = "OK", danger = false } = {}) {
     return new Promise((resolve) => {
@@ -121,6 +141,17 @@
     chevronUp: svgIcon('<path d="m6 15 6-6 6 6"/>'),
     back15: svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="15.5" font-size="7.5" font-family="Inter, sans-serif" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">15</text>'),
     fwd30: svgIcon('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/><text x="12" y="15.5" font-size="7.5" font-family="Inter, sans-serif" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">30</text>'),
+    note: svgIcon('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+    disc: svgIcon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>'),
+    artist: svgIcon('<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/>'),
+    tape: svgIcon('<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><circle cx="16" cy="11" r="2"/><path d="M10 11h4M6 19l2-4h8l2 4"/>'),
+    sparkle: svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+    podcast: svgIcon('<circle cx="12" cy="11" r="2"/><path d="M8.5 15.5a5 5 0 1 1 7 0"/><path d="M5.6 18.4a9 9 0 1 1 12.8 0"/><path d="M12 13v8"/>'),
+    check: svgIcon('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'),
+    circleO: svgIcon('<circle cx="12" cy="12" r="9"/>'),
+    x: svgIcon('<path d="M18 6 6 18M6 6l12 12"/>'),
+    grip: svgIcon('<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>', true),
+    chevronLeft: svgIcon('<path d="m15 18-6-6 6-6"/>'),
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
@@ -152,7 +183,7 @@
     $("firstRun").hidden = !(all && all.count === 0 && !shelf.some((x) => x.kind === "user"));
     const list = $("shelfList");
     list.innerHTML = "";
-    const icon = { all: "▤", singles: "♪", albums: "◉", artists: "♫", tidy: "✦" };
+    const icon = { all: ICONS.list, singles: ICONS.note, albums: ICONS.disc, artists: ICONS.artist, tidy: ICONS.sparkle };
     let sepDone = false;
     shelf.forEach((s) => {
       // Subtle divider between the auto shelves and the user's own tapes.
@@ -165,7 +196,7 @@
       }
       const li = document.createElement("li");
       li.className = "shelf-row";
-      li.innerHTML = `<span class="shelf-ico">${icon[s.key] || "▰"}</span>
+      li.innerHTML = `<span class="shelf-ico">${icon[s.key] || ICONS.tape}</span>
         <span class="shelf-name"></span><span class="shelf-count">${s.count}</span>`;
       li.querySelector(".shelf-name").textContent = s.name;
       li.addEventListener("click", () =>
@@ -214,7 +245,7 @@
     $("tidyBtn").hidden = key !== "tidy";
     $("albumEditBtn").hidden = true;
     $("search").value = "";
-    $("backBtn").textContent = "‹ Tapes";
+    $("backBtn").querySelector(".back-label").textContent = "Tapes";
     trackParent = "shelf";
     renderTracks(view);
     showView("tracks");
@@ -244,21 +275,28 @@
   function renderBrowse(rows) {
     const el = $("browseList");
     el.innerHTML = "";
-    if (!rows.length) { el.innerHTML = `<div class="empty-note">Nothing here yet.</div>`; return; }
+    if (!rows.length) {
+      const q = $("browseSearch").value.trim();
+      el.innerHTML = `<div class="empty-note"></div>`;
+      el.firstChild.textContent = q ? `Nothing matches “${q}”.`
+        : currentBrowse === "albums" ? "No albums yet — they appear as you add songs with album tags."
+        : "No artists yet — they appear as you add songs.";
+      return;
+    }
     rows.forEach((r) => {
       const li = document.createElement("li");
       li.className = "browse-row";
       if (currentBrowse === "albums") {
         const art = r.cover_id
           ? `<img class="browse-cover" src="${coverUrl(r.cover_id)}" alt="" loading="lazy" decoding="async">`
-          : `<span class="browse-cover browse-cover--blank">♪</span>`;
+          : `<span class="browse-cover browse-cover--blank">${ICONS.disc}</span>`;
         li.innerHTML = `${art}<span class="browse-meta">
           <span class="browse-name"></span><span class="browse-sub"></span></span>
           <span class="shelf-count">${r.count}</span>`;
         li.querySelector(".browse-sub").textContent = r.artist;
         li.addEventListener("click", () => openAlbumTracks(r.name));
       } else {
-        li.innerHTML = `<span class="shelf-ico">♫</span><span class="browse-meta">
+        li.innerHTML = `<span class="shelf-ico">${ICONS.artist}</span><span class="browse-meta">
           <span class="browse-name"></span></span><span class="shelf-count">${r.count}</span>`;
         li.addEventListener("click", () => openArtistTracks(r.name));
       }
@@ -276,14 +314,14 @@
     const data = await jget(`api/albums/tracks?album=${encodeURIComponent(album)}`);
     if (tok !== navToken) return;
     view = data;
-    openTrackList(album, "albums", "‹ Albums");
+    openTrackList(album, "albums", "Albums");
   }
   async function openArtistTracks(artist) {
     const tok = ++navToken;
     const data = await jget(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
     if (tok !== navToken) return;
     view = data;
-    openTrackList(artist, "artists", "‹ Artists");
+    openTrackList(artist, "artists", "Artists");
   }
   function openTrackList(title, parent, backLabel) {
     currentTape = null;
@@ -300,7 +338,7 @@
     $("albumEditBtn").hidden = parent !== "albums";
     $("tapeDelBtn").hidden = true;
     $("sortBar").hidden = true;
-    $("backBtn").textContent = backLabel;
+    $("backBtn").querySelector(".back-label").textContent = backLabel;
     $("search").value = "";
     renderTracks(view);
     showView("tracks");
@@ -353,7 +391,7 @@
     const el = $("showList");
     el.innerHTML = "";
     if (!data.shows.length && !data.loose_count) {
-      el.innerHTML = `<div class="empty-note">No podcasts yet. Paste an RSS or YouTube URL above.</div>`;
+      el.innerHTML = `<div class="empty-note">Follow a show: tap <b>+ Add</b> and paste its RSS or YouTube link.</div>`;
       return;
     }
     data.shows.forEach((s) => {
@@ -361,7 +399,7 @@
       li.className = "browse-row";
       const art = s.has_image
         ? `<img class="browse-cover" src="${M.epShowCoverBase + s.id}" alt="" loading="lazy" decoding="async">`
-        : `<span class="browse-cover browse-cover--blank">◎</span>`;
+        : `<span class="browse-cover browse-cover--blank">${ICONS.podcast}</span>`;
       li.innerHTML = `${art}<span class="browse-meta">
         <span class="browse-name"></span><span class="browse-sub"></span></span>
         <span class="shelf-count">${s.unplayed ? s.unplayed + " new" : s.count}</span>`;
@@ -373,8 +411,8 @@
     if (data.loose_count) {
       const li = document.createElement("li");
       li.className = "browse-row";
-      li.innerHTML = `<span class="browse-cover browse-cover--blank">◎</span>
-        <span class="browse-meta"><span class="browse-name">Loose episodes</span></span>
+      li.innerHTML = `<span class="browse-cover browse-cover--blank">${ICONS.podcast}</span>
+        <span class="browse-meta"><span class="browse-name">Unsorted episodes</span></span>
         <span class="shelf-count">${data.loose_count}</span>`;
       li.addEventListener("click", openLoose);
       el.appendChild(li);
@@ -393,7 +431,7 @@
     const data = await jget("api/podcast/episodes/loose");
     if (tok !== navToken) return;
     currentShow = null;
-    enterEpisodes("Loose episodes", data.episodes, { refreshable: false, deletable: false });
+    enterEpisodes("Unsorted episodes", data.episodes, { refreshable: false, deletable: false });
   }
   // Shared tail for the two episode views (a tape's episodes, or Loose episodes).
   function enterEpisodes(title, eps, { refreshable, deletable }) {
@@ -413,7 +451,15 @@
   function renderEpisodes(list) {
     const el = $("episodeList");
     el.innerHTML = "";
-    if (!list.length) { el.innerHTML = `<div class="empty-note">No episodes.</div>`; return; }
+    if (!list.length) {
+      const q = $("epSearch").value.trim();
+      el.innerHTML = `<div class="empty-note"></div>`;
+      el.firstChild.textContent = q ? `Nothing matches “${q}”.`
+        : epFilter === "unplayed" ? "No unplayed episodes."
+        : epFilter === "downloaded" ? "No downloaded episodes."
+        : "No episodes yet. Use Refresh to check for new ones.";
+      return;
+    }
     list.forEach((e, i) => {
       const li = document.createElement("li");
       li.dataset.id = e.id;
@@ -422,15 +468,15 @@
         ? Math.min(100, (e.position / e.duration) * 100) : 0;
       const sub = [
         formatEpDate(e.published_at),
-        e.duration ? fmt(e.duration) : (e.status === "new" ? "not downloaded" : ""),
-        e.status === "downloading" ? "downloading…" : "",
+        e.duration ? fmt(e.duration) : (e.status === "new" ? "Not downloaded yet" : ""),
+        e.status === "downloading" ? "Downloading…" : "",
       ].filter(Boolean).join(" · ");
       li.innerHTML = `<span class="tl-meta">
           <div class="tl-title"></div><div class="tl-sub"></div>
           <div class="ep-prog"${pct ? "" : " hidden"}><div class="ep-prog-fill" style="width:${pct}%"></div></div>
         </span>
-        <button class="tl-add ep-played" title="Mark played / unplayed">${e.played ? "✓" : "○"}</button>
-        <button class="tl-add ep-menu" title="More">${ICONS.more}</button>`;
+        <button class="tl-add ep-played" title="${e.played ? "Mark as unplayed" : "Mark as played"}" aria-label="${e.played ? "Mark as unplayed" : "Mark as played"}">${e.played ? ICONS.check : ICONS.circleO}</button>
+        <button class="tl-add ep-menu" title="More" aria-label="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = e.title;
       li.querySelector(".tl-sub").textContent = sub;
       li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
@@ -471,7 +517,7 @@
     menu.appendChild(menuHead(ep.title));
     // Loose episodes can be filed into a tape (in-place picker — see submenuItem).
     if (ep.show_id == null)
-      menu.appendChild(submenuItem("Add to tape…", () => openAssignMenu(e, ep)));
+      menu.appendChild(submenuItem("Move to show…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
     menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
@@ -480,23 +526,24 @@
   async function openAssignMenu(e, ep) {
     if (!showsData) { try { showsData = await jget("api/podcast/shows"); } catch (_) { /* ignore */ } }
     menu.innerHTML = "";
+    menu.appendChild(menuHead(`Move “${ep.title}” to…`));
     (showsData?.shows || []).forEach((s) =>
       menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
     menu.appendChild(menuSep());
-    menu.appendChild(menuItem("New tape…", () => {
-      const name = prompt("New tape name:");
-      if (name && name.trim()) assignEpisode(ep, { new_show_name: name.trim() });
+    menu.appendChild(menuItem("New show…", async () => {
+      const name = await askName("New show", { label: "Show name", ok: "Create" });
+      if (name) assignEpisode(ep, { new_show_name: name });
     }, closeMenu));
     showMenuAt(e);
   }
   async function assignEpisode(ep, body) {
     let res;
     try { res = await jsend(`api/podcast/episodes/${ep.id}/assign`, "POST", body).then((r) => r.json()); }
-    catch (err) { console.error(err); toast("Couldn't add to tape."); return; }
+    catch (err) { console.error(err); toast(errText(err, "Couldn't move the episode.")); return; }
     episodes = episodes.filter((x) => x.id !== ep.id);   // it left Loose episodes
     applyEpisodeSearch();
     showsData = null;   // counts/new show changed — refetch on next open
-    toast(`Added to "${res.show.title}"`);
+    toast(`Moved to “${res.show.title}”`);
   }
   async function removeDownload(ep) {
     try { await jsend(`api/podcast/episodes/${ep.id}/remove-download`, "POST"); }
@@ -591,12 +638,12 @@
   async function refreshCurrentShow() {
     if (!currentShow) return;
     const btn = $("showRefreshBtn"), orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "…";
+    btn.disabled = true; btn.textContent = "Checking…";
     try {
       const r = await jsend(`api/podcast/shows/${currentShow.id}/refresh`, "POST").then((x) => x.json());
-      toast(r.added ? `Added ${r.added} new episode${r.added > 1 ? "s" : ""}` : "No new episodes");
+      toast(r.added ? `${r.added} new episode${r.added > 1 ? "s" : ""}` : "No new episodes");
       if (r.added) await openShow(currentShow);
-    } catch (e) { console.error(e); toast("Refresh failed."); }
+    } catch (e) { console.error(e); toast(errText(e, "Couldn't check for new episodes.")); }
     finally { btn.disabled = false; btn.textContent = orig; }
   }
   async function deleteCurrentShow() {
@@ -649,19 +696,29 @@
   function renderTracks(list) {
     const el = $("trackList");
     el.innerHTML = "";
-    if (!list.length) { el.innerHTML = `<div class="empty-note">Empty.</div>`; return; }
+    if (!list.length) {
+      const q = $("search").value.trim();
+      el.innerHTML = `<div class="empty-note"></div>`;
+      el.firstChild.textContent = q ? `Nothing matches “${q}”.`
+        : currentTape && currentTape.kind === "user" ? "This tape is empty. Tap + on any song to add it here."
+        : currentTape && currentTape.key === "tidy" ? "Nothing needs tidying."
+        : "No songs yet. Tap + Add to rip one from a link.";
+      return;
+    }
     // Drag-reorder only makes sense (and persists) for a user tape, and only
     // when the list isn't filtered by a search.
     const reorderable = !!(currentTape && currentTape.kind === "user") && !$("search").value.trim();
     list.forEach((t, i) => {
       const li = document.createElement("li");
       li.dataset.id = t.id;
-      const handle = reorderable ? `<span class="tl-drag drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>` : "";
+      const handle = reorderable ? `<span class="tl-drag drag-handle" title="Drag to reorder" aria-hidden="true">${ICONS.grip}</span>` : "";
       li.innerHTML = `${handle}<span class="tl-num">${i + 1}</span>
         <span class="tl-meta"><div class="tl-title"></div><div class="tl-sub"></div></span>
-        <button class="tl-add tl-addto" title="Add to…">${ICONS.plus}</button>
-        <button class="tl-add tl-more" title="More">${ICONS.more}</button>`;
+        <span class="tl-dur">${t.duration ? fmt(t.duration) : ""}</span>
+        <button class="tl-add tl-addto" title="Add to…" aria-label="Add to tape or queue">${ICONS.plus}</button>
+        <button class="tl-add tl-more" title="More" aria-label="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = t.title;
+      li.querySelector(".tl-title").title = t.title;   // full text on hover
       const sub = li.querySelector(".tl-sub");
       if (t.artist) sub.textContent = [t.artist, t.album].filter(Boolean).join(" · ");
       else {
@@ -762,7 +819,8 @@
     labelTitle.textContent = t.title;
     labelArtist.textContent = isEp
       ? (t.show || "Podcast")
-      : [t.artist, t.album].filter(Boolean).join(" — ");
+      : [t.artist || "Unknown artist", t.album].filter(Boolean).join(" · ");
+    fitLabel();
     const art = artUrl(t);
     if (art) labelArt.src = art; else labelArt.removeAttribute("src");
     document.title = t.title + (isEp ? (t.show ? " · " + t.show : "") : (t.artist ? " · " + t.artist : ""));
@@ -775,6 +833,19 @@
     updateUpNext();
     updateMini();
   }
+  // Long titles on the paper label drift slowly sideways (and back) so the
+  // whole name can be read; the full text is also the tooltip.
+  function fitLabel() {
+    [labelTitle, labelArtist].forEach((el) => {
+      el.title = el.textContent;
+      el.classList.remove("drift");
+      el.style.removeProperty("--drift");
+      const inner = el.scrollWidth - el.clientWidth;
+      if (inner > 4) { el.style.setProperty("--drift", `-${inner}px`); el.classList.add("drift"); }
+    });
+  }
+  window.addEventListener("resize", () => { if (currentTrack()) fitLabel(); });
+
   // Warm the browser/nginx cache for the next track so skips start instantly.
   let prefetchEl = null, prefetchId = null;
   function prefetchNext() {
@@ -899,7 +970,8 @@
 
   // ---------- queue editing ----------
   function addToQueue(t) {
-    if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); return; }
+    if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); toast(`Playing “${t.title}”`); return; }
+    toast(`Queued “${t.title}”`);
     queue.push(t);
     baseQueue = queue.slice();
     savePlaystate();
@@ -932,16 +1004,18 @@
   function renderQueue() {
     const el = $("queueList");
     el.innerHTML = "";
-    if (!queue.length) { el.innerHTML = `<div class="queue-empty">Queue is empty.</div>`; return; }
+    if (!queue.length) { el.innerHTML = `<div class="queue-empty">Nothing up next. Use + → Queue on any song.</div>`; return; }
     queue.forEach((t, i) => {
       const li = document.createElement("li");
       li.dataset.id = t.id;
       li.className = "q-row" + (i === qi ? " active" : "");
-      li.innerHTML = `<span class="q-drag drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
+      li.innerHTML = `<span class="q-drag drag-handle" title="Drag to reorder" aria-hidden="true">${ICONS.grip}</span>
         <span class="q-meta"><div class="q-title"></div><div class="q-sub"></div></span>
-        <button class="q-btn q-rm" title="Remove">✕</button>`;
+        <button class="q-btn q-rm" title="Remove from queue" aria-label="Remove from queue">${ICONS.x}</button>`;
       li.querySelector(".q-title").textContent = t.title;
-      li.querySelector(".q-sub").textContent = [t.artist, t.album].filter(Boolean).join(" · ");
+      li.querySelector(".q-title").title = t.title;
+      li.querySelector(".q-sub").textContent = t.kind === "episode" ? (t.show || "Podcast")
+        : [t.artist, t.album].filter(Boolean).join(" · ");
       li.querySelector(".q-meta").addEventListener("click", () => queueJump(i));
       li.querySelector(".q-drag").addEventListener("click", (e) => e.stopPropagation());
       li.querySelector(".q-rm").addEventListener("click", (e) => { e.stopPropagation(); queueRemove(i); });
@@ -1067,7 +1141,8 @@
     const cur = currentTrack();
     if (cur && cur.id === id) {   // refresh the deck label without reloading audio
       labelTitle.textContent = cur.title;
-      labelArtist.textContent = [cur.artist, cur.album].filter(Boolean).join(" — ");
+      labelArtist.textContent = [cur.artist || "Unknown artist", cur.album].filter(Boolean).join(" · ");
+      fitLabel();
       document.title = cur.title + (cur.artist ? " · " + cur.artist : "");
       updateMini();
     }
@@ -1263,8 +1338,11 @@
     if (tapes.length) {
       menu.appendChild(menuSep());
       tapes.forEach((s) => menu.appendChild(menuItem(s.name, async () => {
-        await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id });
-        loadShelf();
+        try {
+          const r = await jsend(`api/playlists/${s.key}/tracks`, "POST", { track_id: t.id }).then((x) => x.json());
+          toast(r.added ? `Added to ${r.tape}` : `Already on ${r.tape}`);
+          loadShelf();
+        } catch (e) { console.error(e); toast(errText(e, `Couldn't add it to ${s.name}.`)); }
       }, closeMenu)));
     }
     showMenuAt(e);
@@ -1353,6 +1431,8 @@
   $("dlToggle").addEventListener("click", () => {
     const showing = $("dlPanel").hidden;
     $("dlPanel").hidden = !showing;
+    $("dlToggle").setAttribute("aria-expanded", String(showing));
+    if (showing) $("dlUrl").focus();
     if (showing) openDlStream(); else closeDlStream();
   });
   $("dlForm").addEventListener("submit", async (e) => {
@@ -1381,10 +1461,10 @@
     try {
       const r = await jsend("api/podcast/add", "POST", { url }).then((x) => x.json());
       $("dlUrl").value = "";
-      const msg = r.assigned ? `Added to "${r.assigned.title}"`
-        : r.loose ? "Added to Loose episodes"
-        : r.created === false ? `Added ${r.added} new episode${r.added === 1 ? "" : "s"}`
-        : `Added "${r.title}"`;
+      const msg = r.assigned ? `Added to “${r.assigned.title}”`
+        : r.loose ? "Added to Unsorted episodes"
+        : r.created === false ? `${r.added} new episode${r.added === 1 ? "" : "s"}`
+        : `Following “${r.title}”`;
       toast(msg);
       openPodcasts();
     } catch (err) {
@@ -1442,7 +1522,7 @@
         // Finished: what happened, what it was saved as, and what to do next.
         li.innerHTML = `<div class="dl-row"><div class="dl-meta"><div class="dl-msg"></div><div class="dl-sub"></div></div>
           <div class="dl-actions"></div>
-          <button class="dl-dismiss" title="Dismiss" aria-label="Dismiss">✕</button></div>`;
+          <button class="dl-dismiss" title="Dismiss" aria-label="Dismiss">${ICONS.x}</button></div>`;
         li.querySelector(".dl-msg").textContent = jobOutcomeText(j);
         const sub = j.status === "error" ? j.url
           : j.track ? [j.track.artist, j.track.album].filter(Boolean).join(" · ") || "No artist or album yet" : "";
@@ -1639,10 +1719,10 @@
     });
   }
   wireCreateForm("newTapeForm", "newTapeName", async (name) => {
-    await jsend("api/playlists", "POST", { name }); loadShelf();
+    await jsend("api/playlists", "POST", { name }); loadShelf(); toast(`Created the tape “${name}”`);
   });
   wireCreateForm("newShowForm", "newShowName", async (name) => {
-    await jsend("api/podcast/shows", "POST", { name }); showsData = null; openPodcasts();
+    await jsend("api/podcast/shows", "POST", { name }); showsData = null; openPodcasts(); toast(`Created the show “${name}”`);
   });
 
   audio.addEventListener("play", () => {
@@ -1770,6 +1850,7 @@
   $("speedBtn").addEventListener("click", cycleSpeed);
 
   // ---------- init ----------
+  document.querySelectorAll(".ico[data-icon]").forEach((el) => { el.innerHTML = ICONS[el.dataset.icon] || ""; });
   $("back15Btn").innerHTML = ICONS.back15;
   $("fwd30Btn").innerHTML = ICONS.fwd30;
   renderSpeed();

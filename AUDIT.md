@@ -37,12 +37,14 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** `templates/index.html` `#newShowForm`, `#showDelBtn`; `player.js` `openAssignMenu`
 - **Why:** A tape is a mixtape you curate. A show is something you follow. Using one word for both blurs the two halves of the app.
 - **Fix:** Use *show* throughout Podcasts: "New show…", "Unfollow show", "Move to show…". Keep *tape* for music.
+- **Status:** Done. The podcast side says *show* throughout: "New show…", "Create show", "Unfollow", "Move to show…", and naming a show uses an in-app field instead of `prompt()`.
 
 **1.3 One hidden "⬇" panel does two different jobs**
 - **What:** The ⬇ glyph (tooltip "Add") opens a URL field that rips a song in Music mode and follows a feed in Podcasts mode. Nothing on screen says which.
 - **Where:** `#dlToggle`, `#dlPanel`
 - **Why:** Adding music is the main way the library grows. It's behind an unlabeled download arrow that reads as "download this". The podcast empty state even says "paste … above", pointing at a field that isn't visible.
 - **Fix:** Use a labelled **+ Add** button in each mode's header, opening a field titled for the mode: *Rip a song or playlist* / *Follow a podcast*. Keep the job list beneath it.
+- **Status:** Done. The header button is a labelled **+ Add** (with `aria-expanded`); opening it focuses the link field, and its two modes are labelled Music / Podcasts with icons.
 
 **1.4 "Singles" means "tracks with no album tag"**
 - **What:** The Singles shelf is defined as `album IS NULL OR album = ''`. Real singles and badly tagged rips land in it together.
@@ -114,6 +116,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - Lists: add a `title` attribute and allow two lines.
   - Deck label: a slow, label-appropriate scroll on hover or tap, or wrap to two lines in a smaller hand-lettered size.
   - Move "INDEX" out of the title's line.
+- **Status:** Done. List titles wrap to two lines before cutting and carry the full title as a tooltip (also in Up Next). On the deck label a title or artist line that doesn't fit drifts slowly across and back (off with reduced motion), with the full text as a tooltip. Label text now scales with the cassette (container units), and the title block sits below the INDEX stamp and clear of the cover thumbnail, so they no longer overlap at 375px.
 
 **2.8 Untagged tracks fall through the cracks** (confirmed)
 - **What:** A file with no tags shows its filename as the title and an empty second line. No "Unknown artist", and no artist, album or year at all. It doesn't appear under Artists or Albums, so it can only be found by scrolling All Tracks or searching.
@@ -147,27 +150,32 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** Transport, shuffle, repeat, sleep and row buttons use a clean inline-SVG set. The shelf, mode toggle and other controls use Unicode glyphs (▤ ♪ ◉ ♫ ▰ ◎ ⬇ ☰ ✓ ○ ✕ ⠿ ‹), which render at different sizes and weights on each platform.
 - **Where:** `player.js` `loadShelf`, `renderEpisodes`, `renderQueue`; `index.html`
 - **Fix:** Draw the remaining glyphs in the existing `ICONS` set.
+- **Status:** Done. Every remaining glyph (shelf, browse placeholders, mode toggle, Add, back, played toggle, drag handles, queue and job dismiss) is drawn from the one `ICONS` set.
 
 **3.2 Five empty-state voices**
 - **What:** "Empty.", "Nothing here yet.", "No episodes.", "Queue is empty." and one helpful one ("No podcasts yet. Paste an RSS or YouTube URL above.").
 - **Fix:** One voice, each saying what to do next (see 6).
+- **Status:** Done. Each empty state says what to do next, in one voice (tape, library, albums/artists, shows, episodes by filter, queue), and searches with no hits say *Nothing matches “…”*.
 
 **3.3 Two kinds of dialog**
 - **What:** Edit uses a styled in-app modal. Delete track, delete tape, delete show and delete episode use the browser's `confirm()`, and naming a show uses `prompt()`.
 - **Fix:** Replace confirms with Undo (see 4.3). Use the in-app modal style for naming.
-- **Status:** Partly done. Every `confirm()` (delete tape, show, episode) is now an in-app dialog stating the consequence (e.g. *The songs stay in your library.*), and deleting a song uses Undo instead. The one remaining `prompt()` (naming a show when filing an episode) is replaced with the podcast wording in #9.
+- **Status:** Done. All confirms are in-app (see above) and the last `prompt()` is now the in-app *New show* field.
 
 **3.4 Feedback depends on which half of the app you're in**
 - **What:** Podcast actions confirm themselves ("Added to …", "Download removed", "No new episodes"). Music actions don't: adding to a tape, queueing, creating or renaming a tape, deleting a track and renaming an artist are all silent. Adding a song that's already on the tape is silently ignored.
 - **Fix:** Toast every outcome in the same style: *"Added to Road trip"*, *"Already on Road trip"*, *"Queued — plays after this"*.
+- **Status:** Done. Music actions confirm themselves like podcast ones: *Added to Road trip* / *Already on Road trip* (the server now says which), *Queued “…”*, *Created the tape “…”*, plus delete/rename with Undo from #3. Failures name the action.
 
 **3.5 Words for the same things**
 - **What:** The rip button is "Get" while the podcast one is "Add". There are three delete phrasings: "Delete from library", "Delete episode", "Delete tape". Subtitles use "·" in lists but "—" on the deck label.
 - **Fix:** One verb per action, and one separator.
+- **Status:** Done. Rip is *Rip*, the podcast side is *Add/Follow*, delete actions read *Delete …* consistently, and subtitles use “·” everywhere including the deck label (with *Unknown artist* instead of a blank).
 
 **3.6 Track rows show no duration**
 - **What:** Episode rows show date and length. Track rows show neither, though the data has a duration.
 - **Fix:** Add the duration, right-aligned in the mono face the timer uses.
+- **Status:** Done. Track rows show the duration right-aligned in the timer's mono face. With a mouse, + and ⋯ take its place on hover, so they no longer squeeze the title; on phones both stay visible.
 
 ---
 
@@ -298,6 +306,8 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | Unlabeled controls | ⬇, shelf glyphs, ⠿ handles, ✕ in queue | `aria-label`s: "Add", "Reorder", "Remove from queue" |
 | Deck, empty | "insert a tape" | Keep. It's the right voice, and the empty-state card (2.1) can carry the instructions. |
 
+**Status: done.** Every row above is in the app (the rip messages since #2, the rest in #9). The one wording change from the table: empty shows say "Use Refresh to check for new ones", since there's no pull-to-refresh.
+
 ---
 
 ## 7. Mobile (375px, touch)
@@ -404,7 +414,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | Done |
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | Done |
 | 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | Done |
-| 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | To do |
+| 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | Done |
 | 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | To do |
 
 Close runners-up:

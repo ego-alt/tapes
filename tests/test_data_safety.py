@@ -46,3 +46,10 @@ def test_playstate_accepts_beacon_post(client, add_track):
     s = PlaybackSession.query.one()
     assert s.position_s == 42.5
     assert client.get("/api/playstate").get_json()["position"] == 42.5
+
+
+def test_add_to_tape_reports_duplicates(client, add_track):
+    t = add_track()
+    pid = client.post("/api/playlists", json={"name": "Road trip"}).get_json()["key"]
+    assert client.post(f"/api/playlists/{pid}/tracks", json={"track_id": t.id}).get_json() == {"added": True, "tape": "Road trip"}
+    assert client.post(f"/api/playlists/{pid}/tracks", json={"track_id": t.id}).get_json() == {"added": False, "tape": "Road trip"}
