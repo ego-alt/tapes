@@ -8,7 +8,9 @@ to the current song.
 
 ## Features
 
-- **Cassette-deck player** — animated reels, scrubber, shuffle / repeat,
+- **Cassette-deck player** — a detailed cassette whose tape winds from reel to
+  reel as the song plays (the emptier reel spins faster, as real tape does),
+  with the title and artist handwritten on its label; scrubber, shuffle / repeat,
   keyboard shortcuts (`Space`, `←/→` seek, `Shift + ←/→` skip, `↑/↓` volume,
   `M` `S` `R` `Q`, `/` search, `?` for the list), lock-screen controls,
   and it resumes your queue across sessions and devices.
