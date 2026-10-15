@@ -72,7 +72,7 @@ _RIP_ERRORS = [
     (("available in your country", "geo restrict", "geo-restrict"),
      "This video isn't available in this region."),
     (("unsupported url",), "That site or link isn't supported."),
-    (("video unavailable", "has been removed", "no longer available", "does not exist"),
+    (("video unavailable", "video is unavailable", "has been removed", "no longer available", "does not exist"),
      "This video is no longer available."),
     (("unable to download webpage", "name or service not known", "timed out",
       "temporary failure in name resolution", "connection"),
@@ -216,11 +216,12 @@ def _process(app, job_id: int):
     final_mp3 = None
     title = None
     last_pct = -1
-    errors = []
+    errors, tail = [], []
     for line in proc.stdout:
         line = line.strip()
         if line.startswith("ERROR"):
             errors.append(line)
+        tail = (tail + [line])[-5:]   # for failures that never print ERROR
         m = re.search(r"\[download\]\s+([\d.]+)%", line)
         if m:
             pct = float(m.group(1))
@@ -242,8 +243,9 @@ def _process(app, job_id: int):
 
     proc.wait()
     if proc.returncode != 0:
-        log.warning("yt-dlp failed for %s: %s", job.url, " | ".join(errors) or "no output")
-        raise RipError(friendly_rip_error(" ".join(errors)))
+        detail = " | ".join(errors or tail) or "no output"
+        log.warning("yt-dlp failed for %s: %s", job.url, detail)
+        raise RipError(friendly_rip_error(detail))
 
     if not final_mp3:
         mp3s = sorted(music_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)

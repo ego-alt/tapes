@@ -34,19 +34,26 @@
     setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3200);
   }
   // Both throw on a non-2xx or network failure so callers (and the global
-  // unhandledrejection handler) can surface it instead of silently dying.
+  // unhandledrejection handler) can surface it instead of silently dying. The
+  // error carries the server's plain-language message as .userMessage.
+  async function failure(r, what) {
+    const err = new Error(`${what} → ${r.status}`);
+    try { err.userMessage = (await r.json()).error; } catch (_) { /* not JSON */ }
+    return err;
+  }
   async function jget(u) {
     const r = await fetch(u);
-    if (!r.ok) throw new Error(`GET ${u} → ${r.status}`);
+    if (!r.ok) throw await failure(r, `GET ${u}`);
     return r.json();
   }
   async function jsend(u, m, b) {
     const r = await fetch(u, {
       method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : null,
     });
-    if (!r.ok) throw new Error(`${m} ${u} → ${r.status}`);
+    if (!r.ok) throw await failure(r, `${m} ${u}`);
     return r;
   }
+  const errText = (e, fallback) => (e && e.userMessage) || fallback;
 
   // ---------- icons (inline SVG, currentColor) ----------
   // Replaces the mismatched unicode glyphs. Stroke icons by default; `filled`
@@ -125,8 +132,8 @@
     $("modeMusic").setAttribute("aria-selected", String(m === "music"));
     $("modePods").setAttribute("aria-selected", String(m === "podcasts"));
     // The one add input re-skins to the mode; the submit handler routes on it.
-    $("dlUrl").placeholder = m === "music" ? "Paste a URL to rip…" : "RSS or YouTube URL…";
-    $("dlSubmit").textContent = m === "music" ? "Get" : "Add";
+    $("dlUrl").placeholder = m === "music" ? "Paste a song or playlist link…" : "Paste an RSS or YouTube link…";
+    $("dlSubmit").textContent = m === "music" ? "Rip" : "Follow";
     if (m === "music") showView("shelf");
     else openPodcasts();
   }
@@ -1085,9 +1092,17 @@
     const url = $("dlUrl").value.trim();
     if (!url) return;
     if (mode === "podcasts") { await addPodcast(url); return; }
-    await jsend("api/downloads", "POST", { url });
-    $("dlUrl").value = "";
-    openDlStream();
+    const btn = $("dlSubmit");
+    btn.disabled = true;
+    try {
+      const r = await jsend("api/downloads", "POST", { url }).then((x) => x.json());
+      $("dlUrl").value = "";
+      toast(r.playlist ? `Ripping ${r.queued} songs into a new tape, “${r.playlist}”` : "Ripping…");
+      handleJobs(await jget("api/downloads"));   // show the job right away
+      openDlStream();
+    } catch (err) {
+      console.error(err); toast(errText(err, "Couldn't start that rip."));
+    } finally { btn.disabled = false; }
   });
   async function addPodcast(url) {
     const btn = $("dlSubmit");
@@ -1102,11 +1117,12 @@
       toast(msg);
       openPodcasts();
     } catch (err) {
-      console.error(err); toast("Couldn't add that — check the URL.");
+      console.error(err); toast(errText(err, "Couldn't add that — check the link."));
     } finally { btn.disabled = false; }
   }
   function openDlStream() {
     if (dlEvt) return;  // already streaming
+    jget("api/downloads").then(handleJobs).catch(() => {});   // recent results too
     dlEvt = new EventSource("api/downloads/stream");
     dlEvt.onmessage = (e) => handleJobs(JSON.parse(e.data));
     dlEvt.addEventListener("done", closeDlStream);
@@ -1115,20 +1131,29 @@
   function closeDlStream() {
     if (dlEvt) { dlEvt.close(); dlEvt = null; }
   }
+  // What a finished job means, in words. `t` is the track (or episode title).
+  function jobOutcomeText(j) {
+    const name = j.track ? j.track.title : j.message;
+    if (j.status === "error") return j.message || "Couldn't rip that link.";
+    if (j.kind === "podcast") return `Downloaded “${name}”`;
+    if (j.outcome === "exists") return `You already have “${name}”`;
+    if (j.outcome === "duplicate") return `Same recording as “${name}” — kept the one you have`;
+    return `Added “${name}”`;
+  }
   function handleJobs(jobs) {
-    const activeIds = new Set(jobs.map((j) => j.id));
-    // A job we were tracking dropped out of the active list → it finished. Route
-    // music completions to the shelf refresh, podcast ones to the play-on-ready.
+    // A job we saw queued/running is now finished → announce it once and route
+    // the follow-up (shelf refresh for music, play-when-ready for podcasts).
     let musicCompleted = false;
-    for (const id of Object.keys(dlPrev)) {
-      if (!activeIds.has(Number(id))) {
-        const prev = dlPrev[id];
-        if (prev.kind === "podcast") onPodcastJobDone(prev.episode_id);
-        else musicCompleted = true;
+    for (const j of jobs) {
+      const prev = dlPrev[j.id];
+      const finished = j.status === "done" || j.status === "error";
+      if (prev && !prev.finished && finished) {
+        if (j.kind === "podcast") onPodcastJobDone(j.episode_id);
+        else { musicCompleted = true; toast(jobOutcomeText(j)); }
       }
     }
     dlPrev = {};
-    jobs.forEach((j) => { dlPrev[j.id] = { kind: j.kind, episode_id: j.episode_id }; });
+    jobs.forEach((j) => { dlPrev[j.id] = { finished: j.status === "done" || j.status === "error" }; });
     if (musicCompleted) onDownloadDone();
 
     const el = $("dlList");
@@ -1136,12 +1161,39 @@
     jobs.forEach((j) => {
       const li = document.createElement("li");
       li.className = "dl-job " + j.status;
-      li.innerHTML = `<div class="dl-msg"></div>
-        <div class="dl-bar"><div class="dl-bar-fill" style="width:${j.progress}%"></div></div>`;
-      li.querySelector(".dl-msg").textContent =
-        j.status === "error" ? "⚠ " + j.message
-        : j.message ? j.message + ` · ${j.progress}%`
-        : j.url;
+      if (j.status === "queued" || j.status === "running") {
+        li.innerHTML = `<div class="dl-msg"></div>
+          <div class="dl-bar"><div class="dl-bar-fill" style="width:${j.progress}%"></div></div>`;
+        li.querySelector(".dl-msg").textContent = j.status === "queued" ? `Waiting… ${j.url}`
+          : j.message && j.message !== "downloading" ? `${j.message} · ${Math.round(j.progress)}%`
+          : `Starting… ${j.url}`;
+      } else {
+        // Finished: what happened, what it was saved as, and what to do next.
+        li.innerHTML = `<div class="dl-row"><div class="dl-meta"><div class="dl-msg"></div><div class="dl-sub"></div></div>
+          <div class="dl-actions"></div>
+          <button class="dl-dismiss" title="Dismiss" aria-label="Dismiss">✕</button></div>`;
+        li.querySelector(".dl-msg").textContent = jobOutcomeText(j);
+        const sub = j.status === "error" ? j.url
+          : j.track ? [j.track.artist, j.track.album].filter(Boolean).join(" · ") || "No artist or album yet" : "";
+        li.querySelector(".dl-sub").textContent = sub;
+        const actions = li.querySelector(".dl-actions");
+        if (j.track && j.status === "done") {
+          const play = document.createElement("button");
+          play.className = "btn btn-ghost dl-act"; play.textContent = "Play";
+          play.addEventListener("click", () => playFromList([j.track], 0));
+          actions.appendChild(play);
+          if (j.outcome === "added") {
+            const edit = document.createElement("button");
+            edit.className = "btn btn-ghost dl-act"; edit.textContent = "Edit";
+            edit.addEventListener("click", () => openEdit(j.track));
+            actions.appendChild(edit);
+          }
+        }
+        li.querySelector(".dl-dismiss").addEventListener("click", async () => {
+          li.remove();
+          try { await jsend(`api/downloads/${j.id}`, "DELETE"); } catch (_) { /* best effort */ }
+        });
+      }
       el.appendChild(li);
     });
   }
@@ -1378,7 +1430,7 @@
   enableReorder($("queueList"), onQueueReorder);
   window.addEventListener("unhandledrejection", (e) => {
     console.error(e.reason);
-    toast("Something went wrong — please try again.");
+    toast(errText(e.reason, "Something went wrong — please try again."));
   });
   (async () => {
     try {

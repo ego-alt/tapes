@@ -13,6 +13,7 @@ from models import DownloadJob, User, db
     ("ERROR: The uploader has not made this video available in your country", "This video isn't available in this region."),
     ("ERROR: Unsupported URL: https://example.com/x", "That site or link isn't supported."),
     ("ERROR: [youtube] abc: Video unavailable", "This video is no longer available."),
+    ("ERROR: [youtube] abc: This video is unavailable", "This video is no longer available."),
     ("ERROR: Unable to download webpage: <urlopen error timed out>", "Couldn't reach that site. Check the connection and try again."),
     ("/usr/bin/python: No module named yt_dlp", "Ripping isn't set up on this server (yt-dlp is missing)."),
     ("something odd", "Couldn't rip that link. It may be private, region-locked or not a video."),

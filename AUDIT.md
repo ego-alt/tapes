@@ -74,12 +74,14 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** `routes/downloads.py` `_active_jobs`; `player.js` `handleJobs`
 - **Why:** You can't tell a failed rip from one still in progress, and you won't know to try another link.
 - **Fix:** Keep finished and failed jobs in the list for the session, with a clear outcome per row (see 6), dismissible. Show a toast for failures.
+- **Status:** Done. Failed rips stay in the panel (30 min, or until dismissed with ✕) and toast a plain reason. yt-dlp output is mapped to private / age-restricted / region / unsupported / gone / network / yt-dlp missing, with the raw output kept in the server log. Failed podcast downloads go back to 'not downloaded' instead of hanging. Verified with a real yt-dlp failure: "This video is no longer available."
 
 **2.3 Successful rips and dedups aren't confirmed either** (confirmed)
 - **What:** A finished rip also drops out of the list. The only sign is a shelf count changing. The dedup results ("already in library: X", "duplicate of: X") are written to the job and never displayed.
 - **Where:** same as 2.2
 - **Why:** You paste a link and nothing tells you whether you now have the song, or already did.
 - **Fix:** Show *"Added **Title** — Play · Show"* (or *"You already have **Title**"*), and highlight the new row.
+- **Status:** Done. Finished rips stay listed as *Added “Title”* (with artist · album, **Play** and **Edit**), *You already have “Title”* or *Same recording as “Title” — kept the one you have*, and each one toasts. Verified in Chrome.
 
 **2.4 Unplayable tracks fail silently** (confirmed)
 - **What:** I played a track whose file is missing. The label showed its title, the audio failed, and nothing else happened: no toast, no skip. The `error` handler only reports podcast episodes.
@@ -92,6 +94,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Some actions have no error handling at all:** adding to a tape, creating a tape, deleting a tape, submitting a rip. Their failures fall through to the global "Something went wrong".
 - **Where:** all `routes/*.py`; `player.js` `jsend`
 - **Fix:** Return JSON errors (one `errorhandler`) with human messages (see 6), and show the server's message in the toast.
+- **Status:** Done. API errors are JSON with human messages (one error handler), and the page shows the server's message in its toast instead of a generic one. Verified: a bad feed now says "That link isn't a podcast feed. Try the show's RSS link or a YouTube channel."
 
 **2.6 No offline story**
 - **What:** There's no service worker or manifest (and no favicon; the only 404s in the logs were `/favicon.ico`). When the connection drops mid-song, the deck stalls with no message.
@@ -377,7 +380,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 |---|---|---|---|---|
 | 1 | **Make phones work:** menus above the drawer, plus one global `[hidden]` rule (fixes ghost "Delete tape", "Refresh" and "Up Next") | 7.1, 2.11 | **Small** | Done |
 | 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | Done |
-| 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | To do |
+| 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | Done |
 | 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | To do |
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | To do |
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | To do |
