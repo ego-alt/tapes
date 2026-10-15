@@ -426,6 +426,11 @@ body {
     color: var(--color-text-primary);
 }
 
+.first-run { margin: var(--space-4); padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
+.first-run-title { margin: 0 0 var(--space-1); color: var(--color-text-primary); font-weight: 600; }
+.first-run-body { margin: 0 0 var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+.first-run-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.track-list li.unavailable .tl-title { color: var(--color-text-muted); text-decoration: line-through; }
 .tape-act { font-size: var(--text-sm); color: var(--color-accent); }
 .tl-sub .unknown { font-style: italic; }
 .tl-issues { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-top: 2px; }

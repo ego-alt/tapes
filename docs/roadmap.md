@@ -27,11 +27,13 @@ choice. Updated 2026-06-15.
 
 ## Open loops (hygiene — do before more building)
 
-1. **Browser-verify the browse UI.** Album/Artist browsing is API-verified but
-   never clicked through in a real browser at desktop + mobile widths.
-2. **Clear the mispointed favorites.** The earlier DB incident left 8 favorites
-   + 1 playlist's contents pointing at the wrong songs (SQLite id reuse). The
-   original mapping is unrecoverable; clearing them is the honest fix.
+1. ~~**Browser-verify the browse UI.**~~ Done 2026-10-15: Albums/Artists
+   clicked through in Chrome at desktop and 375px (see AUDIT.md).
+2. **Check the one mispointed tape.** Favorites were removed (not useful), so
+   the 8 mispointed favorites from the earlier DB incident (SQLite id reuse)
+   are moot. The same incident left 1 tape's contents pointing at the wrong
+   songs; the original mapping is unrecoverable, so clearing that tape is the
+   honest fix.
 
 ## Next features (prioritised)
 

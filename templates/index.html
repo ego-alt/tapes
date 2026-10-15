@@ -36,6 +36,14 @@
       <!-- shelf of tapes -->
       <div class="shelf" id="shelfView">
         <ul class="shelf-list" id="shelfList"></ul>
+        <div class="first-run" id="firstRun" hidden>
+          <p class="first-run-title">Your shelf is empty.</p>
+          <p class="first-run-body">Rip a song or playlist from a link, or follow a podcast.</p>
+          <div class="first-run-actions">
+            <button class="btn btn-primary" id="firstRip" type="button">Rip a song</button>
+            <button class="btn btn-secondary" id="firstFollow" type="button">Follow a podcast</button>
+          </div>
+        </div>
         <form class="new-tape" id="newTapeForm">
           <input class="input" id="newTapeName" placeholder="New tape…" autocomplete="off">
           <button class="btn btn-secondary" id="newTapeBtn" type="submit" title="Create tape" aria-label="Create tape"></button>

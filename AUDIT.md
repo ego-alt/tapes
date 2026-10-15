@@ -30,6 +30,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** `README.md` (features, browse list, home-stack note); `docs/roadmap.md` open loop 2
 - **Why:** Small, but the README is the app's front page. Promising a feature that's gone makes the rest of it harder to trust.
 - **Fix:** Remove favorites from the README, and close or delete that roadmap item. If the data still has old favorite rows or tables, drop them in the same change.
+- **Status:** Done. Favorites are gone from the README, and the roadmap item now covers only the one mispointed tape that's still relevant. (Roadmap open loop 1, browser-verifying the browse UI, was also done during this audit and is marked.)
 
 **1.2 Podcasts borrow the music vocabulary**
 - **What:** In Podcasts mode, the create form says "New tape…", the show screen says "Delete tape", and filing an episode says "Add to tape…" with a "New tape name:" prompt. The API and code call these *shows*.
@@ -70,6 +71,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** first launch, `player.js` init
 - **Why:** The very first moment gives no next step.
 - **Fix:** When the library is empty, put a card under the deck: *"Your shelf is empty. Rip a song from a link, or follow a podcast."* with the two Add actions from 1.3.
+- **Status:** Done. An empty library shows a card on the shelf: *Your shelf is empty. Rip a song or playlist from a link, or follow a podcast.* with **Rip a song** and **Follow a podcast** buttons that open the add field in the right mode, focused. Verified on desktop and phone against an empty library.
 
 **2.2 Failed rips vanish without a word** (bug, confirmed)
 - **What:** The job stream only lists *queued* and *running* jobs, so a job that errors drops out within a second. I submitted a non-video link: it appeared as its URL, then disappeared. No toast, no message. The stored error ("yt-dlp failed (see server log)") is never shown.
@@ -90,6 +92,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** `player.js` `audio` `error` listener
 - **Why:** On a phone in a pocket, playback just stops.
 - **Fix:** Show a toast (*"Couldn't play **Title** — skipping"*) and move to the next track. Mark the row as unavailable.
+- **Status:** Done. A song that can't play toasts *Couldn't play “X” — skipping*, is struck through in the list, and the next song starts. After three failures in a row, or at the end of the queue, it stops and says so instead of racing through. Verified with two songs whose files were missing.
 
 **2.5 Errors arrive as HTML pages**
 - **What:** Every `abort(400, "…")` returns Flask's HTML error page, for example `couldn't read that feed: not a readable RSS feed`. `jsend` throws a generic error, so the user sees "Couldn't add that — check the URL." or "Something went wrong — please try again."
@@ -400,7 +403,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | Done |
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | Done |
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | Done |
-| 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | To do |
+| 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | Done |
 | 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | To do |
 | 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | To do |
 

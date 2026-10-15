@@ -148,6 +148,8 @@
   // ---------- shelf ----------
   async function loadShelf() {
     shelf = await jget("api/playlists");
+    const all = shelf.find((x) => x.key === "all");
+    $("firstRun").hidden = !(all && all.count === 0 && !shelf.some((x) => x.kind === "user"));
     const list = $("shelfList");
     list.innerHTML = "";
     const icon = { all: "▤", singles: "♪", albums: "◉", artists: "♫", tidy: "✦" };
@@ -1104,6 +1106,16 @@
     applySearch();
   }
 
+  // ---------- first run ----------
+  function openAdd(m) {
+    setMode(m);
+    $("dlPanel").hidden = false;
+    openDlStream();
+    $("dlUrl").focus();
+  }
+  $("firstRip").addEventListener("click", () => openAdd("music"));
+  $("firstFollow").addEventListener("click", () => openAdd("podcasts"));
+
   // ---------- tidying + album edits ----------
   async function tidy(ids) {
     let changed = 0, ai = true;
@@ -1578,10 +1590,27 @@
   $("epSearch").addEventListener("input", applyEpisodeSearch);
   $("showRefreshBtn").addEventListener("click", refreshCurrentShow);
   $("showDelBtn").addEventListener("click", deleteCurrentShow);
+  // A song that can't play (missing or damaged file): say so and move on, but
+  // stop after three failures in a row rather than racing through the queue.
+  let playErrors = 0;
   audio.addEventListener("error", () => {
     const t = currentTrack();
-    if (t && t.kind === "episode") toast("Couldn't play this episode.");
+    if (!t || !audio.getAttribute("src")) return;
+    if (t.kind === "episode") { toast("Couldn't play this episode."); return; }
+    t.unavailable = true;
+    [...$("trackList").children].forEach((li) => {
+      if (Number(li.dataset.id) === t.id) li.classList.add("unavailable");
+    });
+    playErrors += 1;
+    if (playErrors >= 3 || qi + 1 >= queue.length) {
+      toast(`Couldn't play “${t.title}”.` + (playErrors >= 3 ? " Several songs in a row failed, so playback stopped." : ""));
+      playErrors = 0;
+      return;
+    }
+    toast(`Couldn't play “${t.title}” — skipping`);
+    next(true);
   });
+  audio.addEventListener("playing", () => { playErrors = 0; });
   $("upnextBar").addEventListener("click", toggleUpNext);
   $("tapeDelBtn").addEventListener("click", async () => {
     if (!currentTape) return;
