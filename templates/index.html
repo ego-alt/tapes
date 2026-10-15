@@ -246,7 +246,36 @@
                 <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.9 0 0 0 -0.42"/>
               </filter>
               <clipPath id="labelClip"><path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z"/></clipPath>
-              <clipPath id="windowClip"><rect x="130" y="73" width="72" height="23" rx="1.5"/></clipPath>
+              <clipPath id="windowClip"><rect x="129.0" y="73.0" width="72.0" height="23.0" rx="1.5"/></clipPath>
+              <clipPath id="stadiumClip"><rect x="69" y="65.5" width="192" height="53.5" rx="26.75"/></clipPath>
+              <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+                <stop offset="0.5" stop-color="#fff" stop-opacity="0.16"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+              <!-- raised ring around each reel hole: lit on top, falling off below -->
+              <linearGradient id="ringGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#3a3a3a"/>
+                <stop offset="0.5" stop-color="#1c1c1c"/>
+                <stop offset="1" stop-color="#0c0c0c"/>
+              </linearGradient>
+              <!-- the hole's lip: catches light on its lower edge -->
+              <linearGradient id="holeLip" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#000" stop-opacity="0.9"/>
+                <stop offset="0.6" stop-color="#000" stop-opacity="0"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0.35"/>
+              </linearGradient>
+              <!-- shadow inside the label cut-out: darkest under the top edge -->
+              <linearGradient id="innerShade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#000" stop-opacity="0.85"/>
+                <stop offset="0.5" stop-color="#000" stop-opacity="0.25"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0.12"/>
+              </linearGradient>
+              <!-- the window frame: a bevel, light along the top -->
+              <linearGradient id="frameGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2e2e2e"/>
+                <stop offset="1" stop-color="#121212"/>
+              </linearGradient>
               <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.2"/></filter>
             </defs>
 
@@ -290,45 +319,70 @@
             <path d="M19.5 27.5 L23.5 23.5 H43.5 V51.5 H19.5 Z" fill="none" stroke="#2a2a2a" stroke-width="0.6"/>
             <path d="M49 35.5 H307 M49 51.5 H307" stroke="#2a2a2a" stroke-width="0.5"/>
 
-            <!-- the black window surround, over the label -->
-            <rect x="68.5" y="66" width="190.5" height="53.5" rx="26.7" fill="#000" opacity="0.5" filter="url(#soft)"/>
-            <rect x="68.5" y="65.5" width="190.5" height="53.5" rx="26.7" fill="url(#recess)"/>
-            <rect x="69" y="66" width="189.5" height="52.5" rx="26.2" fill="none" stroke="url(#lip)" stroke-width="1.4"/>
-            <path d="M88 68.5 H240" stroke="rgba(255,255,255,0.18)" stroke-width="0.6" stroke-linecap="round"/>
+            <!-- the window area: shell plastic showing through a stadium cut-out in
+                 the label. Everything here is symmetric about x=165; the hubs sit at
+                 the centres of the stadium's round ends. -->
+            <rect x="68.4" y="64.9" width="193.2" height="54.7" rx="27.35" fill="#f8f4ec" opacity="0.9"/>
+            <rect x="69.0" y="65.5" width="192.0" height="53.5" rx="26.75" fill="url(#recess)"/>
+            <rect x="69.0" y="65.5" width="192.0" height="53.5" rx="26.75" filter="url(#wear)" opacity="0.06"/>
+            <!-- the label's edge throws a soft shadow onto the plastic below it -->
+            <rect x="69.0" y="65.5" width="192.0" height="53.5" rx="26.75" fill="none" stroke="url(#innerShade)" stroke-width="3"/>
+            
+            <!-- reel hole: a raised moulded ring, then the opening with the hub turning inside -->
+            <circle cx="95.75" cy="92.25" r="22.6" fill="url(#ringGrad)"/>
+            <circle cx="95.75" cy="92.25" r="22.6" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="0.5"/>
+            <circle cx="95.75" cy="92.25" r="19" fill="#060606"/>
+            <circle cx="95.75" cy="92.25" r="19.3" fill="none" stroke="url(#holeLip)" stroke-width="0.8"/>
+            
+            <!-- reel hole: a raised moulded ring, then the opening with the hub turning inside -->
+            <circle cx="234.25" cy="92.25" r="22.6" fill="url(#ringGrad)"/>
+            <circle cx="234.25" cy="92.25" r="22.6" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="0.5"/>
+            <circle cx="234.25" cy="92.25" r="19" fill="#060606"/>
+            <circle cx="234.25" cy="92.25" r="19.3" fill="none" stroke="url(#holeLip)" stroke-width="0.8"/>
+            <path d="M75.45 84.86 A21.6 21.6 0 0 1 116.05 84.86" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.9" stroke-linecap="round"/>
+            <path d="M77.40 79.40 A22.4 22.4 0 0 1 114.10 79.40" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.35" stroke-linecap="round"/>
+            <path d="M213.95 84.86 A21.6 21.6 0 0 1 254.55 84.86" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.9" stroke-linecap="round"/>
+            <path d="M215.90 79.40 A22.4 22.4 0 0 1 252.60 79.40" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.35" stroke-linecap="round"/>
+            <g class="reel" id="reelL" transform="rotate(0 95.75 92.25)"><use href="#hub" x="80.25" y="76.75" width="31" height="31"/></g>
+            <g class="reel" id="reelR" transform="rotate(0 234.25 92.25)"><use href="#hub" x="218.75" y="76.75" width="31" height="31"/></g>
+            <circle cx="95.75" cy="92.25" r="18.6" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="2.6"/>
+            <circle cx="234.25" cy="92.25" r="18.6" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="2.6"/>
 
-            <!-- reel holes with the hubs turning inside -->
-            <circle cx="96.6" cy="91.5" r="19" fill="#0a0a0a"/>
-            <circle cx="238" cy="91.5" r="19" fill="#0a0a0a"/>
-            <g class="reel" id="reelL" transform="rotate(0 96.6 91.5)"><use href="#hub" x="81.1" y="76" width="31" height="31"/></g>
-            <g class="reel" id="reelR" transform="rotate(0 238 91.5)"><use href="#hub" x="222.5" y="76" width="31" height="31"/></g>
-            <circle cx="96.6" cy="91.5" r="18.6" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="2.6"/>
-            <circle cx="238" cy="91.5" r="18.6" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="2.6"/>
-            <path d="M80 99 A19 19 0 0 0 113.2 99" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.7"/>
-            <path d="M221.4 99 A19 19 0 0 0 254.6 99" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.7"/>
-
-            <!-- the centre window: tape packs seen edge-on -->
-            <rect x="129" y="72" width="74" height="25" rx="2" fill="#050505"/>
+            <!-- the centre window: a bevelled frame around clear plastic -->
+            <rect x="126.6" y="70.6" width="76.8" height="27.8" rx="3.2" fill="url(#frameGrad)"/>
+            <rect x="126.6" y="70.6" width="76.8" height="27.8" rx="3.2" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="0.5"/>
+            <rect x="128.4" y="72.4" width="73.2" height="24.2" rx="1.8" fill="#030303"/>
             <g clip-path="url(#windowClip)">
-              <rect x="130" y="73" width="72" height="23" fill="url(#windowBack)"/>
+              <rect x="129.0" y="73.0" width="72.0" height="23.0" fill="url(#windowBack)"/>
               <!-- clear reel flanges: their rims cross the window as faint arcs -->
-              <circle cx="96.6" cy="91.5" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
-              <circle cx="238" cy="91.5" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
-              <circle class="tape-pack" id="packL" cx="96.6" cy="91.5" r="78" fill="url(#pack)"/>
-              <circle class="tape-pack" id="packR" cx="238" cy="91.5" r="36" fill="url(#pack)"/>
+              <circle cx="95.75" cy="92.25" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+              <circle cx="234.25" cy="92.25" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+              <circle class="tape-pack" id="packL" cx="95.75" cy="92.25" r="78" fill="url(#pack)"/>
+              <circle class="tape-pack" id="packR" cx="234.25" cy="92.25" r="36" fill="url(#pack)"/>
               <!-- winding layers, kept just inside each pack's edge (see reels in player.js) -->
               <g class="pack-layers" id="layersL"></g>
               <g class="pack-layers" id="layersR"></g>
-              <rect x="130" y="73" width="72" height="23" fill="url(#gloss)"/>
+              <rect x="129.0" y="73.0" width="72.0" height="23.0" fill="url(#gloss)"/>
+              <rect x="129.0" y="73.0" width="72.0" height="2.2" fill="#000" opacity="0.35"/>
               <!-- dust and a hairline scratch on the window -->
               <g fill="#fff" opacity="0.5">
-                <circle cx="141" cy="80" r="0.35"/><circle cx="187" cy="91" r="0.3"/><circle cx="160" cy="93.5" r="0.25"/><circle cx="196" cy="77" r="0.3"/>
+                <circle cx="140" cy="80" r="0.35"/><circle cx="186" cy="91" r="0.3"/><circle cx="159" cy="93.5" r="0.25"/><circle cx="195" cy="77" r="0.3"/>
               </g>
-              <path d="M150 76 L172 88" stroke="rgba(255,255,255,0.12)" stroke-width="0.25"/>
+              <path d="M149 76 L171 88" stroke="rgba(255,255,255,0.12)" stroke-width="0.25"/>
             </g>
-            <!-- printed scale -->
-            <g class="window-scale" stroke="#d8d8d8" stroke-width="0.45"><path d="M130.0 99 v3"/><path d="M137.2 99 v1.8"/><path d="M144.4 99 v1.8"/><path d="M151.6 99 v1.8"/><path d="M158.8 99 v1.8"/><path d="M166.0 99 v3"/><path d="M173.2 99 v1.8"/><path d="M180.4 99 v1.8"/><path d="M187.6 99 v1.8"/><path d="M194.8 99 v1.8"/><path d="M202.0 99 v3"/></g>
+            <!-- a broad, soft reflection across the black moulding -->
+            <g clip-path="url(#stadiumClip)" pointer-events="none">
+              <path d="M60 60 L150 60 L105 125 L15 125 Z" fill="url(#sheen)" opacity="0.55"/>
+              <path d="M200 60 L232 60 L187 125 L155 125 Z" fill="url(#sheen)" opacity="0.25"/>
+            </g>
+            <!-- printed scale, centred under the window -->
+            <g class="window-scale-shadow" transform="translate(0 0.35)" opacity="0.8" stroke="#000" stroke-width="0.45"><path d="M129.0 100 v3"/><path d="M136.2 100 v1.8"/><path d="M143.4 100 v1.8"/><path d="M150.6 100 v1.8"/><path d="M157.8 100 v1.8"/><path d="M165.0 100 v3"/><path d="M172.2 100 v1.8"/><path d="M179.4 100 v1.8"/><path d="M186.6 100 v1.8"/><path d="M193.8 100 v1.8"/><path d="M201.0 100 v3"/></g>
+            <g class="window-scale-shadow" transform="translate(0 0.35)" opacity="0.8" fill="#000" font-family="Inter, Arial, sans-serif" font-size="6" text-anchor="middle">
+              <text x="129.0" y="110.5">100</text><text x="165" y="110.5">50</text><text x="201.0" y="110.5">0</text>
+            </g>
+                        <g class="window-scale" stroke="#d8d8d8" stroke-width="0.45"><path d="M129.0 100 v3"/><path d="M136.2 100 v1.8"/><path d="M143.4 100 v1.8"/><path d="M150.6 100 v1.8"/><path d="M157.8 100 v1.8"/><path d="M165.0 100 v3"/><path d="M172.2 100 v1.8"/><path d="M179.4 100 v1.8"/><path d="M186.6 100 v1.8"/><path d="M193.8 100 v1.8"/><path d="M201.0 100 v3"/></g>
             <g class="window-scale-nums" fill="#d8d8d8" font-family="Inter, Arial, sans-serif" font-size="6" text-anchor="middle">
-              <text x="130" y="110">100</text><text x="166" y="110">50</text><text x="202" y="110">0</text>
+              <text x="129.0" y="110.5">100</text><text x="165" y="110.5">50</text><text x="201.0" y="110.5">0</text>
             </g>
 
             <!-- bottom plate (tape head area) with its four holes -->

@@ -928,7 +928,7 @@
   const reels = (() => {
     // View-box geometry: hub centres, empty core and full pack radii. On a
     // real C-cassette the full pack is a little over twice the core.
-    const CORE = 36, FULL = 80, CX = { L: 96.6, R: 238 }, CY = 91.5;
+    const CORE = 36, FULL = 80, CX = { L: 95.75, R: 234.25 }, CY = 92.25;
     const TAPE_SPEED = 55;   // view-box units per second at the tape surface
     const el = (id) => document.getElementById(id);
     const packL = el("packL"), packR = el("packR"), reelL = el("reelL"), reelR = el("reelR");
@@ -938,13 +938,13 @@
                     [6.5, 0.1, "#000"], [8.8, 0.12, "#5e5045"], [12, 0.08, "#000"]];
     const makeLayers = (g, cx) => LAYERS.map(([, w, color]) => {
       const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      c.setAttribute("cx", cx); c.setAttribute("cy", 91.5);
+      c.setAttribute("cx", cx); c.setAttribute("cy", CY);
       c.setAttribute("fill", "none"); c.setAttribute("stroke", color);
       c.setAttribute("stroke-width", 0.5); c.setAttribute("stroke-opacity", w * 3);
       g.appendChild(c);
       return c;
     });
-    const ringsL = makeLayers(el("layersL"), 96.6), ringsR = makeLayers(el("layersR"), 238);
+    const ringsL = makeLayers(el("layersL"), CX.L), ringsR = makeLayers(el("layersR"), CX.R);
     const placeLayers = (rings, r) => rings.forEach((c, i) => {
       const rr = r - LAYERS[i][0];
       c.setAttribute("r", Math.max(0, rr));
