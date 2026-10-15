@@ -1,3 +1,7 @@
+/* `hidden` must always win: buttons (.btn) and flex containers set their own
+   display, which would otherwise keep "hidden" elements on screen. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 
 body {
@@ -195,9 +199,7 @@ body {
 .shelf, .tracks-view, .browse-view, .podcasts-view, .episodes-view {
     display: flex; flex-direction: column; min-height: 0; flex: 1;
 }
-/* class display:flex would otherwise beat the `hidden` attribute */
-.shelf[hidden], .tracks-view[hidden], .browse-view[hidden],
-.podcasts-view[hidden], .episodes-view[hidden], .dl-panel[hidden] { display: none !important; }
+
 
 /* ---- album / artist browse rows ---- */
 .browse-row {
@@ -304,7 +306,8 @@ body {
 
 /* ---- popover menus (add-to-tape, sleep timer) ---- */
 .menu {
-    position: fixed; z-index: 20; background: var(--color-bg-elevated);
+    /* Above the phone drawer (30) and its scrim (25); below modals/toasts (100). */
+    position: fixed; z-index: 40; background: var(--color-bg-elevated);
     border: 1px solid var(--color-border-soft); border-radius: var(--radius-md);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.44), 0 4px 10px rgba(0, 0, 0, 0.3);
     padding: var(--space-1); min-width: 180px; max-width: 280px;
@@ -359,7 +362,7 @@ body {
     padding: var(--space-4);
     background: rgba(0, 0, 0, 0.5);
 }
-.modal-scrim[hidden] { display: none; }
+
 .modal-card {
     width: 100%;
     max-width: 380px;
@@ -423,7 +426,7 @@ body {
     background: var(--color-bg-inset);
     overflow: hidden;
 }
-.ep-prog[hidden] { display: none; }
+
 .ep-prog-fill { height: 100%; background: var(--color-accent); }
 /* the played toggle shares .tl-add but stays visible (not hover-revealed) */
 .ep-played { opacity: 1; }

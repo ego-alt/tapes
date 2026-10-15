@@ -128,6 +128,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Same root cause, from the code [code]:** "Refresh" on shows that can't refresh, and "Delete tape" on Loose episodes.
 - **Where:** `static/css/index.css` (only some views have `[hidden]` overrides), `player.css` `.upnext`
 - **Fix:** One global rule, `[hidden] { display: none !important; }`.
+- **Status:** Done. One global `[hidden] { display: none !important; }` rule replaces the per-view overrides. Verified: no Up Next with an empty queue, and no Delete tape on All Tracks.
 
 ---
 
@@ -287,6 +288,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** Popover menus are `z-index: 20`; the phone drawer is `z-index: 30`. Tapping **+** or **⋯** on a row opens the menu underneath the list, and the tap lands on the row behind it. On a phone you can't add to a tape, queue, edit, delete, or use any episode menu.
 - **Where:** `static/css/index.css` `.menu` vs the 640px drawer rule
 - **Fix:** Raise menus above the drawer (`z-index: 40`). Better still, show them as bottom action sheets on phones (7.6).
+- **Status:** Done. Menus now sit above the phone drawer (`z-index: 40`). Verified at 375px with touch: + → Queue and ⋯ → Edit details both work. Bottom-sheet menus come with the phone layout (7.6).
 
 **7.2 Small tap targets** (measured; goal is 44×44)
 
@@ -368,18 +370,18 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 
 ## Top 10, ranked by how much better the app will feel
 
-| Rank | Fix | Section | Size |
-|---|---|---|---|
-| 1 | **Make phones work:** menus above the drawer, plus one global `[hidden]` rule (fixes ghost "Delete tape", "Refresh" and "Up Next") | 7.1, 2.11 | **Small** |
-| 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** |
-| 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** |
-| 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** |
-| 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** |
-| 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** |
-| 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** |
-| 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** |
-| 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** |
-| 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** |
+| Rank | Fix | Section | Size | Status |
+|---|---|---|---|---|
+| 1 | **Make phones work:** menus above the drawer, plus one global `[hidden]` rule (fixes ghost "Delete tape", "Refresh" and "Up Next") | 7.1, 2.11 | **Small** | Done |
+| 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | To do |
+| 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | To do |
+| 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | To do |
+| 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | To do |
+| 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | To do |
+| 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | To do |
+| 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | To do |
+| 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | To do |
+| 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | To do |
 
 Close runners-up:
 - **Collision-safe rip filenames in `Artist/Album/` folders** (4.7, medium).
