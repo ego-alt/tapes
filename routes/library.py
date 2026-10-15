@@ -404,6 +404,31 @@ def artist_tracks():
     return jsonify(_serialize(tracks))
 
 
+# Most results /api/tracks returns for one search.
+MAX_SEARCH_RESULTS = 100
+
+
+@library_blueprint.route("/api/tracks")
+@login_required
+def search_tracks():
+    """Tracks whose title, artist or album contains every word of ``q`` (case-
+    insensitive), best-known first. For programmatic clients (the MCP server);
+    the deck filters its loaded list in the browser."""
+    words = (request.args.get("q") or "").split()
+    if not words:
+        abort(400, "Say what to search for.")
+    limit = min(max(request.args.get("limit", 25, type=int) or 25, 1), MAX_SEARCH_RESULTS)
+    query = Track.query
+    for word in words:
+        like = f"%{word}%"
+        query = query.filter(or_(Track.title.ilike(like), Track.artist.ilike(like),
+                                 Track.album.ilike(like)))
+    tracks = (query.order_by(Track.artist.is_(None), Track.artist, Track.album,
+                             Track.track_no, Track.title)
+              .limit(limit).all())
+    return jsonify(_serialize(tracks))
+
+
 # ---- per-track edit / delete ----
 
 @library_blueprint.route("/api/tracks/<int:track_id>", methods=["PATCH"])
