@@ -69,7 +69,9 @@ After adding a user in dashboard, sync shadow accounts:
 cd ../dashboard && uv run python scripts/sync_household_users.py
 ```
 
-> Code is baked into the image at build time. After pulling changes, rebuild:
+> On the Pi, merged commits that pass CI deploy themselves within about five
+> minutes (see the dashboard README, "Deploying"). To deploy by hand: code is
+> baked into the image at build time, so after pulling run
 > `docker compose build music && docker compose up -d music`. A bare `up -d`
 > reuses the old image.
 
