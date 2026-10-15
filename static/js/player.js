@@ -490,7 +490,7 @@
     currentShow = null;
     enterEpisodes("Unsorted episodes", data.episodes, { refreshable: false, deletable: false });
   }
-  // Shared tail for the two episode views (a tape's episodes, or Loose episodes).
+  // Shared tail for the two episode views (a show's episodes, or Unsorted episodes).
   function enterEpisodes(title, eps, { refreshable, deletable }) {
     episodes = eps;
     $("showTitle").textContent = title;
@@ -573,7 +573,7 @@
     menu.dataset.for = "ep" + ep.id;
     menu.innerHTML = "";
     menu.appendChild(menuHead(ep.title));
-    // Loose episodes can be filed into a tape (in-place picker — see submenuItem).
+    // Unsorted episodes can be moved into a show (in-place picker — see submenuItem).
     if (ep.show_id == null)
       menu.appendChild(submenuItem("Move to show…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
@@ -603,7 +603,7 @@
     let res;
     try { res = await jsend(`api/podcast/episodes/${ep.id}/assign`, "POST", body).then((r) => r.json()); }
     catch (err) { console.error(err); toast(errText(err, "Couldn't move the episode.")); return; }
-    episodes = episodes.filter((x) => x.id !== ep.id);   // it left Loose episodes
+    episodes = episodes.filter((x) => x.id !== ep.id);   // it left Unsorted episodes
     applyEpisodeSearch();
     showsData = null;   // counts/new show changed — refetch on next open
     toast(`Moved to “${res.show.title}”`);

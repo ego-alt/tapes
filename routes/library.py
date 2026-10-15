@@ -404,15 +404,6 @@ def artist_tracks():
     return jsonify(_serialize(tracks))
 
 
-@library_blueprint.route("/api/tracks/by-ids", methods=["POST"])
-@login_required
-def tracks_by_ids():
-    """Hydrate a list of track ids into full track objects (for playstate/queue
-    restore) without fetching the entire library."""
-    ids = (request.get_json(silent=True) or {}).get("ids") or []
-    return jsonify(_tracks_by_ids([i for i in ids if isinstance(i, int)]))
-
-
 # ---- per-track edit / delete ----
 
 @library_blueprint.route("/api/tracks/<int:track_id>", methods=["PATCH"])

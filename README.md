@@ -23,7 +23,14 @@ to the current song.
   original source URL is saved with each track. Re-ripping a URL you already have
   is skipped, and acoustic fingerprinting (Chromaprint) catches the same
   recording even from a different URL — adding it to your tape without making a
-  duplicate.
+  duplicate. Each finished rip stays in the panel saying what happened, with
+  Play, Add to… and Edit.
+- **Podcasts** — follow an RSS feed or a YouTube channel/playlist, or add a
+  single video. Episodes stream straight from the feed while they download;
+  ±15/30 s skips, playback speed, played/unplayed and resume position. Hide an
+  episode of a followed show and refreshes won't bring it back.
+- **Safe edits** — deleting a song moves it to a 30-day trash with Undo; edits
+  only touch the fields you changed; artist renames preview any merge first.
 - **Tidy metadata** — ripped tags are cleaned automatically (YouTube cruft
   stripped, `Artist - Title` split). With `ANTHROPIC_API_KEY` set, a Claude
   (Haiku) pass then refines title/artist and fills in a blank album when it's
@@ -127,14 +134,23 @@ flag — handy to schedule, or to run after topping up credit.
 ## Layout
 
 ```
-app.py          create_app: db, login, blueprints, static cache-busting
-cleaning.py     deterministic title/artist cleanup for rips
-llm_cleaning.py Claude (Haiku) tag correction + album fill; sync per-rip, Batches for retag
-art.py          MusicBrainz + Cover Art Archive lookup
-fingerprint.py  Chromaprint acoustic fingerprint + local match for content dedup
-scan.py         flask scan / flask retag — mutagen tags + Pillow thumbnails
-downloader.py   yt-dlp worker, playlist expansion, tag cleanup
-routes/         index · stream · library (shelves/tapes/albums/artists) · downloads · auth
-static/         css (tokens · primitives · index · player) + player.js
-templates/      index.html
+app.py            create_app: db + migrations, login, blueprints, cache-busting
+gunicorn.conf.py  server config; runs `db upgrade` before workers start
+models.py         SQLAlchemy models (soft-deleted tracks hidden by default)
+migrations/       Flask-Migrate / Alembic revisions
+scan.py           flask scan / retag / purge-trash — mutagen tags + Pillow thumbnails
+downloader.py     rip worker: yt-dlp, playlist expansion, tagging, filing, dedup
+cleaning.py       deterministic title/artist cleanup for rips
+llm_cleaning.py   Claude (Haiku) tag correction + album fill; sync per-rip, Batches for retag
+art.py            MusicBrainz + Cover Art Archive lookup
+fingerprint.py    Chromaprint acoustic fingerprint + local match for content dedup
+metadata_ops.py   tidy, album edit, cover replacement
+trash.py          move to / restore from MUSIC_DIR/.trash, purge after 30 days
+podcasts.py       RSS + YouTube feed parsing, episode upsert, show images
+youtube.py        YouTube URL helpers
+proxy_auth.py     standalone local user vs. dashboard proxy-header sign-in
+routes/           index · stream · library · downloads · podcasts · pwa · auth
+static/           css (tokens · structural · index · player), js (player.js, sw.js), icons
+templates/        index.html
+tests/            pytest suite (run by CI)
 ```

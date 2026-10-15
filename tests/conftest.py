@@ -3,9 +3,8 @@
 import pathlib
 
 import pytest
-from mutagen.id3 import ID3, TALB, TIT2, TPE1, TRCK
-
 from flask_migrate import upgrade
+from mutagen.id3 import ID3, TALB, TIT2, TPE1, TRCK
 
 from app import create_app
 from models import Track, db

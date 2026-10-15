@@ -30,7 +30,10 @@ def test_delete_moves_to_trash_and_hides_everywhere(app, client, add_track):
     assert [a["name"] for a in client.get("/api/artists").get_json()] == ["Other"]
     assert client.get(f"/api/playlists/{pid}/tracks").get_json() == []
     assert client.get(f"/stream/{t.id}").status_code == 404
-    assert client.post("/api/tracks/by-ids", json={"ids": [t.id, keep.id]}).get_json()[0]["title"] == "Kept"
+    # A saved queue that still names the trashed song restores without it.
+    client.put("/api/playstate", json={"context": "music", "queue": [t.id, keep.id], "index": 1})
+    restored = client.get("/api/playstate?context=music").get_json()
+    assert [x["title"] for x in restored["queue"]] == ["Kept"]
 
 
 def test_restore_brings_back_file_tapes_and_plays(app, client, add_track):

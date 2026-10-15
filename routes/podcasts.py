@@ -1,5 +1,5 @@
 import pathlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
@@ -272,7 +272,7 @@ def hide_episode(eid):
     ep.file_path = None
     if ep.status == "ready":
         ep.status = "new"
-    ep.hidden_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    ep.hidden_at = datetime.now(UTC).replace(tzinfo=None)
     db.session.commit()
     return jsonify({"hidden": True})
 

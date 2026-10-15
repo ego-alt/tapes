@@ -135,7 +135,7 @@ class Show(db.Model):
     source_type = db.Column(db.String, nullable=False)  # rss | youtube
     source_url = db.Column(db.String, nullable=False)  # feed/channel/playlist URL ("" = manual)
     # Linked YouTube channel: when set, future single videos from this channel
-    # auto-file into this show instead of landing in Loose episodes.
+    # auto-file into this show instead of landing in Unsorted episodes.
     channel_id = db.Column(db.String, index=True)
     description = db.Column(db.Text)
     has_image = db.Column(db.Boolean, default=False)     # cover cached at shows/<id>.jpg

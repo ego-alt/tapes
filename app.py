@@ -4,10 +4,10 @@ import pathlib
 import secrets
 
 from flask import Flask, jsonify, request
-from werkzeug.exceptions import HTTPException
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from sqlalchemy import event
+from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from downloader import start_worker
