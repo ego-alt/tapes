@@ -6,6 +6,7 @@ import secrets
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from sqlalchemy import event
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -134,56 +135,25 @@ def create_app(config=None):
             cur.execute("PRAGMA busy_timeout=5000")
             cur.close()
 
-        db.create_all()
-        # Lightweight column adds for existing DBs (SQLite ignores IF NOT EXISTS
-        # for columns, so each is best-effort and rolls back if already present).
-        for stmt in (
-            "ALTER TABLE download_jobs ADD COLUMN playlist_id INTEGER REFERENCES playlists(id)",
-            "ALTER TABLE download_jobs ADD COLUMN kind VARCHAR DEFAULT 'music'",
-            "ALTER TABLE download_jobs ADD COLUMN episode_id INTEGER REFERENCES episodes(id)",
-            "ALTER TABLE shows ADD COLUMN channel_id VARCHAR",
-            "ALTER TABLE episodes ADD COLUMN channel_id VARCHAR",
-            "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
-            "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
-            "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",
-            "ALTER TABLE tracks ADD COLUMN deleted_at DATETIME",
-            "CREATE INDEX IF NOT EXISTS ix_tracks_deleted_at ON tracks (deleted_at)",
-            "ALTER TABLE download_jobs ADD COLUMN outcome VARCHAR",
-            "ALTER TABLE download_jobs ADD COLUMN finished_at DATETIME",
-            "ALTER TABLE download_jobs ADD COLUMN dismissed BOOLEAN DEFAULT 0",
-            # Indexes for shelf grouping (artist/album) and the re-rip dedup
-            # lookup — create_all() won't add these to a pre-existing table.
-            "CREATE INDEX IF NOT EXISTS ix_tracks_artist ON tracks (artist)",
-            "CREATE INDEX IF NOT EXISTS ix_tracks_album ON tracks (album)",
-            "CREATE INDEX IF NOT EXISTS ix_tracks_source_url ON tracks (source_url)",
-        ):
-            try:
-                db.session.execute(db.text(stmt))
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-
-        # One-time: migrate the old single-row playstate into the per-context
-        # playback_sessions table as the 'music' context. Best-effort; the old
-        # table is left in place (harmless) once copied.
-        try:
-            from models import PlaybackSession
-            rows = db.session.execute(db.text(
-                'SELECT user_id, queue_json, "index", position_s FROM playstate')).fetchall()
-            for r in rows:
-                if db.session.get(PlaybackSession, (r[0], "music")):
-                    continue
-                db.session.add(PlaybackSession(
-                    user_id=r[0], context="music", queue_json=r[1],
-                    cursor=r[2] or 0, position_s=r[3] or 0))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+    # The schema lives in migrations/ and is applied by `flask db upgrade`
+    # (gunicorn runs it before starting workers; see gunicorn.conf.py).
+    Migrate(app, db, render_as_batch=True)
 
     register_cli(app)
-    start_worker(app)
+
+    # The rip worker starts with the first request, so CLI commands
+    # (db upgrade, scan, purge-trash) never pick up queued rips.
+    @app.before_request
+    def _start_worker():
+        start_worker(app)
+
     return app
 
 
 if __name__ == "__main__":
-    create_app().run(debug=True, host="0.0.0.0", port=5003)
+    from flask_migrate import upgrade
+
+    dev = create_app()
+    with dev.app_context():
+        upgrade()
+    dev.run(debug=True, host="0.0.0.0", port=5003)

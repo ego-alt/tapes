@@ -64,12 +64,11 @@ choice. Updated 2026-06-15.
 
 ## Backlog / robustness
 
-- **Adopt Flask-Migrate** (like the calendar/library siblings) to replace the
-  raw `ALTER TABLE` hack in `app.py` — needed before the next schema change.
 - **Downloader filename collisions** — `-o "%(title)s.%(ext)s"` can clobber; the
   "newest mp3" fallback is fragile under concurrency. Dedupe + safer naming.
 - **`--prune-covers`** housekeeping for orphaned cover thumbnails.
-- **Tests** — there are none; the cleanup/sort/browse logic is worth covering.
+- **More tests** — `tests/` covers the API safety nets (edits, trash, rips,
+  podcasts, metadata); the cleanup/sort/browse logic is still worth covering.
 - **beets (shelved)** — optional future *interactive* enrichment tool only; not
   automated. See `beets-plan.md` for the Phase 0 findings.
 - **Hash-based track identity** — only if we ever let something reorganize files

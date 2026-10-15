@@ -37,6 +37,7 @@ to the current song.
 ```sh
 uv sync
 export MUSIC_DIR=/path/to/mp3s            # optional; defaults to ./music
+uv run flask --app app:create_app db upgrade   # create / update the database
 uv run flask --app app:create_app scan    # index the library
 uv run flask --app app:create_app run --port 5003
 # open http://127.0.0.1:5003
@@ -76,6 +77,11 @@ cd ../dashboard && uv run python scripts/sync_household_users.py
 > baked into the image at build time, so after pulling run
 > `docker compose build music && docker compose up -d music`. A bare `up -d`
 > reuses the old image.
+>
+> The container applies database migrations itself on start (a gunicorn hook,
+> before any worker runs); if one fails, it stops instead of serving on a
+> half-updated schema. A database from before migrations is brought up to date
+> by the first one, with nothing to run by hand.
 
 ## Commands
 
@@ -85,7 +91,12 @@ uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
 uv run flask --app app:create_app retag [--write] [--llm] [--pending]  # clean (and enrich) tags
 uv run flask --app app:create_app art [--write] [--all]     # fetch cover art (MusicBrainz)
 uv run flask --app app:create_app fingerprint [--all]       # backfill acoustic fingerprints
+uv run flask --app app:create_app db upgrade                # apply database migrations
 ```
+
+Changing the schema: edit `models.py`, then
+`uv run flask --app app:create_app db migrate -m "what changed"`, review the
+file it writes under `migrations/versions/`, and commit it.
 
 Deleting a song moves it to `MUSIC_DIR/.trash/` (with an Undo toast); it's
 removed for good after 30 days, on the next delete or via `purge-trash`. Set

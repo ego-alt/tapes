@@ -21,5 +21,5 @@ ENV FLASK_APP=app:create_app
 
 EXPOSE 5003
 
-# Tables are created in create_app(); no migration step in Stage 1/2.
+# gunicorn.conf.py runs the database migrations before starting workers.
 CMD ["sh", "-c", "exec uv run gunicorn 'app:create_app()' -c gunicorn.conf.py"]

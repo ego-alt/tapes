@@ -8,6 +8,7 @@ dependencies = [
     "feedparser>=6.0.12",
     "flask>=3.1.0",
     "flask-login>=0.6.3",
+    "flask-migrate>=4.0",
     "flask-sqlalchemy>=3.1.1",
     "gunicorn>=23.0.0",
     "mutagen>=1.47.0",

@@ -239,6 +239,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 **4.10 Schema changes fail silently** **[code]**
 - **What:** New columns are added by "best-effort" `ALTER TABLE` statements that swallow every error, as the roadmap notes.
 - **Fix:** Adopt Flask-Migrate like library and calendar, so a failed schema change stops startup instead of drifting.
+- **Status:** Done. Flask-Migrate replaces `create_all()` and the error-swallowing ALTER list. The baseline migration creates any missing table and, on a pre-migration database, adds each missing column and index explicitly (it fails loudly if one can't be added) and copies the old `playstate` row. gunicorn runs `upgrade` in `on_starting`, once before workers fork, so a failed migration stops the container and the deploy rolls back. The rip worker now starts on the first request, so `flask db upgrade`, `scan` and other CLI commands never start rips. Tests build their schema through the migrations. Verified on a fresh DB, a copy of the test library, a copy with columns and a table removed, and end to end under gunicorn: upgraded, then healthy.
 
 ---
 

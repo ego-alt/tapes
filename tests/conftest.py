@@ -5,6 +5,8 @@ import pathlib
 import pytest
 from mutagen.id3 import ID3, TALB, TIT2, TPE1, TRCK
 
+from flask_migrate import upgrade
+
 from app import create_app
 from models import Track, db
 
@@ -24,6 +26,7 @@ def app(tmp_path, monkeypatch):
         "PODCAST_DIR": str(music / "_podcasts"),
     })
     with app.app_context():
+        upgrade()   # build the schema the way production does
         yield app
         db.session.remove()
 
