@@ -174,6 +174,37 @@ body {
     .track-list li:hover .tl-dur, .track-list li:focus-within .tl-dur { display: none; }
 }
 
+/* ---- loading: the library dims and a thin bar runs while a view loads ---- */
+.sidebar { position: relative; }
+.sidebar::after {
+    content: ""; position: absolute; top: 0; left: 0; height: 2px; width: 30%;
+    background: var(--color-accent); opacity: 0; pointer-events: none;
+}
+.sidebar.loading::after { opacity: 1; animation: loading-bar 1s ease-in-out infinite; }
+.sidebar.loading .shelf, .sidebar.loading .tracks-view, .sidebar.loading .browse-view,
+.sidebar.loading .podcasts-view, .sidebar.loading .episodes-view { opacity: 0.55; transition: opacity 0.15s; }
+@keyframes loading-bar { from { left: -30%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .sidebar.loading::after { animation: none; left: 0; width: 100%; opacity: 0.6; } }
+.list-more { height: 1px; list-style: none; }
+
+/* ---- library search + shortcut sheet ---- */
+.lib-search { position: relative; padding: 0 var(--space-4) var(--space-3); }
+.lib-search .input { width: 100%; padding-right: 2.2em; }
+.search-key {
+    position: absolute; right: calc(var(--space-4) + 8px); top: 50%; transform: translateY(calc(-50% - var(--space-3) / 2));
+    font: 0.72rem var(--font-mono); color: var(--color-text-muted);
+    border: 1px solid var(--color-border-soft); border-radius: 4px; padding: 0 5px; pointer-events: none;
+}
+.lib-search .input:focus + .search-key, .lib-search .input:not(:placeholder-shown) + .search-key { display: none; }
+@media (hover: none) { .search-key { display: none; } }
+.keys-list { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); margin: var(--space-3) 0; align-items: center; }
+.keys-list dt { white-space: nowrap; color: var(--color-text-muted); }
+.keys-list dd { margin: 0; }
+kbd {
+    font: 0.78rem var(--font-mono); padding: 1px 6px; border-radius: 4px;
+    border: 1px solid var(--color-border-soft); background: var(--color-bg-inset);
+}
+
 /* ---- shelf ---- */
 .sidebar-head { justify-content: space-between; }
 .shelf, .tracks-view, .browse-view, .podcasts-view, .episodes-view {
@@ -586,6 +617,7 @@ body {
 
     /* New tape / show: at the top of the shelf, so the keyboard can't cover it. */
     .shelf .new-tape, .podcasts-view .new-tape { order: -1; border-top: 0; border-bottom: 1px solid var(--color-border); }
+    .lib-search { padding-top: var(--space-3); }
 
     /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
        inline top/left, so the sheet placement needs !important. */

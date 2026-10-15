@@ -9,10 +9,12 @@ to the current song.
 ## Features
 
 - **Cassette-deck player** — animated reels, scrubber, shuffle / repeat,
-  keyboard shortcuts (`Space`, `Shift + ←/→`), lock-screen controls,
+  keyboard shortcuts (`Space`, `←/→` seek, `Shift + ←/→` skip, `↑/↓` volume,
+  `M` `S` `R` `Q`, `/` search, `?` for the list), lock-screen controls,
   and it resumes your queue across sessions and devices.
 - **Browse** — All Tracks (sortable: by artist / recently added / recently
-  played / most played), Singles, Albums, Artists, and your own tapes.
+  played / most played; the sort is remembered per shelf), Singles, Albums,
+  Artists, and your own tapes. Search your whole library from the shelf.
 - **Up Next** queue with drag-to-reorder; *Play next* / *Add to queue* per track.
 - **Rip** any URL to MP3 with cover art via `yt-dlp` + `ffmpeg`, with live
   progress over SSE; paste a YouTube playlist to rip it into a new tape. The

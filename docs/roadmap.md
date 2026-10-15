@@ -57,9 +57,10 @@ choice. Updated 2026-06-15.
   on mobile. *effort: M–L*
 - **Offline downloads.** Cache tracks via the service worker for no-connection
   playback. Defining feature for a phone streamer. *effort: L*
-- **Global server-side search** across the whole library (today's search is
-  client-side over the current list only), focusable with `/`, plus a `?`
-  shortcuts overlay. *effort: M*
+- **Search podcasts from the shelf too.** `/` and the shelf field search the
+  whole music library (client-side, over All Tracks); episodes are only
+  searchable inside a show. Move search server-side if libraries outgrow it.
+  *effort: M*
 
 ## Backlog / robustness
 

@@ -6,6 +6,7 @@
   const playBtn = $("playBtn");
   const scrub = $("scrub"), scrubFill = $("scrubFill"), curTime = $("curTime"), durTime = $("durTime");
   const app = $("app");
+  const sidebar = document.querySelector(".sidebar");
 
   const streamUrl = (id) => M.streamBase + id;
   const coverUrl = (id) => M.coverBase + id;
@@ -220,15 +221,22 @@
     else openPodcasts();
   }
 
+  // The last sort picked on each shelf, remembered on this device.
+  function savedSort(key) {
+    let v = null;
+    try { v = localStorage.getItem(`tapes-sort-${key}`); } catch (_) { /* private mode */ }
+    return v && [...$("sortSelect").options].some((o) => o.value === v) ? v : "default";
+  }
+
   async function openTape(key, name, kind) {
     const tok = ++navToken;
     const sortable = key === "all" || key === "singles";
-    currentSort = "default";
-    const data = await jget(`api/playlists/${key}/tracks?sort=${currentSort}`);
+    currentSort = sortable ? savedSort(key) : "default";
+    const data = await navGet(`api/playlists/${key}/tracks?sort=${currentSort}`);
     if (tok !== navToken) return;   // a newer view opened while we waited
     currentTape = { key, name, kind };
     view = data;
-    $("sortSelect").value = "default";
+    $("sortSelect").value = currentSort;
     $("sortBar").hidden = !sortable;
     const titleEl = $("tapeTitle");
     titleEl.textContent = name;
@@ -251,6 +259,51 @@
     showView("tracks");
   }
 
+  // ---------- loading + long lists ----------
+  // A view that takes more than a moment to load dims the library and shows a
+  // thin bar, instead of looking like the tap did nothing.
+  let loadingCount = 0, loadingTimer = null;
+  function whileLoading(p) {
+    loadingCount++;
+    if (!loadingTimer) loadingTimer = setTimeout(() => sidebar.classList.add("loading"), 150);
+    return p.finally(() => {
+      if (--loadingCount) return;
+      clearTimeout(loadingTimer); loadingTimer = null;
+      sidebar.classList.remove("loading");
+    });
+  }
+  const navGet = (url) => whileLoading(jget(url));
+
+  // Build a long list a chunk at a time: the first rows straight away, the
+  // rest as the end of the list scrolls into view.
+  const CHUNK = 150;
+  function renderInChunks(el, items, makeRow, after) {
+    let n = 0;
+    const more = () => {
+      const frag = document.createDocumentFragment();
+      const end = Math.min(items.length, n + CHUNK);
+      for (; n < end; n++) frag.appendChild(makeRow(items[n], n));
+      el.appendChild(frag);
+      if (after) after();
+      if (n < items.length) watch();
+    };
+    const watch = () => {
+      const sentinel = document.createElement("li");
+      sentinel.className = "list-more"; sentinel.setAttribute("aria-hidden", "true");
+      el.appendChild(sentinel);
+      const io = new IntersectionObserver((entries) => {
+        if (!entries.some((x) => x.isIntersecting)) return;
+        io.disconnect(); sentinel.remove(); more();
+      }, { rootMargin: "600px 0px" });
+      io.observe(sentinel);
+    };
+    more();
+  }
+  function debounce(fn, ms) {
+    let t = null;
+    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
   // ---------- view switching ----------
   function showView(name) {
     $("shelfView").hidden = name !== "shelf";
@@ -263,7 +316,7 @@
   // ---------- album / artist browse ----------
   async function openBrowse(kind) {
     const tok = ++navToken;
-    const rows = await jget(kind === "albums" ? "api/albums" : "api/artists");
+    const rows = await navGet(kind === "albums" ? "api/albums" : "api/artists");
     if (tok !== navToken) return;
     currentBrowse = kind;
     browseRows = rows;
@@ -283,7 +336,7 @@
         : "No artists yet — they appear as you add songs.";
       return;
     }
-    rows.forEach((r) => {
+    renderInChunks(el, rows, (r) => {
       const li = document.createElement("li");
       li.className = "browse-row";
       if (currentBrowse === "albums") {
@@ -301,7 +354,7 @@
         li.addEventListener("click", () => openArtistTracks(r.name));
       }
       li.querySelector(".browse-name").textContent = r.name;
-      el.appendChild(li);
+      return li;
     });
   }
   function applyBrowseSearch() {
@@ -311,14 +364,14 @@
   }
   async function openAlbumTracks(album) {
     const tok = ++navToken;
-    const data = await jget(`api/albums/tracks?album=${encodeURIComponent(album)}`);
+    const data = await navGet(`api/albums/tracks?album=${encodeURIComponent(album)}`);
     if (tok !== navToken) return;
     view = data;
     openTrackList(album, "albums", "Albums");
   }
   async function openArtistTracks(artist) {
     const tok = ++navToken;
-    const data = await jget(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
+    const data = await navGet(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
     if (tok !== navToken) return;
     view = data;
     openTrackList(artist, "artists", "Artists");
@@ -380,7 +433,7 @@
   async function openPodcasts() {
     const tok = ++navToken;
     let data;
-    try { data = await jget("api/podcast/shows"); }
+    try { data = await navGet("api/podcast/shows"); }
     catch (e) { console.error(e); toast("Couldn't load podcasts."); return; }
     if (tok !== navToken) return;
     showsData = data;
@@ -420,7 +473,7 @@
   }
   async function openShow(s) {
     const tok = ++navToken;
-    const data = await jget(`api/podcast/shows/${s.id}/episodes`);
+    const data = await navGet(`api/podcast/shows/${s.id}/episodes`);
     if (tok !== navToken) return;
     currentShow = data.show;
     // manual tapes can't refresh; only real shows can be deleted from here
@@ -428,7 +481,7 @@
   }
   async function openLoose() {
     const tok = ++navToken;
-    const data = await jget("api/podcast/episodes/loose");
+    const data = await navGet("api/podcast/episodes/loose");
     if (tok !== navToken) return;
     currentShow = null;
     enterEpisodes("Unsorted episodes", data.episodes, { refreshable: false, deletable: false });
@@ -460,7 +513,7 @@
         : "No episodes yet. Use Refresh to check for new ones.";
       return;
     }
-    list.forEach((e, i) => {
+    renderInChunks(el, list, (e, i) => {
       const li = document.createElement("li");
       li.dataset.id = e.id;
       li.className = e.played ? "played" : "";   // layout comes from .track-list li
@@ -478,6 +531,7 @@
         <button class="tl-add ep-played" title="${e.played ? "Mark as unplayed" : "Mark as played"}" aria-label="${e.played ? "Mark as unplayed" : "Mark as played"}">${e.played ? ICONS.check : ICONS.circleO}</button>
         <button class="tl-add ep-menu" title="More" aria-label="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = e.title;
+      li.querySelector(".tl-title").title = e.title;
       li.querySelector(".tl-sub").textContent = sub;
       li.querySelector(".ep-played").addEventListener("click", (ev) => { ev.stopPropagation(); togglePlayed(e); });
       li.querySelector(".ep-menu").addEventListener("click", (ev) => {
@@ -486,9 +540,8 @@
         else openEpisodeMenu(ev, e);
       });
       li.addEventListener("click", () => playEpisode(list, i));
-      el.appendChild(li);
-    });
-    markActive();
+      return li;
+    }, markActive);
   }
   let epFilter = localStorage.getItem("tapes-ep-filter") || "all";  // all | unplayed | downloaded
   function applyEpisodeSearch() {
@@ -708,7 +761,7 @@
     // Drag-reorder only makes sense (and persists) for a user tape, and only
     // when the list isn't filtered by a search.
     const reorderable = !!(currentTape && currentTape.kind === "user") && !$("search").value.trim();
-    list.forEach((t, i) => {
+    const makeRow = (t, i) => {
       const li = document.createElement("li");
       li.dataset.id = t.id;
       const handle = reorderable ? `<span class="tl-drag drag-handle" title="Drag to reorder" aria-hidden="true">${ICONS.grip}</span>` : "";
@@ -741,9 +794,10 @@
       const h = li.querySelector(".tl-drag");
       if (h) h.addEventListener("click", (e) => e.stopPropagation());
       li.addEventListener("click", () => playFromList(list, i));
-      el.appendChild(li);
-    });
-    markActive();
+      return li;
+    };
+    if (reorderable) { list.forEach((t, i) => el.appendChild(makeRow(t, i))); markActive(); }
+    else renderInChunks(el, list, makeRow, markActive);
   }
 
   function applySearch() {
@@ -1643,13 +1697,27 @@
   $("sortSelect").addEventListener("change", async () => {
     if (!currentTape) return;
     currentSort = $("sortSelect").value;
-    view = await jget(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
+    try { localStorage.setItem(`tapes-sort-${currentTape.key}`, currentSort); } catch (_) { /* private mode */ }
+    view = await navGet(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
     applySearch();   // re-render, honouring any active search text
   });
   $("backBtn").addEventListener("click", () =>
     showView(trackParent === "albums" || trackParent === "artists" ? "browse" : "shelf"));
   $("browseBack").addEventListener("click", () => showView("shelf"));
-  $("browseSearch").addEventListener("input", applyBrowseSearch);
+  $("browseSearch").addEventListener("input", debounce(applyBrowseSearch, 120));
+  // Library-wide search from the shelf: typing jumps into All Tracks with the
+  // query, keeping the cursor in the search field.
+  // Keys typed while All Tracks loads stay in this field, then move across.
+  let libJumping = false;
+  $("libSearch").addEventListener("input", async () => {
+    if (libJumping || !$("libSearch").value.trim()) return;
+    libJumping = true;
+    try { await openTape("all", "All Tracks", "smart"); } finally { libJumping = false; }
+    $("search").value = $("libSearch").value;
+    $("libSearch").value = "";
+    applySearch();
+    $("search").focus();
+  });
   $("modeMusic").addEventListener("click", () => setMode("music"));
   $("modePods").addEventListener("click", () => setMode("podcasts"));
   $("edCancel").addEventListener("click", closeEdit);
@@ -1667,7 +1735,7 @@
       updateEpFilterBtns();
       applyEpisodeSearch();
     }));
-  $("epSearch").addEventListener("input", applyEpisodeSearch);
+  $("epSearch").addEventListener("input", debounce(applyEpisodeSearch, 120));
   $("showRefreshBtn").addEventListener("click", refreshCurrentShow);
   $("showDelBtn").addEventListener("click", deleteCurrentShow);
   // A song that can't play (missing or damaged file): say so and move on, but
@@ -1707,7 +1775,7 @@
     isMobile() ? closeDeck() : app.classList.toggle("nav-collapsed"));
   $("miniOpen").addEventListener("click", openDeck);
   $("miniPlay").addEventListener("click", togglePlay);
-  $("search").addEventListener("input", applySearch);
+  $("search").addEventListener("input", debounce(applySearch, 120));
   // Both "New tape" forms (music + podcast) share the create boilerplate.
   function wireCreateForm(formId, inputId, onSubmit) {
     $(formId).addEventListener("submit", async (e) => {
@@ -1805,11 +1873,52 @@
       upnext.classList.remove("expanded"); closeMenu(); closeSleep();
       if (!anyOpen && isMobile()) closeDeck();
     }
-    if (e.target.tagName === "INPUT" || e.target.isContentEditable) return;
-    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
-    if (e.key === "ArrowRight" && e.shiftKey) next(true);
-    if (e.key === "ArrowLeft" && e.shiftKey) prev();
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;   // leave browser shortcuts alone
+    if (document.querySelector(".modal-scrim:not([hidden])")) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const handled = {
+      " ": () => togglePlay(),
+      ArrowRight: () => (e.shiftKey ? next(true) : skipBy(activeIsEpisode() ? 10 : 5)),
+      ArrowLeft: () => (e.shiftKey ? prev() : skipBy(activeIsEpisode() ? -10 : -5)),
+      ArrowUp: () => nudgeVolume(0.1),
+      ArrowDown: () => nudgeVolume(-0.1),
+      m: () => toggleMute(),
+      s: () => { setShuffle(!shuffleOn); toast(shuffleOn ? "Shuffle on" : "Shuffle off"); },
+      r: () => { cycleRepeat(); toast(repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat off"); },
+      q: () => { if (!upnext.hidden) toggleUpNext(); },
+      "/": () => focusSearch(),
+      "?": () => { $("keysModal").hidden = false; $("keysClose").focus(); },
+    }[key];
+    if (!handled) return;
+    e.preventDefault();
+    handled();
   });
+  function nudgeVolume(d) {
+    audio.muted = false;
+    audio.volume = Math.round(Math.max(0, Math.min(1, audio.volume + d)) * 10) / 10;
+    try { localStorage.setItem("tapes-volume", String(audio.volume)); } catch (_) { /* private mode */ }
+    toast(`Volume ${Math.round(audio.volume * 100)}%`);
+  }
+  function toggleMute() {
+    audio.muted = !audio.muted;
+    toast(audio.muted ? "Muted" : "Sound on");
+  }
+  // `/`: search the list that's open, or the whole library from the shelf.
+  function focusSearch() {
+    if (isMobile()) closeDeck();
+    const visible = (id) => !$(id).hidden;
+    const field = visible("tracksView") ? "search" : visible("browseView") ? "browseSearch"
+      : visible("episodesView") ? "epSearch" : mode === "music" ? "libSearch" : null;
+    if (field) { $(field).focus(); $(field).select(); }
+  }
+  $("keysClose").addEventListener("click", () => { $("keysModal").hidden = true; });
+  $("keysModal").addEventListener("click", (e) => { if (e.target === $("keysModal")) $("keysModal").hidden = true; });
+  $("keysModal").addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "?") $("keysModal").hidden = true; });
+  try {
+    const v = parseFloat(localStorage.getItem("tapes-volume"));
+    if (v >= 0 && v <= 1) audio.volume = v;
+  } catch (_) { /* private mode */ }
   // Closing or backgrounding the page: send the playhead right away with a
   // beacon (a normal fetch would be cancelled, and savePlaystate debounces).
   function beaconPlaystate() {

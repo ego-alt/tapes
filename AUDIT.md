@@ -128,10 +128,12 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** With 3,010 tracks, opening All Tracks builds all 3,010 rows: 1.1–1.2 s on a fast Mac, so likely several times that on a phone. Search re-renders the whole list on every keystroke (0.14 s here). It only searches the list you have open; there's no library-wide search.
 - **Where:** `player.js` `renderTracks`, `applySearch`
 - **Fix:** Render the visible window only (virtual list, or chunks of ~100 on scroll), and debounce search. Add a global search (see 8.4).
+- **Status:** Done. Track, album/artist and episode lists build 150 rows at a time and add more as you scroll near the end (a reorderable tape still renders in full, since drag needs every row). Searches are debounced. Measured with 3,000 stubbed tracks: 150 rows on open instead of 3,000, and a full-list search re-render in about 35 ms. Library-wide search: see 8.4.
 
 **2.10 No loading states**
 - **What:** Opening a list, an album or a show shows nothing until the data arrives.
 - **Fix:** Fade in a few skeleton rows after about 150 ms, and keep the previous list dimmed rather than blank.
+- **Status:** Done. If a list takes more than 150 ms to arrive, the current view dims and a thin accent bar runs across the top of the library (static under reduced motion) until it lands. The view itself stays put rather than going blank.
 
 **2.11 Things that should be hidden show anyway** (bug, confirmed)
 - **What:** The app hides elements with the `hidden` attribute, but nothing forces `[hidden]` to `display: none`. Any element styled as a `.btn` or flex box stays visible. Confirmed cases:
@@ -387,18 +389,22 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - a rip until yt-dlp's first output line;
   - finished rips (2.3).
 - **Fix:** Toast every outcome immediately. Add the rip job row with its link the instant you submit, marked *"Starting…"*.
+- **Status:** Done. Every music action now toasts (see 3.4). A rip shows its job row the moment the server accepts it (*Starting… link*), before yt-dlp prints anything, and finished rips stay as review cards (#3).
 
 **8.3 Lists are slow to open at scale and show no loading state**
 - **What:** See 2.9 and 2.10.
 - **Fix:** Render only the visible rows, and show skeleton rows while loading.
+- **Status:** Done. See 2.9 and 2.10.
 
 **8.4 Keyboard shortcuts are minimal**
 - **What:** Only Space and Shift+←/→ exist. In testing, plain → didn't seek, and `/` didn't focus search.
 - **Fix:** ←/→ seek 5 s (10 s for episodes), ↑/↓ volume, `M` mute, `/` library-wide search, `Q` toggle Up Next, `S` shuffle, `R` repeat, `?` shortcut sheet.
+- **Status:** Done. `Space` play/pause; `←/→` seek 5 s (10 s for episodes); `Shift + ←/→` previous/next; `↑/↓` volume (remembered, with a toast); `M` mute; `S` shuffle; `R` repeat; `Q` Up Next; `/` search (the open list's field, or the new *Search your library* field on the shelf, which jumps into All Tracks without losing what you're typing); `?` a shortcut sheet. Shortcuts ignore typing, open dialogs and Cmd/Ctrl/Alt combos, so browser shortcuts still work.
 
 **8.5 Sort resets every time you open a shelf**
 - **What:** `openTape` resets the sort to *By artist*.
 - **Fix:** Remember the last sort per shelf.
+- **Status:** Done. All Tracks and Singles remember their last sort on this device.
 
 ---
 
@@ -415,7 +421,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | Done |
 | 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | Done |
 | 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | Done |
-| 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | To do |
+| 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | Done |
 
 Close runners-up:
 - **Collision-safe rip filenames in `Artist/Album/` folders** (4.7, medium).
