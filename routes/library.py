@@ -133,23 +133,27 @@ def delete_playlist(pid):
 SORTS = {"default", "added", "played", "most"}
 
 
-def _apply_sort(base, sort, uid):
+def _take(query, limit):
+    return query.limit(limit).all() if limit else query.all()
+
+
+def _apply_sort(base, sort, uid, limit=None):
     if sort == "added":
         # Recently added == recently downloaded (rips get a fresh added_at).
-        return base.order_by(Track.added_at.desc(), Track.id.desc()).all()
+        return _take(base.order_by(Track.added_at.desc(), Track.id.desc()), limit)
     if sort == "played":
         last = (db.session.query(Play.track_id, db.func.max(Play.played_at).label("lp"))
                 .filter(Play.user_id == uid).group_by(Play.track_id).subquery())
         # SQLite sorts NULLs last on DESC, so never-played tracks fall to the end.
-        return (base.outerjoin(last, last.c.track_id == Track.id)
-                .order_by(last.c.lp.desc(), Track.title).all())
+        return _take(base.outerjoin(last, last.c.track_id == Track.id)
+                     .order_by(last.c.lp.desc(), Track.title), limit)
     if sort == "most":
         cnt = (db.session.query(Play.track_id, db.func.count().label("c"))
                .filter(Play.user_id == uid).group_by(Play.track_id).subquery())
-        return (base.outerjoin(cnt, cnt.c.track_id == Track.id)
-                .order_by(db.func.coalesce(cnt.c.c, 0).desc(), Track.added_at.desc()).all())
+        return _take(base.outerjoin(cnt, cnt.c.track_id == Track.id)
+                     .order_by(db.func.coalesce(cnt.c.c, 0).desc(), Track.added_at.desc()), limit)
     order = (Track.artist.is_(None), Track.artist, Track.album, Track.track_no, Track.title)
-    return base.order_by(*order).all()
+    return _take(base.order_by(*order), limit)
 
 
 @library_blueprint.route("/api/playlists/<key>/tracks")
@@ -158,20 +162,23 @@ def playlist_tracks(key):
     sort = request.args.get("sort", "default")
     if sort not in SORTS:
         sort = "default"
+    # Optional cap for programmatic clients (the MCP server); the deck loads all.
+    limit = request.args.get("limit", type=int)
+    limit = max(limit, 1) if limit else None
     if key == "all":
-        tracks = _apply_sort(Track.query, sort, _uid())
+        tracks = _apply_sort(Track.query, sort, _uid(), limit)
     elif key == "singles":
         base = Track.query.filter(_is_single())
-        tracks = _apply_sort(base, sort, _uid())
+        tracks = _apply_sort(base, sort, _uid(), limit)
     elif key == "tidy":
-        tracks = _apply_sort(Track.query.filter(_needs_tidying()), sort, _uid())
+        tracks = _apply_sort(Track.query.filter(_needs_tidying()), sort, _uid(), limit)
         return jsonify([{**t.to_dict(), "issues": _issues(t)} for t in tracks])
     else:
         p = Playlist.query.filter_by(id=int(key), user_id=_uid()).first_or_404()
         rows = (db.session.query(Track).join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
                 .filter(PlaylistTrack.playlist_id == p.id)
-                .order_by(PlaylistTrack.position).all())
-        tracks = rows
+                .order_by(PlaylistTrack.position))
+        tracks = _take(rows, limit)
     return jsonify(_serialize(tracks))
 
 
