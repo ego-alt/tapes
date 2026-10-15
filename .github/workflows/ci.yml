@@ -26,11 +26,8 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync --frozen --all-groups
-      # No test suite yet: check every module compiles and the app starts.
-      - name: Compile check
-        run: uv run python -m compileall -q -x '/\.venv/' .
-      - name: App starts
-        run: uv run python -c "from app import create_app; create_app()"
+      - name: Tests
+        run: uv run pytest -q
       # Advisory until the existing warnings are cleaned up: shows issues
       # inline on the PR without failing the build.
       - name: Lint (advisory)
