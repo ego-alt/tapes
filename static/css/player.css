@@ -181,6 +181,24 @@
 }
 .tbtn.play:hover { background: var(--color-accent-hover); }
 
+/* Podcast-only controls (skip ±, speed) appear while an episode is loaded. */
+.deck:not(.is-episode) .ep-only { display: none; }
+.speed-btn {
+    font: 600 var(--text-sm) var(--font-mono);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    min-width: 56px;
+    min-height: 32px;
+    cursor: pointer;
+}
+.speed-btn:hover { background: var(--color-bg-inset); }
+@media (max-width: 640px) {
+    .deck.is-episode .transport { gap: var(--space-3); }
+    .speed-btn { min-height: 44px; min-width: 64px; }
+}
+
 /* inline-svg icons — sized per container, centred by the button's flex */
 .icn { display: block; }
 .tbtn .icn { width: 22px; height: 22px; }

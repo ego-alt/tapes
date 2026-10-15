@@ -12,7 +12,13 @@
   // Polymorphic source/art: a track plays from the music endpoints, an episode
   // (kind === "episode") from the podcast ones. Everything else in the player
   // works on these two helpers so the queue/deck can hold either.
-  const srcUrl = (t) => t.kind === "episode" ? M.epStreamBase + t.id : streamUrl(t.id);
+  // An RSS episode that isn't downloaded yet streams straight from the feed's
+  // audio URL while the download runs in the background.
+  const canStreamRemote = (t) => t.kind === "episode" && t.status !== "ready"
+    && t.source_type === "rss" && /^https?:/.test(t.source_url || "");
+  const srcUrl = (t) => t.kind === "episode"
+    ? (canStreamRemote(t) ? t.source_url : M.epStreamBase + t.id)
+    : streamUrl(t.id);
   const artUrl = (t) => t.kind === "episode"
     ? (t.show_id ? M.epEpisodeCoverBase + t.id : null)
     : (t.has_cover ? coverUrl(t.id) : null);
@@ -113,6 +119,8 @@
     repeatOne: svgIcon('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/>'),
     list: svgIcon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
     chevronUp: svgIcon('<path d="m6 15 6-6 6 6"/>'),
+    back15: svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><text x="12" y="15.5" font-size="7.5" font-family="Inter, sans-serif" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">15</text>'),
+    fwd30: svgIcon('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/><text x="12" y="15.5" font-size="7.5" font-family="Inter, sans-serif" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">30</text>'),
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
@@ -496,9 +504,13 @@
     episodes = episodes.filter((x) => x.id !== ep.id);
     applyEpisodeSearch();
   }
+  // Start the download without the "wait for it" UI (used while streaming).
+  function fetchEpisodeQuietly(t) {
+    jsend(`api/podcast/episodes/${t.id}/play`, "POST").catch(() => { /* streaming still works */ });
+  }
   async function playEpisode(list, i) {
     const e = list[i];
-    if (e.status === "ready") { startEpisodePlayback(list, i); return; }
+    if (e.status === "ready" || canStreamRemote(e)) { startEpisodePlayback(list, i); return; }
     let res;
     try { res = await jsend(`api/podcast/episodes/${e.id}/play`, "POST").then((r) => r.json()); }
     catch (err) { console.error(err); toast("Couldn't start the episode."); return; }
@@ -520,6 +532,7 @@
   // Show a "downloading…" deck state and fetch an episode that was reached before
   // it was downloaded; onPodcastJobDone plays it once the job completes.
   function loadPendingEpisode(t) {
+    cassette.closest(".deck").classList.add("is-episode");
     cassette.classList.add("loaded");
     labelTitle.textContent = t.title;
     labelArtist.textContent = (t.show || "Podcast") + " · downloading…";
@@ -717,8 +730,11 @@
     const isEp = t.kind === "episode";
     // Reached an episode that isn't downloaded yet (e.g. auto-advance / queue jump):
     // kick off the fetch and let onPodcastJobDone resume playback when it's ready.
-    if (isEp && t.status !== "ready") { loadPendingEpisode(t); return; }
+    if (isEp && t.status !== "ready" && !canStreamRemote(t)) { loadPendingEpisode(t); return; }
+    if (isEp && t.status !== "ready") fetchEpisodeQuietly(t);   // stream now, keep a copy
     audio.src = srcUrl(t);
+    $("cassette").closest(".deck").classList.toggle("is-episode", isEp);
+    audio.playbackRate = isEp ? episodeSpeed : 1;
     // Resume an episode where you left off (music resume rides the playstate path).
     if (isEp) resumeEpisodeTo(t.position);
     if (autoplay) audio.play().catch(() => {});
@@ -748,7 +764,8 @@
     prefetchId = next.id;
     prefetchEl = new Audio();
     prefetchEl.preload = "auto";
-    // Don't warm an undownloaded episode — its stream 404s until it's fetched.
+    // Don't warm an undownloaded episode — its stream 404s until it's fetched
+    // (and a remote feed's file isn't ours to pre-pull).
     if (next.kind === "episode" && next.status !== "ready") { prefetchEl = null; prefetchId = null; return; }
     prefetchEl.src = srcUrl(next);
   }
@@ -779,8 +796,13 @@
       album: isEp ? "" : (t.album || ""),
       artwork: art ? [{ src: art, sizes: "500x500", type: "image/jpeg" }] : [],
     });
-    navigator.mediaSession.setActionHandler("previoustrack", () => prev());
-    navigator.mediaSession.setActionHandler("nexttrack", () => next(true));
+    const handle = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn); } catch (_) { /* unsupported */ } };
+    handle("previoustrack", () => prev());
+    handle("nexttrack", () => next(true));
+    // Lock-screen scrubbing and skips (±15/30 s for episodes, ±10 s for songs).
+    handle("seekto", (d) => { if (d.seekTime != null) { audio.currentTime = d.seekTime; savePlaystate(); } });
+    handle("seekbackward", (d) => skipBy(-(d.seekOffset || (isEp ? 15 : 10))));
+    handle("seekforward", (d) => skipBy(d.seekOffset || (isEp ? 30 : 10)));
   }
   function go(i, autoplay) { qi = i; loadCurrent(autoplay); }
   // `manual` = user pressed next (vs. a track ending). Repeat-one only loops on
@@ -800,6 +822,26 @@
     if (activeIsEpisode()) { if (qi + 1 < queue.length) go(qi + 1, true); return; }  // back = older
     if (qi > 0) go(qi - 1, true);
     else if (repeatMode === "all") go(queue.length - 1, true);
+  }
+
+  // ---------- podcast controls: skip and speed ----------
+  const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+  let episodeSpeed = Number(localStorage.getItem("tapes-ep-speed")) || 1;
+  function renderSpeed() {
+    const label = `${episodeSpeed}×`;
+    $("speedBtn").textContent = label;
+    $("speedBtn").setAttribute("aria-label", `Playback speed ${label}`);
+  }
+  function cycleSpeed() {
+    episodeSpeed = SPEEDS[(SPEEDS.indexOf(episodeSpeed) + 1) % SPEEDS.length];
+    localStorage.setItem("tapes-ep-speed", String(episodeSpeed));
+    if (activeIsEpisode()) audio.playbackRate = episodeSpeed;
+    renderSpeed();
+  }
+  function skipBy(sec) {
+    if (!audio.duration) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration - 0.5, audio.currentTime + sec));
+    savePlaystate();
   }
 
   // ---------- shuffle / repeat ----------
@@ -1403,7 +1445,7 @@
     if (!cur) return;
     // Don't auto-fetch an undownloaded episode on a passive reload — you can only
     // resume what you already have; tapping it will download as usual.
-    if (cur.kind === "episode" && cur.status !== "ready") return;
+    if (cur.kind === "episode" && cur.status !== "ready" && !canStreamRemote(cur)) return;
     queue = ps.queue;   // already hydrated server-side
     baseQueue = queue.slice();
     qi = idx;
@@ -1514,6 +1556,7 @@
       if (audio.duration) paintScrub(audio.currentTime / audio.duration);
     }
     const t = currentTrack();
+    updatePositionState();
     if (t && t.kind === "episode") maybeSaveEpisodeTick(t);
     else if (t && !audio.paused && Date.now() - lastMusicSave > 15000) {
       lastMusicSave = Date.now();   // keep the saved playhead fresh while playing
@@ -1595,7 +1638,28 @@
     if (document.visibilityState === "hidden") beaconPlaystate();
   });
 
+  // Keep the lock screen's position bar in sync (throttled).
+  let lastPosState = 0;
+  function updatePositionState() {
+    if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState || !audio.duration) return;
+    const now = Date.now();
+    if (now - lastPosState < 1000) return;
+    lastPosState = now;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration, playbackRate: audio.playbackRate || 1,
+        position: Math.min(audio.currentTime, audio.duration),
+      });
+    } catch (_) { /* ignore */ }
+  }
+  $("back15Btn").addEventListener("click", () => skipBy(-15));
+  $("fwd30Btn").addEventListener("click", () => skipBy(30));
+  $("speedBtn").addEventListener("click", cycleSpeed);
+
   // ---------- init ----------
+  $("back15Btn").innerHTML = ICONS.back15;
+  $("fwd30Btn").innerHTML = ICONS.fwd30;
+  renderSpeed();
   updateNavToggle();
   $("prevBtn").innerHTML = ICONS.prev;
   playBtn.innerHTML = ICONS.play;

@@ -259,6 +259,8 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - An RSS episode must download completely before it plays: *"Downloading episode…"*, then it auto-plays when done. Streaming the enclosure URL directly while it downloads would make it play instantly.
 - Once playing, there's no **skip back 15 s / forward 30 s**, no **playback speed**, and the lock screen only has previous/next (8.1).
 
+**Status: done.** RSS episodes that aren't downloaded yet now play at once, streamed straight from the feed's audio link while the download runs quietly in the background (verified with a local feed: playback started immediately, and the episode was marked downloaded about a second later, without interrupting). YouTube episodes still download first, because they can't be streamed directly. Skip and speed are covered in 8.1.
+
 ---
 
 ## 6. Copy
@@ -361,6 +363,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Fix:**
   - Add `seekto`, `seekbackward` and `seekforward` handlers.
   - Add ↺15 / 30↻ buttons and a speed toggle (1×, 1.25×, 1.5×, 2×), shown only for episodes, styled as deck buttons.
+- **Status:** Done. While an episode plays, the deck shows ↺15, 30↻ and a speed button (1×, 1.25×, 1.5×, 1.75×, 2×; remembered on the device; songs always play at 1×). The lock screen gets seek-to, skip back and skip forward, and a live position bar. Volume and mute are left to the device's own controls. Verified with a local RSS feed: +30/−15 land correctly and the speed applies.
 
 **8.2 Missing instant feedback**
 - **What:** Several actions give no sign they worked:
@@ -392,7 +395,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | Done |
 | 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | Done |
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | Done |
-| 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | To do |
+| 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | Done |
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | To do |
 | 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | To do |
 | 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | To do |

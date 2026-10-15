@@ -185,6 +185,7 @@ class Episode(db.Model):
             "played": bool(self.played),
             "published_at": self.published_at.isoformat() if self.published_at else None,
             "source_url": self.source_url or "",
+            "source_type": self.source_type,
             "has_cover": True,  # cover endpoint falls back to the show image
         }
 
