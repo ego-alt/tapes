@@ -920,6 +920,52 @@
     updateUpNext();
     updateMini();
   }
+  // ---------- reels ----------
+  // The tape winds from the left pack to the right one as the song plays.
+  // Each pack's radius follows the amount of tape on it (area, not length,
+  // so it changes faster near the empty hub), and the hubs turn at the
+  // speed constant tape speed implies: a small pack spins faster.
+  const reels = (() => {
+    const HUB = 11, FULL = 25, CX = { L: 98, R: 232 }, CY = 112;
+    const TAPE_SPEED = 26;   // view-box units per second at the tape surface
+    const el = (id) => document.getElementById(id);
+    const packL = el("packL"), packR = el("packR"), sheenL = el("sheenL"), sheenR = el("sheenR");
+    const reelL = el("reelL"), reelR = el("reelR"), runL = el("tapeRunL"), runR = el("tapeRunR");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let angL = 0, angR = 0, last = 0, raf = 0;
+    const radius = (share) => Math.sqrt(HUB * HUB + share * (FULL * FULL - HUB * HUB));
+    function setPacks() {
+      const p = audio.duration ? Math.min(1, Math.max(0, audio.currentTime / audio.duration)) : 0;
+      const rL = radius(1 - p), rR = radius(p);
+      packL.setAttribute("r", rL); sheenL.setAttribute("r", Math.max(HUB, rL - 2));
+      packR.setAttribute("r", rR); sheenR.setAttribute("r", Math.max(HUB, rR - 2));
+      // tape leaves each pack from its lower outer edge
+      runL.setAttribute("x1", CX.L - rL * 0.7); runL.setAttribute("y1", CY + rL * 0.7);
+      runR.setAttribute("x1", CX.R + rR * 0.7); runR.setAttribute("y1", CY + rR * 0.7);
+      return [rL, rR];
+    }
+    function frame(t) {
+      const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
+      last = t;
+      const [rL, rR] = setPacks();
+      if (!still.matches) {
+        const speed = TAPE_SPEED * (audio.playbackRate || 1) * dt;
+        angL = (angL + (speed / rL) * 180 / Math.PI) % 360;
+        angR = (angR + (speed / rR) * 180 / Math.PI) % 360;
+        reelL.setAttribute("transform", `rotate(${angL} ${CX.L} ${CY})`);
+        reelR.setAttribute("transform", `rotate(${angR} ${CX.R} ${CY})`);
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    return {
+      start() { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } },
+      stop() { cancelAnimationFrame(raf); raf = 0; setPacks(); },
+      sync: setPacks,
+    };
+  })();
+  ["loadedmetadata", "seeked", "emptied"].forEach((ev) => audio.addEventListener(ev, reels.sync));
+  reels.sync();
+
   // Long titles on the paper label drift slowly sideways (and back) so the
   // whole name can be read; the full text is also the tooltip.
   function fitLabel() {
@@ -1908,7 +1954,7 @@
   });
 
   audio.addEventListener("play", () => {
-    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini();
+    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini(); reels.start();
     const t = currentTrack();
     // Play counts are a music-catalog thing (no Play row for episodes).
     if (t && t.kind !== "episode" && t.id !== lastPlayed) {
@@ -1916,7 +1962,7 @@
     }
   });
   audio.addEventListener("pause", () => {
-    cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; updateMini(); savePlaystate();
+    cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; updateMini(); savePlaystate(); reels.stop();
   });
   audio.addEventListener("ended", () => {
     if (sleepEndOfTrack) { clearSleep(); audio.pause(); return; }  // sleep: stop, don't advance

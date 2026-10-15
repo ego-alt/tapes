@@ -17,25 +17,18 @@
 }
 .cassette-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-/* orange band + black reel window */
-.band         { fill: #ef6219; }
-.reel-window  { fill: #0c0a09; }
-.tape-view    { fill: #1b1611; }
-.tape-line    { fill: none; stroke: #2a221c; stroke-width: 5; opacity: 0.8; }
-.roller       { fill: #cfc7b6; }
+/* orange band; the reel window is smoked plastic (gradient in the SVG) */
+.band { fill: #ef6219; }
 
-/* reels — rotate about each reel's centre (view-box units) */
-.reel { animation: cassette-spin 3s linear infinite; animation-play-state: paused; }
-.reel-left  { transform-box: view-box; transform-origin: 98px 112px; }
-.reel-right { transform-box: view-box; transform-origin: 232px 112px; animation-duration: 3.4s; }
-.cassette.playing .reel { animation-play-state: running; }
-@keyframes cassette-spin { to { transform: rotate(1turn); } }
-@media (prefers-reduced-motion: reduce) { .reel { animation: none !important; } }
-
-.tape-pack   { fill: #241d17; }
-.teeth       { fill: none; stroke: #e8e2d4; stroke-width: 8; stroke-dasharray: 4 6; }
-.hub         { fill: #efeadd; }
-.hub-center  { fill: #2b2620; }
+/* Tape packs wind from left to right as the song plays, and the hubs spin
+   at the speed real tape would turn them (see the reels code in player.js). */
+.tape-pack  { stroke: rgba(0,0,0,0.5); stroke-width: 0.6; }
+.pack-sheen {
+    fill: none; stroke: rgba(255,226,190,0.08); stroke-width: 3;
+    stroke-dasharray: 0.6 1.4;   /* faint winding rings */
+}
+.tape-run   { stroke: #3d2b1d; stroke-width: 1.4; }
+.head-tape  { stroke: #4a3424; stroke-width: 2.2; }
 
 /* band print */
 .band-arrow { fill: rgba(20,16,8,0.8); }
