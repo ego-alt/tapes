@@ -297,6 +297,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Status:** Done. Menus now sit above the phone drawer (`z-index: 40`). Verified at 375px with touch: + → Queue and ⋯ → Edit details both work. Bottom-sheet menus come with the phone layout (7.6).
 
 **7.2 Small tap targets** (measured; goal is 44×44)
+- **Status:** Done. At ≤640px every control measured at least 44×44: row + and ⋯, shuffle/repeat, queue handles and remove, menu items (48), tabs, shelf rows (48), Add, sleep, back and Up Next.
 
 | Control | Size |
 |---|---|
@@ -315,18 +316,21 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 **7.3 The scrub bar only accepts clicks**
 - **What:** You can tap a position but not drag. There's no handle, no hover time and no buffered indicator (the roadmap lists this).
 - **Fix:** Pointer-drag with a visible thumb while dragging, and show the time under your finger.
+- **Status:** Done. The scrub bar takes press-drag-release with mouse or finger; the fill, a thumb and the time follow the pointer, and the seek happens on release. It has a 44px invisible hit area, and when focused, ←/→ move 5 s. Verified on phone and desktop.
 
 **7.4 The keyboard covers inputs [code]**
 - **What:**
   - The edit dialog is centred (measured y 134–534 on a 667px screen), so an iPhone keyboard covers its Save button.
   - The "New tape…" field sits pinned to the bottom of the drawer, where the keyboard will cover it.
 - **Fix:** On phones, make the edit dialog a top-anchored or full-height sheet with Save in its header. Move "New tape" to a + in the shelf header.
+- **Status:** Done. On phones the edit dialog anchors to the top (measured y 16–416), so the keyboard can't cover Save, and the New tape / New show field moved to the top of its list.
 
 **7.5 Notch, home bar and zoom [code]**
 - **What:**
   - The drawer's bottom "New tape" form has no `safe-area-inset-bottom` padding, so it sits under the home indicator on iPhones.
   - The viewport sets `maximum-scale=1`, which blocks pinch-zoom for anyone who needs it.
 - **Fix:** Pad the drawer's bottom with `env(safe-area-inset-bottom)`, and drop `maximum-scale=1`.
+- **Status:** Done. `maximum-scale=1` is gone, so pinch-zoom works. The library, deck, mini-player and sheets pad themselves with `env(safe-area-inset-*)`.
 
 **7.6 The phone layout should change structure, not just shrink**
 - **What:** On a phone the library is a drawer over the deck. While browsing you can't see or control what's playing. Up Next is a small floating card over the deck. Menus are tiny popovers.
@@ -334,6 +338,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - Make the library the main phone screen, with a **mini-player bar** at the bottom (label art, title, play/pause; tap to open the deck).
   - Make the deck a full-screen "now playing" view with the cassette.
   - Make Up Next a bottom sheet, and row menus bottom action sheets.
+- **Status:** Done. On phones the library is the main screen, with a **mini-player** pinned to the bottom (art, title, artist, play/pause). Tapping it slides the full cassette deck up; ⌄ slides it back down. Picking a song keeps you in the library. Up Next and the row menus are full-width bottom sheets over a dimmed screen, titled with the song. Desktop is unchanged. Verified at 375px with touch.
 
 **7.7 Desktop keyboard can't reach row actions**
 - **What:**
@@ -381,7 +386,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 1 | **Make phones work:** menus above the drawer, plus one global `[hidden]` rule (fixes ghost "Delete tape", "Refresh" and "Up Next") | 7.1, 2.11 | **Small** | Done |
 | 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | Done |
 | 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | Done |
-| 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | To do |
+| 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | Done |
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | To do |
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | To do |
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | To do |

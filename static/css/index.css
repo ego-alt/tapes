@@ -141,51 +141,8 @@ body {
     line-height: 1;
 }
 
-@media (max-width: 640px) {
-    /* Off-canvas drawer: a full-height overlay that slides in from the left,
-     * rather than a column that resizes the deck. */
-    .sidebar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 30;
-        width: min(86vw, 360px);
-        height: 100%;
-        padding-top: env(safe-area-inset-top);
-        box-shadow: 0 0 40px var(--color-shadow);
-    }
-    .app.nav-collapsed .sidebar {
-        width: min(86vw, 360px);     /* keep width so the slide reads as a drawer, not a squeeze */
-        transform: translateX(-100%);
-        border-right-color: var(--color-border);
-    }
-
-    /* Tap-to-dismiss backdrop, faded with the drawer. */
-    .scrim {
-        display: block;
-        position: absolute;
-        inset: 0;
-        z-index: 25;
-        background: rgba(0, 0, 0, 0.5);
-        transition: opacity 0.25s ease;
-    }
-    .app.nav-collapsed .scrim {
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    /* Make the toggle a solid 44px tap target that reads over the deck. */
-    .nav-toggle {
-        top: max(var(--space-4), env(safe-area-inset-top));
-        left: max(var(--space-3), env(safe-area-inset-left));
-        width: 44px;
-        height: 44px;
-        border-radius: var(--radius-md);
-        background: var(--color-bg-overlay);
-        border: 1px solid var(--color-border-soft);
-        color: var(--color-text-primary);
-    }
-}
+/* The mini-player only exists on phones. */
+.mini { display: none; }
 
 /* On touch (no hover), surface the per-row actions that otherwise only
  * appear on hover — they're unreachable with a finger otherwise. */
@@ -455,3 +412,148 @@ body {
     background: var(--color-bg-inset);
     color: var(--color-text-primary);
 }
+
+/* Sheet title (which song a menu is for) — phones only. */
+.menu-head {
+    display: none;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--color-border-soft);
+    margin-bottom: var(--space-1);
+}
+
+/* Phone overrides come last so they win over the base rules above. */
+/* ---- Phones: library first, deck as a full-screen "now playing" ----
+ * The library fills the screen with a mini-player pinned to the bottom; tapping
+ * it slides the cassette deck up over everything (.app.deck-open), and the
+ * deck's ⌄ button slides it back down. */
+@media (max-width: 640px) {
+    .sidebar,
+    .app.nav-collapsed .sidebar {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        width: 100%;
+        transform: none;
+        border-right: 0;
+        padding-top: env(safe-area-inset-top);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+    .main {
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        background: var(--color-bg-base);
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        transform: translateY(100%);
+        transition: transform 0.28s var(--ease-emphasized, ease);
+        visibility: hidden;
+    }
+    .app.deck-open .main { transform: none; visibility: visible; }
+    @media (prefers-reduced-motion: reduce) { .main { transition: none; } }
+    .scrim { display: none; }
+
+    /* The deck's close button: a solid 44px chevron in the top-left corner. */
+    .nav-toggle {
+        top: max(var(--space-3), env(safe-area-inset-top));
+        left: max(var(--space-3), env(safe-area-inset-left));
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        background: var(--color-bg-overlay);
+        border: 1px solid var(--color-border-soft);
+        color: var(--color-text-primary);
+    }
+
+    .mini:not([hidden]) {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-top: auto;
+        padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
+        background: var(--color-bg-base);
+        border-top: 1px solid var(--color-border);
+    }
+    .mini-open {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: 52px;
+        padding: 0;
+        background: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .mini-art {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        object-fit: cover;
+        background: #f4f1e9;   /* the cassette label's paper */
+    }
+    .mini-meta { display: flex; flex-direction: column; min-width: 0; }
+    .mini-title, .mini-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mini-sub { font-size: var(--text-sm); color: var(--color-text-muted); }
+    .mini-play {
+        width: 48px;
+        height: 48px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        border: 0;
+        background: var(--color-accent);
+        color: #1b1b1b;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .mini-play .icn { width: 22px; height: 22px; }
+
+    /* 44px touch targets */
+    .tl-add { min-width: 44px; min-height: 44px; }
+    .tape-mode { width: 44px; height: 44px; }
+    .back-btn, .tape-del, .ep-refresh { min-height: 44px; }
+    .mode-btn { min-height: 44px; }
+    .shelf-row, .browse-row { min-height: 48px; }
+    .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
+    #dlToggle { min-width: 44px; min-height: 44px; }
+    .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
+
+    /* New tape / show: at the top of the shelf, so the keyboard can't cover it. */
+    .shelf .new-tape, .podcasts-view .new-tape { order: -1; border-top: 0; border-bottom: 1px solid var(--color-border); }
+
+    /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
+       inline top/left, so the sheet placement needs !important. */
+    .menu {
+        top: auto !important;
+        left: 0 !important;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: none;
+        max-height: 70dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-2) var(--space-2) calc(var(--space-3) + env(safe-area-inset-bottom));
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5);
+        transform-origin: bottom center !important;
+        animation: sheet-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .menu-item { min-height: 48px; display: flex; align-items: center; font-size: var(--text-base); }
+    .menu-head { display: block; }
+    @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+
+    /* Edit dialog: anchored to the top so the keyboard never covers Save. */
+    .modal-scrim { align-items: flex-start; padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
+}
+

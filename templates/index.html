@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tapes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,8 +14,6 @@
 </head>
 <body>
   <div class="app" id="app">
-    <!-- Start the drawer closed on phones, set before the sidebar paints to avoid a flash. -->
-    <script>if (window.matchMedia("(max-width: 640px)").matches) document.getElementById("app").classList.add("nav-collapsed");</script>
     <aside class="sidebar">
       <div class="sidebar-head">
         <h1><span class="accent">▰▰</span> TAPES</h1>
@@ -112,10 +110,19 @@
         <div class="tape-title-row"><div class="tape-title" id="browseTitle"></div></div>
         <ul class="shelf-list" id="browseList"></ul>
       </div>
+
+      <!-- Phones: what's playing, always in reach while browsing; tap to open the deck. -->
+      <div class="mini" id="mini" hidden>
+        <button class="mini-open" id="miniOpen" type="button" aria-label="Open the player">
+          <img class="mini-art" id="miniArt" alt="">
+          <span class="mini-meta"><span class="mini-title" id="miniTitle"></span><span class="mini-sub" id="miniSub"></span></span>
+        </button>
+        <button class="mini-play" id="miniPlay" type="button" aria-label="Play"></button>
+      </div>
     </aside>
 
     <main class="main">
-      <button class="btn btn-ghost nav-toggle" id="navToggle" title="Toggle navigator">☰</button>
+      <button class="btn btn-ghost nav-toggle" id="navToggle" title="Library" aria-label="Library"></button>
 
       <div class="deck">
         <div class="cassette" id="cassette">
@@ -227,7 +234,10 @@
         </div>
 
         <div class="controls">
-          <div class="scrub" id="scrub"><div class="scrub-fill" id="scrubFill"></div></div>
+          <div class="scrub" id="scrub" role="slider" aria-label="Seek" tabindex="0"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="scrub-fill" id="scrubFill"></div><div class="scrub-thumb" id="scrubThumb"></div>
+          </div>
           <div class="times"><span id="curTime">0:00</span><span id="durTime">0:00</span></div>
           <div class="transport">
             <button class="tbtn" id="prevBtn" title="Previous" aria-label="Previous"></button>

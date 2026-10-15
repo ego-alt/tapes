@@ -74,6 +74,8 @@
     repeatOne: svgIcon('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/>'),
     list: svgIcon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
     chevronUp: svgIcon('<path d="m6 15 6-6 6 6"/>'),
+    chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
+    library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
   };
 
@@ -388,6 +390,7 @@
   function openEpisodeMenu(e, ep) {
     menu.dataset.for = "ep" + ep.id;
     menu.innerHTML = "";
+    menu.appendChild(menuHead(ep.title));
     // Loose episodes can be filed into a tape (in-place picker — see submenuItem).
     if (ep.show_id == null)
       menu.appendChild(submenuItem("Add to tape…", () => openAssignMenu(e, ep)));
@@ -451,7 +454,6 @@
     queue = list.slice();
     qi = i;
     loadCurrent(true);
-    if (isMobile()) closeNav();
   }
   // Show a "downloading…" deck state and fetch an episode that was reached before
   // it was downloaded; onPodcastJobDone plays it once the job completes.
@@ -462,6 +464,7 @@
     labelArt.removeAttribute("src");
     markActive();
     updateUpNext();
+    updateMini();
     pendingPlays[t.id] = { list: queue, i: qi };
     jsend(`api/podcast/episodes/${t.id}/play`, "POST").then((r) => r.json()).then((res) => {
       if (res.ready) { t.status = "ready"; loadCurrent(true); }
@@ -593,9 +596,34 @@
       (t.title + " " + t.artist + " " + t.album).toLowerCase().includes(q)) : view);
   }
 
-  // ---------- mobile drawer ----------
-  const isMobile = () => window.matchMedia("(max-width: 640px)").matches;
-  const closeNav = () => app.classList.add("nav-collapsed");
+  // ---------- phone layout: library first, deck slides up ----------
+  const phoneQuery = window.matchMedia("(max-width: 640px)");
+  const isMobile = () => phoneQuery.matches;
+  const openDeck = () => app.classList.add("deck-open");
+  const closeDeck = () => app.classList.remove("deck-open");
+  function updateNavToggle() {
+    const b = $("navToggle");
+    b.innerHTML = isMobile() ? ICONS.chevronDown : ICONS.library;
+    const label = isMobile() ? "Back to library" : "Show or hide the library";
+    b.title = label;
+    b.setAttribute("aria-label", label);
+  }
+  phoneQuery.addEventListener("change", updateNavToggle);
+
+  // The phone mini-player mirrors the deck: art, title, play/pause.
+  function updateMini() {
+    const t = currentTrack();
+    $("mini").hidden = !t;
+    if (!t) { closeDeck(); return; }
+    $("miniTitle").textContent = t.title;
+    $("miniSub").textContent = t.kind === "episode" ? (t.show || "Podcast")
+      : [t.artist, t.album].filter(Boolean).join(" · ") || "Unknown artist";
+    const art = artUrl(t);
+    if (art) $("miniArt").src = art; else $("miniArt").removeAttribute("src");
+    const playing = !audio.paused;
+    $("miniPlay").innerHTML = playing ? ICONS.pause : ICONS.play;
+    $("miniPlay").setAttribute("aria-label", playing ? "Pause" : "Play");
+  }
 
   // ---------- playback ----------
   function shuffleArray(a) {
@@ -616,7 +644,6 @@
       qi = i;
     }
     loadCurrent(true);
-    if (isMobile()) closeNav();   // reveal the deck once a track is picked
   }
   function loadCurrent(autoplay) {
     const t = queue[qi];
@@ -644,6 +671,7 @@
     if (isEp) savePodcastSession(); else savePlaystate();
     prefetchNext();
     updateUpNext();
+    updateMini();
   }
   // Warm the browser/nginx cache for the next track so skips start instantly.
   let prefetchEl = null, prefetchId = null;
@@ -769,6 +797,10 @@
     upnext.classList.toggle("expanded");
     if (upnext.classList.contains("expanded")) renderQueue();
   }
+  // Tapping outside the open queue closes it (it's a sheet on phones).
+  document.addEventListener("click", (e) => {
+    if (upnext.classList.contains("expanded") && !upnext.contains(e.target)) upnext.classList.remove("expanded");
+  });
   function renderQueue() {
     const el = $("queueList");
     el.innerHTML = "";
@@ -796,7 +828,7 @@
     baseQueue = queue.slice();
     if (!queue.length) {
       qi = -1; audio.pause(); audio.removeAttribute("src");
-      updateUpNext(); markActive(); savePlaystate(); return;
+      updateUpNext(); markActive(); updateMini(); savePlaystate(); return;
     }
     if (wasCurrent) {
       qi = Math.min(i, queue.length - 1);
@@ -909,6 +941,7 @@
       labelTitle.textContent = cur.title;
       labelArtist.textContent = [cur.artist, cur.album].filter(Boolean).join(" — ");
       document.title = cur.title + (cur.artist ? " · " + cur.artist : "");
+      updateMini();
     }
     loadShelf();   // album/artist counts may have shifted
   }
@@ -953,6 +986,13 @@
     item.addEventListener("click", (ev) => { ev.stopPropagation(); opener(); });
     return item;
   }
+  // Shown as the bottom sheet's title on phones (which song this menu is for).
+  function menuHead(text) {
+    const h = document.createElement("div");
+    h.className = "menu-head";
+    h.textContent = text;
+    return h;
+  }
   function menuSep() {
     const s = document.createElement("div");
     s.className = "menu-sep";
@@ -966,6 +1006,7 @@
   function openMenu(e, t) {
     menu.dataset.for = t.id;
     menu.innerHTML = "";
+    menu.appendChild(menuHead(t.title));
     // On a tape, taking a song off the tape comes first; deleting it from the
     // whole library is the rare, separate action below the divider.
     if (currentTape && currentTape.kind === "user") {
@@ -990,6 +1031,7 @@
   function openAddMenu(e, t) {
     menu.dataset.for = "add" + t.id;
     menu.innerHTML = "";
+    menu.appendChild(menuHead(`Add “${t.title}” to…`));
     menu.appendChild(menuItem("Queue", () => addToQueue(t), closeMenu));
     const tapes = shelf.filter((s) => s.kind === "user");
     if (tapes.length) {
@@ -1335,8 +1377,10 @@
     $("shelfView").hidden = false;
     loadShelf();
   });
-  $("navToggle").addEventListener("click", () => app.classList.toggle("nav-collapsed"));
-  $("scrim").addEventListener("click", closeNav);
+  $("navToggle").addEventListener("click", () =>
+    isMobile() ? closeDeck() : app.classList.toggle("nav-collapsed"));
+  $("miniOpen").addEventListener("click", openDeck);
+  $("miniPlay").addEventListener("click", togglePlay);
   $("search").addEventListener("input", applySearch);
   // Both "New tape" forms (music + podcast) share the create boilerplate.
   function wireCreateForm(formId, inputId, onSubmit) {
@@ -1356,14 +1400,16 @@
   });
 
   audio.addEventListener("play", () => {
-    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause;
+    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini();
     const t = currentTrack();
     // Play counts are a music-catalog thing (no Play row for episodes).
     if (t && t.kind !== "episode" && t.id !== lastPlayed) {
       lastPlayed = t.id; jsend("api/plays", "POST", { track_id: t.id });
     }
   });
-  audio.addEventListener("pause", () => { cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; savePlaystate(); });
+  audio.addEventListener("pause", () => {
+    cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; updateMini(); savePlaystate();
+  });
   audio.addEventListener("ended", () => {
     if (sleepEndOfTrack) { clearSleep(); audio.pause(); return; }  // sleep: stop, don't advance
     const t = currentTrack();
@@ -1372,8 +1418,10 @@
   });
   audio.addEventListener("loadedmetadata", () => { durTime.textContent = fmt(audio.duration); });
   audio.addEventListener("timeupdate", () => {
-    curTime.textContent = fmt(audio.currentTime);
-    if (audio.duration) scrubFill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
+    if (!scrubbing) {   // don't fight the user's drag
+      curTime.textContent = fmt(audio.currentTime);
+      if (audio.duration) paintScrub(audio.currentTime / audio.duration);
+    }
     const t = currentTrack();
     if (t && t.kind === "episode") maybeSaveEpisodeTick(t);
     else if (t && !audio.paused && Date.now() - lastMusicSave > 15000) {
@@ -1381,14 +1429,55 @@
       savePlaystate();
     }
   });
-  scrub.addEventListener("click", (e) => {
-    if (!audio.duration) return;
+  // Scrub: press, drag and release (mouse or finger). While dragging the fill,
+  // thumb and time follow the pointer; the seek happens on release.
+  let scrubbing = false;
+  const scrubFrac = (e) => {
     const r = scrub.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  function paintScrub(frac) {
+    scrubFill.style.width = frac * 100 + "%";
+    $("scrubThumb").style.left = frac * 100 + "%";
+    scrub.setAttribute("aria-valuenow", String(Math.round(frac * 100)));
+  }
+  scrub.addEventListener("pointerdown", (e) => {
+    if (!audio.duration) return;
+    scrubbing = true;
+    scrub.classList.add("dragging");
+    try { scrub.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    const f = scrubFrac(e);
+    paintScrub(f);
+    curTime.textContent = fmt(f * audio.duration);
+  });
+  scrub.addEventListener("pointermove", (e) => {
+    if (!scrubbing) return;
+    const f = scrubFrac(e);
+    paintScrub(f);
+    curTime.textContent = fmt(f * audio.duration);
+  });
+  function endScrub(e) {
+    if (!scrubbing) return;
+    scrubbing = false;
+    scrub.classList.remove("dragging");
+    audio.currentTime = scrubFrac(e) * audio.duration;
     savePlaystate();
+  }
+  scrub.addEventListener("pointerup", endScrub);
+  scrub.addEventListener("pointercancel", () => { scrubbing = false; scrub.classList.remove("dragging"); });
+  // Keyboard on the focused scrub: ←/→ 5 s.
+  scrub.addEventListener("keydown", (e) => {
+    if (!audio.duration || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { upnext.classList.remove("expanded"); closeMenu(); closeSleep(); }
+    if (e.key === "Escape") {
+      const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !sleepMenu.hidden;
+      upnext.classList.remove("expanded"); closeMenu(); closeSleep();
+      if (!anyOpen && isMobile()) closeDeck();
+    }
     if (e.target.tagName === "INPUT" || e.target.isContentEditable) return;
     if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     if (e.key === "ArrowRight" && e.shiftKey) next(true);
@@ -1416,6 +1505,7 @@
   });
 
   // ---------- init ----------
+  updateNavToggle();
   $("prevBtn").innerHTML = ICONS.prev;
   playBtn.innerHTML = ICONS.play;
   $("nextBtn").innerHTML = ICONS.next;

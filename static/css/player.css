@@ -120,7 +120,26 @@
     border-radius: var(--radius-pill);
     cursor: pointer;
     position: relative;
+    touch-action: none;   /* the scrub owns horizontal drags */
 }
+/* A 44px-tall invisible hit area around the 6px line. */
+.scrub::before { content: ""; position: absolute; inset: -19px 0; }
+.scrub-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    background: var(--scrubber-fill);
+    box-shadow: 0 1px 4px var(--color-shadow);
+    opacity: 0;
+    transition: opacity 0.12s;
+    pointer-events: none;
+}
+.scrub:hover .scrub-thumb, .scrub.dragging .scrub-thumb, .scrub:focus-visible .scrub-thumb { opacity: 1; }
+.scrub:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 6px; }
 .scrub-fill {
     height: 100%;
     width: 0;
@@ -258,6 +277,22 @@
         width: min(92vw, 440px);
         max-width: 92vw;
     }
+    /* Up Next: a full-width bottom sheet instead of a floating card. */
+    .upnext {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: none;
+        align-items: stretch;
+        gap: 0;
+        padding: 0 var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+    }
+    .upnext.expanded { background: var(--color-bg-elevated); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5); padding-top: var(--space-2); }
+    .upnext-bar { justify-content: center; min-height: 44px; }
+    .upnext-panel { width: 100%; max-height: 60dvh; border: 0; box-shadow: none; background: none; }
+    .q-drag, .q-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .tbtn.sleep { width: 46px; height: 46px; }
 }
 
 /* Short viewports (landscape phones): shrink the deck so transport stays on-screen. */
