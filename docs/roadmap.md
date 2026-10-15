@@ -64,8 +64,6 @@ choice. Updated 2026-06-15.
 
 ## Backlog / robustness
 
-- **Downloader filename collisions** — `-o "%(title)s.%(ext)s"` can clobber; the
-  "newest mp3" fallback is fragile under concurrency. Dedupe + safer naming.
 - **`--prune-covers`** housekeeping for orphaned cover thumbnails.
 - **More tests** — `tests/` covers the API safety nets (edits, trash, rips,
   podcasts, metadata); the cleanup/sort/browse logic is still worth covering.

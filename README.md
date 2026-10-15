@@ -98,6 +98,11 @@ Changing the schema: edit `models.py`, then
 `uv run flask --app app:create_app db migrate -m "what changed"`, review the
 file it writes under `migrations/versions/`, and commit it.
 
+Rips are filed as `MUSIC_DIR/Artist/Album/NN Title.mp3` (or `Artist/Title.mp3`
+without an album) once their tags are cleaned; same-named rips get " (2)".
+While a rip runs it works in `MUSIC_DIR/.incoming/<job>/`, which scans skip.
+Songs you add by hand can live anywhere under `MUSIC_DIR`.
+
 Deleting a song moves it to `MUSIC_DIR/.trash/` (with an Undo toast); it's
 removed for good after 30 days, on the next delete or via `purge-trash`. Set
 `TAPES_ADMINS` (comma-separated usernames) to limit deleting and library-wide

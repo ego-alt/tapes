@@ -226,6 +226,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** Every rip is saved flat as `MUSIC_DIR/<raw YouTube title>.mp3`, so two different videos with the same title collide. The fallback that picks "the newest MP3 in the folder" breaks if two rips finish together. In a collision, the cleanup can re-tag the *existing* file with the new song's metadata. The roadmap already lists this.
 - **Where:** `downloader.py` `_process`
 - **Fix:** Rip into a temp dir named by job id, then move to `Artist/Album/NN Title.mp3` after tagging, adding a suffix on collision.
+- **Status:** Done. Each rip downloads into its own `MUSIC_DIR/.incoming/<job>/` folder (skipped by scans, always removed afterwards), so the *newest MP3* fallback only ever sees that job's file, and tag cleanup can't touch another song. Once tagged, the file moves to `Artist/Album/NN Title.mp3` (or `Artist/Title.mp3`, or `Unknown artist/…`), with unsafe characters replaced. A name clash gets *(2)*, *(3)*, claimed with an exclusive create so two rips finishing together can't overwrite each other. Existing flat files are left where they are. Verified with a real rip (filed as `jawed/Me at the zoo.mp3`), with tests for the naming and for three same-named rips.
 
 **4.8 Podcast deletes behave unexpectedly**
 - **What:** Deleting a show deletes every downloaded episode (the confirm does say so). Deleting an episode from a followed show brings it back as new on the next refresh, which the code notes but the UI doesn't explain.

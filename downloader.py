@@ -2,7 +2,9 @@ import json
 import logging
 import pathlib
 import queue
+import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -177,6 +179,58 @@ def _find_dup(duration: int, fp: list):
     return None
 
 
+# Characters that don't belong in a file or folder name on any common system.
+_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def _safe_part(text: str, limit: int = 100) -> str:
+    """One path component from a tag value: unsafe characters out, no leading
+    dots (hidden files) or trailing dots/spaces (Windows/SMB), bounded length."""
+    part = _UNSAFE.sub("_", text or "").strip().lstrip(".").rstrip(". ")
+    return part[:limit].rstrip(". ") or "_"
+
+
+def _library_path(music_dir: pathlib.Path, mp3: str) -> pathlib.Path:
+    """Where a finished rip lives: Artist/Album/NN Title.mp3 (or Artist/Title.mp3
+    without an album), from its cleaned tags."""
+    title = artist = album = None
+    track_no = None
+    try:
+        from mutagen.easyid3 import EasyID3
+        tags = EasyID3(mp3)
+        title = (tags.get("title") or [None])[0]
+        artist = (tags.get("artist") or [None])[0]
+        album = (tags.get("album") or [None])[0]
+        m = re.match(r"\d+", (tags.get("tracknumber") or [""])[0])
+        track_no = int(m.group()) if m else None
+    except Exception:  # noqa: BLE001 — untagged: fall back to the file name
+        pass
+    name = _safe_part(title or pathlib.Path(mp3).stem)
+    if album and track_no:
+        name = f"{track_no:02d} {name}"
+    folder = music_dir / _safe_part(artist or "Unknown artist")
+    if album:
+        folder = folder / _safe_part(album)
+    return folder / f"{name}.mp3"
+
+
+def _move_into_library(src: str, dest: pathlib.Path) -> pathlib.Path:
+    """Move a rip to `dest`, adding " (2)", " (3)"… if that name is taken. The
+    name is claimed with an exclusive create, so two rips finishing together
+    can't land on the same file."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    n = 1
+    while True:
+        cand = dest if n == 1 else dest.with_name(f"{dest.stem} ({n}){dest.suffix}")
+        try:
+            os.close(os.open(cand, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        except FileExistsError:
+            n += 1
+            continue
+        os.replace(src, cand)
+        return cand
+
+
 def _process(app, job_id: int):
     job = db.session.get(DownloadJob, job_id)
     if not job or job.status == "done":
@@ -202,14 +256,24 @@ def _process(app, job_id: int):
     db.session.commit()
 
     music_dir = pathlib.Path(app.config["MUSIC_DIR"])
-    music_dir.mkdir(parents=True, exist_ok=True)
+    # Each rip works in its own folder (a dot-dir, so scans skip it) and only
+    # moves into the library once tagged.
+    work = music_dir / ".incoming" / str(job.id)
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    try:
+        _rip(app, job, music_dir, work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
+
+def _rip(app, job, music_dir: pathlib.Path, work: pathlib.Path):
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "-x", "--audio-format", "mp3", "--audio-quality", "0",
         "--embed-thumbnail", "--embed-metadata", "--write-info-json",
         "--no-playlist", "--newline",
-        "-o", str(music_dir / "%(title)s.%(ext)s"), job.url,
+        "-o", str(work / "%(title)s.%(ext)s"), job.url,
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
@@ -248,10 +312,10 @@ def _process(app, job_id: int):
         raise RipError(friendly_rip_error(detail))
 
     if not final_mp3:
-        mp3s = sorted(music_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
+        mp3s = list(work.glob("*.mp3"))   # only this job's folder
         if not mp3s:
             raise RipError(_RIP_GENERIC)
-        final_mp3 = str(mp3s[-1])
+        final_mp3 = str(mp3s[0])
 
     # Content dedup: a different URL but the same recording? Fingerprint the audio
     # and, if we already have it, discard this copy instead of re-tagging it.
@@ -281,6 +345,7 @@ def _process(app, job_id: int):
     llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
     if app.config.get("ART_LOOKUP", True):
         _fetch_art(final_mp3)
+    final_mp3 = str(_move_into_library(final_mp3, _library_path(music_dir, final_mp3)))
     scan_library(music_dir, app.config["COVER_DIR"], full=False)
 
     rel = str(pathlib.Path(final_mp3).relative_to(music_dir))
