@@ -864,7 +864,7 @@
     $("edTitle").value = t.title || "";
     $("edArtist").value = t.artist || "";
     $("edAlbum").value = t.album || "";
-    $("edTrackNo").value = t.track_no || "";
+    $("edTrackNo").value = t.track_no == null ? "" : t.track_no;
     $("editModal").hidden = false;
     $("edTitle").focus();
   }
@@ -872,12 +872,21 @@
   async function saveEdit() {
     if (!editing) return;
     const id = editing.id;
+    // Send only what changed, so a field the form couldn't show (or the user
+    // didn't touch) is never overwritten with a blank.
+    const before = {
+      title: editing.title || "", artist: editing.artist || "",
+      album: editing.album || "", track_no: editing.track_no == null ? "" : String(editing.track_no),
+    };
+    const after = {
+      title: $("edTitle").value, artist: $("edArtist").value,
+      album: $("edAlbum").value, track_no: $("edTrackNo").value,
+    };
+    const changes = Object.fromEntries(Object.entries(after).filter(([k, v]) => v.trim() !== before[k].trim()));
+    if (!Object.keys(changes).length) { closeEdit(); return; }
     let updated;
     try {
-      updated = await jsend(`api/tracks/${id}`, "PATCH", {
-        title: $("edTitle").value, artist: $("edArtist").value,
-        album: $("edAlbum").value, track_no: $("edTrackNo").value,
-      }).then((r) => r.json());
+      updated = await jsend(`api/tracks/${id}`, "PATCH", changes).then((r) => r.json());
     } catch (e) { console.error(e); toast("Couldn't save changes."); return; }
     // Patch every in-memory copy of this track (view, queue, source order).
     [...view, ...queue, ...baseQueue].forEach((x) => {
@@ -950,9 +959,24 @@
   function openMenu(e, t) {
     menu.dataset.for = t.id;
     menu.innerHTML = "";
+    // On a tape, taking a song off the tape comes first; deleting it from the
+    // whole library is the rare, separate action below the divider.
+    if (currentTape && currentTape.kind === "user") {
+      menu.appendChild(menuItem("Remove from tape", () => removeFromTape(t), closeMenu));
+    }
     menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
+    menu.appendChild(menuSep());
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
     showMenuAt(e);
+  }
+  async function removeFromTape(t) {
+    const tape = currentTape;
+    try { await jsend(`api/playlists/${tape.key}/tracks/${t.id}`, "DELETE"); }
+    catch (err) { console.error(err); toast(`Couldn't remove it from ${tape.name}.`); return; }
+    view = view.filter((x) => x.id !== t.id);
+    applySearch();
+    loadShelf();
+    toast(`Removed from ${tape.name}`);
   }
   // "Add to…" picker (the + button): the queue, or any tape. Distinct dataset key
   // so it doesn't clash with the ⋯ more-menu's open/close toggle on the same row.
@@ -1130,7 +1154,7 @@
   }
 
   // ---------- playstate persistence ----------
-  let saveTimer = null, sessTimer = null;
+  let saveTimer = null, sessTimer = null, lastMusicSave = 0;
   function savePlaystate() {
     const cur = currentTrack();
     if (cur && cur.kind === "episode") {
@@ -1297,6 +1321,10 @@
     if (audio.duration) scrubFill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
     const t = currentTrack();
     if (t && t.kind === "episode") maybeSaveEpisodeTick(t);
+    else if (t && !audio.paused && Date.now() - lastMusicSave > 15000) {
+      lastMusicSave = Date.now();   // keep the saved playhead fresh while playing
+      savePlaystate();
+    }
   });
   scrub.addEventListener("click", (e) => {
     if (!audio.duration) return;
@@ -1311,7 +1339,26 @@
     if (e.key === "ArrowRight" && e.shiftKey) next(true);
     if (e.key === "ArrowLeft" && e.shiftKey) prev();
   });
-  window.addEventListener("beforeunload", savePlaystate);
+  // Closing or backgrounding the page: send the playhead right away with a
+  // beacon (a normal fetch would be cancelled, and savePlaystate debounces).
+  function beaconPlaystate() {
+    const cur = currentTrack();
+    if (!cur || !navigator.sendBeacon) return;
+    const send = (url, body) => navigator.sendBeacon(url,
+      new Blob([JSON.stringify(body)], { type: "application/json" }));
+    if (cur.kind === "episode") {
+      send(`api/podcast/episodes/${cur.id}/progress`, { position: audio.currentTime || 0 });
+      send("api/playstate", { context: "podcast", queue: queue.map((t) => t.id), index: qi });
+    } else {
+      send("api/playstate", {
+        context: "music", queue: queue.map((t) => t.id), index: qi, position: audio.currentTime || 0,
+      });
+    }
+  }
+  window.addEventListener("pagehide", beaconPlaystate);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") beaconPlaystate();
+  });
 
   // ---------- init ----------
   $("prevBtn").innerHTML = ICONS.prev;

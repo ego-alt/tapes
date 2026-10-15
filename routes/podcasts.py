@@ -191,11 +191,12 @@ def play(eid):
     return jsonify({"ready": False, "job_id": job.id, "episode": ep.to_dict()})
 
 
-@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/progress", methods=["PUT"])
+# POST for navigator.sendBeacon on page close (see /api/playstate).
+@podcasts_blueprint.route("/api/podcast/episodes/<int:eid>/progress", methods=["PUT", "POST"])
 @login_required
 def progress(eid):
     ep = _episode_or_404(eid)
-    data = request.json or {}
+    data = request.get_json(force=True, silent=True) or {}
     if "position" in data:
         ep.position_s = data.get("position") or 0
     if "played" in data:

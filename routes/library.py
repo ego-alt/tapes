@@ -407,7 +407,9 @@ def _hydrate_episode_ids(ids):
     return out
 
 
-@library_blueprint.route("/api/playstate", methods=["GET", "PUT"])
+# POST is for navigator.sendBeacon (which can only POST): the page saves its
+# playhead that way as it closes, when an ordinary fetch would be cancelled.
+@library_blueprint.route("/api/playstate", methods=["GET", "PUT", "POST"])
 @login_required
 def playstate():
     if request.method == "GET":
@@ -427,7 +429,7 @@ def playstate():
             position = s.position_s or 0
         return jsonify({"queue": queue, "index": s.cursor or 0, "position": position})
 
-    data = request.json or {}
+    data = request.get_json(force=True, silent=True) or {}
     context = "podcast" if data.get("context") == "podcast" else "music"
     s = db.session.get(PlaybackSession, (_uid(), context))
     if not s:

@@ -167,11 +167,13 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** The edit dialog fills its Track # field from `t.track_no`, but `Track.to_dict()` never sends `track_no`, so the field always opens blank. Saving sends an empty value, and the server stores `None` in both the database and the MP3 tag. In the test, "Warm Static" was track 1. After I changed only its title, its track number was gone.
 - **Where:** `models.py` `Track.to_dict`; `player.js` `openEdit`/`saveEdit`; `routes/library.py` `update_track`
 - **Fix:** Include `track_no` in `to_dict`. Only send fields the user actually changed.
+- **Status:** Done. Tracks now include `track_no`, and the edit form sends only the fields you changed. Verified: track 3, edit only the title, still track 3 in the database and the MP3 tag. Tests added.
 
 **4.2 The only way to take a song off a tape deletes it from the library** (confirmed)
 - **What:** Inside a tape, a row's "⋯" menu offers *Edit details…* and *Delete from library*. There's no *Remove from tape*. The API route exists (`DELETE /api/playlists/<id>/tracks/<track>`), but nothing in the UI calls it.
 - **Why:** Tidying a mixtape means permanently deleting the file for everyone in the household.
 - **Fix:** On a tape, put **Remove from tape** first and move *Delete from library* below a divider.
+- **Status:** Done. On a tape, ⋯ now leads with **Remove from tape** (toast "Removed from Road trip"); *Delete from library* sits below a divider. Verified in Chrome: the song leaves the tape and stays in the library.
 
 **4.3 Deleting from the library is permanent, and anyone can do it**
 - **What:** *Delete from library* unlinks the MP3 and wipes its tape links and play history after a browser `confirm()`. There's no undo or trash. The catalogue is shared, so any household member can delete (or edit, or rename the artist of) anyone's music.
@@ -184,6 +186,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** `beforeunload` calls `savePlaystate()`, which only *schedules* a save 400 ms later. The page is gone before it fires. In the test: playing at 14.5 s, close the tab, saved position `0.0`. Music position is otherwise saved only on pause, seek and track change.
 - **Where:** `player.js` `savePlaystate`, `beforeunload`
 - **Fix:** On `pagehide`/`visibilitychange`, send the position immediately with `navigator.sendBeacon`. Also save every ~10 s while playing.
+- **Status:** Done. On `pagehide` or when the page is backgrounded, the playhead is sent at once with `navigator.sendBeacon` (music session, or episode progress for podcasts); the API accepts POST for this. While playing it's also saved every 15 s. Verified: playing at 13.9 s, close the tab, saved 14.0.
 
 **4.5 Artist rename can silently merge into someone else**
 - **What:** Renaming an artist snaps the new name onto any existing spelling it resembles (`reconcile_artist`) without saying so. The tag rewrite runs in a background thread whose failures only reach the server log. There's no undo. The rename itself is reached by clicking the list title, which looks like a heading.
@@ -373,7 +376,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | Rank | Fix | Section | Size | Status |
 |---|---|---|---|---|
 | 1 | **Make phones work:** menus above the drawer, plus one global `[hidden]` rule (fixes ghost "Delete tape", "Refresh" and "Up Next") | 7.1, 2.11 | **Small** | Done |
-| 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | To do |
+| 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | Done |
 | 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | To do |
 | 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | To do |
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | To do |

@@ -47,6 +47,7 @@ class Track(db.Model):
             "title": self.title,
             "artist": self.artist or "",
             "album": self.album or "",
+            "track_no": self.track_no,
             "duration": self.duration_s or 0,
             "has_cover": bool(self.has_cover),
             "source_url": self.source_url or "",
