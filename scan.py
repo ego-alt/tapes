@@ -102,13 +102,14 @@ def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
     if not music_dir.is_dir():
         return {"error": f"MUSIC_DIR not found: {music_dir}"}
 
-    existing = {t.file_path: t for t in Track.query.all()}
+    existing = {t.file_path: t for t in Track.query.execution_options(include_deleted=True).all()}
     seen_rel = set()
     added = updated = skipped = pruned = 0
 
     for root, dirs, files in os.walk(music_dir):
         # Don't descend into the reserved podcast subdir — episodes aren't music.
-        dirs[:] = [d for d in dirs if d != PODCAST_DIRNAME]
+        # Nor into dot-dirs such as the .trash/ of deleted songs.
+        dirs[:] = [d for d in dirs if d != PODCAST_DIRNAME and not d.startswith(".")]
         for name in files:
             if pathlib.Path(name).suffix.lower() not in AUDIO_EXTS:
                 continue
@@ -147,7 +148,7 @@ def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
 
     if prune:
         for rel, track in existing.items():
-            if rel not in seen_rel:
+            if rel not in seen_rel and track.deleted_at is None:   # trashed files live elsewhere
                 db.session.delete(track)
                 pruned += 1
 
@@ -156,6 +157,13 @@ def scan_library(music_dir, cover_dir, *, full=False, prune=False) -> dict:
 
 
 def register_cli(app):
+    @app.cli.command("purge-trash")
+    @click.option("--days", default=30, show_default=True, help="Remove songs trashed more than this many days ago.")
+    def purge_trash_cmd(days):
+        """Permanently remove old songs from the library trash."""
+        from trash import purge_trash
+        click.echo(f"Purged {purge_trash(app, days)} song(s) from the trash.")
+
     @app.cli.command("scan")
     @click.option("--full", is_flag=True, help="Re-read every file, ignore the mtime cache.")
     @click.option("--prune", is_flag=True, help="Drop DB rows whose files are gone.")

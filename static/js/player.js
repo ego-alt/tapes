@@ -25,13 +25,52 @@
     return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
   };
 
-  function toast(msg) {
+  // toast("Saved") or toast("Deleted …", { action: "Undo", onAction }) — a
+  // toast with an action stays up longer so there's time to use it.
+  function toast(msg, { action, onAction } = {}) {
     const t = document.createElement("div");
     t.className = "toast";
-    t.textContent = msg;
+    t.setAttribute("role", "status");
+    const text = document.createElement("span");
+    text.textContent = msg;
+    t.appendChild(text);
+    const dismiss = () => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); };
+    if (action) {
+      const b = document.createElement("button");
+      b.className = "toast-action";
+      b.textContent = action;
+      b.addEventListener("click", (e) => { e.stopPropagation(); dismiss(); onAction(); });
+      t.appendChild(b);
+    }
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add("show"));
-    setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3200);
+    setTimeout(dismiss, action ? 8000 : 3200);
+  }
+
+  // In-app confirm: resolves true/false. `danger` styles the OK button red.
+  function askConfirm(text, { detail = "", ok = "OK", danger = false } = {}) {
+    return new Promise((resolve) => {
+      $("confirmText").textContent = text;
+      $("confirmDetail").textContent = detail;
+      $("confirmOk").textContent = ok;
+      $("confirmOk").classList.toggle("danger", danger);
+      $("confirmModal").hidden = false;
+      $("confirmOk").focus();
+      const done = (v) => {
+        $("confirmModal").hidden = true;
+        $("confirmOk").onclick = $("confirmCancel").onclick = $("confirmModal").onclick = null;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(v);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") { e.stopPropagation(); done(false); }
+        if (e.key === "Enter") { e.preventDefault(); done(true); }
+      };
+      $("confirmOk").onclick = () => done(true);
+      $("confirmCancel").onclick = () => done(false);
+      $("confirmModal").onclick = (e) => { if (e.target === $("confirmModal")) done(false); };
+      document.addEventListener("keydown", onKey, true);
+    });
   }
   // Both throw on a non-2xx or network failure so callers (and the global
   // unhandledrejection handler) can surface it instead of silently dying. The
@@ -158,8 +197,9 @@
       jsend(`api/playlists/${key}`, "PATCH", { name }).then(() => {
         if (currentTape) currentTape.name = name;
         loadShelf();
+        toast(`Renamed to “${name}”`);
         return name;
-      })) : null;
+      }).catch((e) => { toast(errText(e, "Couldn't rename the tape.")); throw e; })) : null;
     $("tapeDelBtn").hidden = kind !== "user";
     $("search").value = "";
     $("backBtn").textContent = "‹ Tapes";
@@ -241,23 +281,45 @@
     titleEl.contentEditable = "false";
     const renamable = parent === "artists";
     titleEl.classList.toggle("editable", renamable);
-    titleEl.onclick = renamable ? () => startTitleEdit((name, orig) =>
-      jsend("api/artists", "PATCH", { old: orig, new: name })
-        .then((r) => { if (!r.ok) throw new Error("rename failed"); return r.json(); })
-        .then(async (r) => {
-          // Refresh the (now-hidden) Artists list so going back reflects the
-          // rename/merge, then reload this artist's tracks under the final name.
-          browseRows = await jget("api/artists");
-          renderBrowse(browseRows);
-          openArtistTracks(r.name);
-          return r.name;
-        })) : null;
+    titleEl.onclick = renamable ? () => startTitleEdit((name, orig) => renameArtist(orig, name)) : null;
     $("tapeDelBtn").hidden = true;
     $("sortBar").hidden = true;
     $("backBtn").textContent = backLabel;
     $("search").value = "";
     renderTracks(view);
     showView("tracks");
+  }
+
+  // Rename an artist everywhere. If the new name matches an existing artist the
+  // tracks merge, so ask first; either way the toast offers Undo.
+  async function renameArtist(orig, name) {
+    const p = await jget(`api/artists/rename-preview?old=${encodeURIComponent(orig)}&new=${encodeURIComponent(name)}`);
+    const n = (k) => `${k} song${k === 1 ? "" : "s"}`;
+    if (p.merges_into && p.name !== orig) {
+      const ok = await askConfirm(`Merge into “${p.name}”?`, {
+        detail: `${n(p.tracks)} by “${orig}” will join ${n(p.merges_into)} already under “${p.name}”.`,
+        ok: "Merge",
+      });
+      if (!ok) throw new Error("cancelled");
+    }
+    const r = await jsend("api/artists", "PATCH", { old: orig, new: name }).then((x) => x.json());
+    browseRows = await jget("api/artists");
+    renderBrowse(browseRows);
+    openArtistTracks(r.name);
+    const note = r.tag_failures ? ` (${r.tag_failures} file tag${r.tag_failures === 1 ? "" : "s"} couldn't be updated)` : "";
+    toast(`Renamed to “${r.name}”${note}`, {
+      action: "Undo",
+      onAction: async () => {
+        try {
+          await jsend("api/tracks/artist", "PATCH", { track_ids: r.track_ids, artist: orig });
+          browseRows = await jget("api/artists");
+          renderBrowse(browseRows);
+          openArtistTracks(orig);
+          toast(`Changed back to “${orig}”`);
+        } catch (e) { console.error(e); toast(errText(e, "Couldn't undo the rename.")); }
+      },
+    });
+    return r.name;
   }
 
   // ---------- podcasts ----------
@@ -428,7 +490,7 @@
     toast("Download removed");
   }
   async function deleteEpisode(ep) {
-    if (!confirm(`Delete "${ep.title}"?`)) return;
+    if (!await askConfirm(`Delete “${ep.title}”?`, { detail: "Its download is removed too.", ok: "Delete", danger: true })) return;
     try { await jsend(`api/podcast/episodes/${ep.id}`, "DELETE"); }
     catch (err) { console.error(err); toast("Couldn't delete."); return; }
     episodes = episodes.filter((x) => x.id !== ep.id);
@@ -517,8 +579,11 @@
     finally { btn.disabled = false; btn.textContent = orig; }
   }
   async function deleteCurrentShow() {
-    if (!currentShow || !confirm(`Delete "${currentShow.title}" and its downloads?`)) return;
-    await jsend(`api/podcast/shows/${currentShow.id}`, "DELETE");
+    if (!currentShow) return;
+    if (!await askConfirm(`Delete “${currentShow.title}”?`, {
+      detail: "Its episodes and their downloads are removed.", ok: "Delete", danger: true })) return;
+    try { await jsend(`api/podcast/shows/${currentShow.id}`, "DELETE"); }
+    catch (e) { console.error(e); toast(errText(e, "Couldn't delete the show.")); return; }
     currentShow = null;
     openPodcasts();
   }
@@ -552,7 +617,8 @@
       }
     }
 
-    el.onblur = () => commit(true);
+    // Only Enter saves; tapping/clicking away cancels, so a stray tap can't rename.
+    el.onblur = () => commit(false);
     el.onkeydown = (e) => {
       if (e.key === "Enter") { e.preventDefault(); commit(true); }
       if (e.key === "Escape") commit(false);
@@ -945,15 +1011,37 @@
     }
     loadShelf();   // album/artist counts may have shifted
   }
+  // Delete goes to the trash; the toast's Undo brings it back (file, tapes and
+  // play history included).
   async function deleteTrack(t) {
-    if (!confirm(`Delete "${t.title}" from the library? This removes the file.`)) return;
     try { await jsend(`api/tracks/${t.id}`, "DELETE"); }
-    catch (e) { console.error(e); toast("Couldn't delete."); return; }
+    catch (e) { console.error(e); toast(errText(e, "Couldn't delete that song.")); return; }
     const idx = queue.findIndex((x) => x.id === t.id);
     if (idx >= 0) queueRemove(idx);   // handles current-track/qi/Up Next cleanup
     view = view.filter((x) => x.id !== t.id);
     applySearch();
     loadShelf();
+    toast(`Deleted “${t.title}”`, { action: "Undo", onAction: () => restoreTrack(t) });
+  }
+  async function restoreTrack(t) {
+    try { await jsend(`api/tracks/${t.id}/restore`, "POST"); }
+    catch (e) { console.error(e); toast(errText(e, "Couldn't restore that song.")); return; }
+    await loadShelf();
+    await reloadCurrentList();
+    toast(`Restored “${t.title}”`);
+  }
+  // Re-fetch whichever track list is open (after an undo changes it).
+  async function reloadCurrentList() {
+    if ($("tracksView").hidden) return;
+    if (currentTape) {
+      view = await jget(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
+    } else if (trackParent === "albums" || trackParent === "artists") {
+      const name = $("tapeTitle").textContent;
+      view = await jget(trackParent === "albums"
+        ? `api/albums/tracks?album=${encodeURIComponent(name)}`
+        : `api/artists/tracks?artist=${encodeURIComponent(name)}`);
+    }
+    applySearch();
   }
 
   // ---------- popover menus (add-to-tape, sleep timer) ----------
@@ -1370,8 +1458,11 @@
   });
   $("upnextBar").addEventListener("click", toggleUpNext);
   $("tapeDelBtn").addEventListener("click", async () => {
-    if (!currentTape || !confirm(`Delete tape "${currentTape.name}"?`)) return;
-    await jsend(`api/playlists/${currentTape.key}`, "DELETE");
+    if (!currentTape) return;
+    if (!await askConfirm(`Delete the tape “${currentTape.name}”?`, {
+      detail: "The songs stay in your library.", ok: "Delete", danger: true })) return;
+    try { await jsend(`api/playlists/${currentTape.key}`, "DELETE"); }
+    catch (e) { console.error(e); toast(errText(e, "Couldn't delete the tape.")); return; }
     currentTape = null;
     $("tracksView").hidden = true;
     $("shelfView").hidden = false;

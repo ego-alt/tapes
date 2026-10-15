@@ -1,7 +1,6 @@
 import json
 import logging
 import pathlib
-import threading
 from datetime import datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request
@@ -14,26 +13,15 @@ library_blueprint = Blueprint("library", __name__)
 log = logging.getLogger("tapes.library")
 
 
-def _write_artist_tags(music_dir, paths, new):
-    """Rewrite the ID3 artist tag across many files. Runs off the request thread
-    (file I/O only, no DB) so a multi-hundred-track rename doesn't block the HTTP
-    response — the DB row is already updated and authoritative."""
-    from mutagen.easyid3 import EasyID3
-    base = pathlib.Path(music_dir)
-    ok = 0
-    for rel in paths:
-        try:
-            audio = EasyID3(str(base / rel))
-            audio["artist"] = new
-            audio.save()
-            ok += 1
-        except Exception as e:  # noqa: BLE001 — DB stays the source of truth
-            log.warning("artist retag failed for %s: %s", rel, e)
-    log.info("artist rename: wrote tag to %d/%d files", ok, len(paths))
-
-
 def _uid():
     return current_user.id
+
+
+def _require_admin(message):
+    """Library-wide destructive actions are limited to TAPES_ADMINS when set."""
+    admins = current_app.config.get("ADMIN_USERS")
+    if admins and current_user.username not in admins:
+        abort(403, message)
 
 
 def _serialize(tracks):
@@ -78,7 +66,9 @@ def playlists():
     for p in Playlist.query.filter_by(user_id=uid).order_by(Playlist.created_at).all():
         shelf.append({
             "key": str(p.id), "name": p.name, "kind": "user",
-            "count": PlaylistTrack.query.filter_by(playlist_id=p.id).count(),
+            # Joined to Track so songs in the trash don't count.
+            "count": (db.session.query(PlaylistTrack).join(Track, Track.id == PlaylistTrack.track_id)
+                      .filter(PlaylistTrack.playlist_id == p.id).count()),
         })
     return jsonify(shelf)
 
@@ -238,13 +228,56 @@ def artists():
     return jsonify([{"name": a, "count": c} for a, c in rows])
 
 
+def _resolve_artist_name(old, new):
+    """The name a rename will actually use: snapped onto an existing spelling it
+    normalizes to (the canonical-override behaviour), excluding the old name."""
+    from cleaning import reconcile_artist
+    from models import distinct_artists
+    return reconcile_artist(new, [a for a in distinct_artists() if a != old])
+
+
+def _set_artist(tracks, name):
+    """Set the artist in the DB and the files. Returns how many tag writes failed
+    (the DB is authoritative either way)."""
+    from mutagen.easyid3 import EasyID3
+    base = pathlib.Path(current_app.config["MUSIC_DIR"])
+    failures = 0
+    for t in tracks:
+        t.artist = name
+        try:
+            audio = EasyID3(str(base / t.file_path))
+            audio["artist"] = name
+            audio.save()
+        except Exception as e:  # noqa: BLE001 — DB stays the source of truth
+            failures += 1
+            log.warning("artist tag write failed for %s: %s", t.file_path, e)
+    db.session.commit()
+    return failures
+
+
+@library_blueprint.route("/api/artists/rename-preview")
+@login_required
+def rename_artist_preview():
+    """What a rename would do, so the page can ask before merging two artists."""
+    old = (request.args.get("old") or "").strip()
+    new = (request.args.get("new") or "").strip()
+    if not old or not new:
+        abort(400, "Type the artist's new name.")
+    name = _resolve_artist_name(old, new)
+    return jsonify({
+        "name": name,
+        "tracks": Track.query.filter(Track.artist == old).count(),
+        "merges_into": Track.query.filter(Track.artist == name).count() if name != old else 0,
+    })
+
+
 @library_blueprint.route("/api/artists", methods=["PATCH"])
 @login_required
 def rename_artist():
-    """Rename one artist across the whole library: rewrite every matching track's
-    file tag (so a later `scan --full` can't revert it) and DB row. If the new
-    name normalizes to an artist that already exists, it merges onto that
-    spelling — the manual canonical override for a bad first-seen name."""
+    """Rename one artist across the whole library, in both the DB and the file
+    tags. If the new name normalizes to an artist that already exists, the tracks
+    merge onto that spelling. Returns the moved track ids so it can be undone."""
+    _require_admin("Only an admin can rename an artist across the library.")
     body = request.json or {}
     old = (body.get("old") or "").strip()
     new = (body.get("new") or "").strip()
@@ -253,26 +286,27 @@ def rename_artist():
     tracks = Track.query.filter(Track.artist == old).all()
     if not tracks:
         abort(404, "That artist isn't in the library any more.")
-
-    # Snap onto an existing spelling (excluding the one we're renaming away from).
-    from cleaning import reconcile_artist
-    from models import distinct_artists
-    new = reconcile_artist(new, [a for a in distinct_artists() if a != old])
+    new = _resolve_artist_name(old, new)
     if new == old:
-        return jsonify({"name": old, "updated": 0})
+        return jsonify({"name": old, "updated": 0, "track_ids": [], "tag_failures": 0})
+    failures = _set_artist(tracks, new)
+    return jsonify({"name": new, "updated": len(tracks),
+                    "track_ids": [t.id for t in tracks], "tag_failures": failures})
 
-    paths = [t.file_path for t in tracks]
-    for t in tracks:
-        t.artist = new
-    db.session.commit()
-    # Defer the (potentially hundreds of) file-tag writes so the request returns
-    # promptly; the rescan reads tags, but the DB is already canonical here.
-    threading.Thread(
-        target=_write_artist_tags,
-        args=(current_app.config["MUSIC_DIR"], paths, new),
-        daemon=True,
-    ).start()
-    return jsonify({"name": new, "updated": len(paths)})
+
+@library_blueprint.route("/api/tracks/artist", methods=["PATCH"])
+@login_required
+def set_tracks_artist():
+    """Set the artist on exactly these tracks (used to undo a rename/merge)."""
+    _require_admin("Only an admin can rename an artist across the library.")
+    body = request.json or {}
+    ids = [i for i in body.get("track_ids", []) if isinstance(i, int)]
+    name = (body.get("artist") or "").strip()
+    if not ids or not name:
+        abort(400, "Nothing to change.")
+    tracks = Track.query.filter(Track.id.in_(ids)).all()
+    failures = _set_artist(tracks, name)
+    return jsonify({"updated": len(tracks), "tag_failures": failures})
 
 
 @library_blueprint.route("/api/albums/tracks")
@@ -363,19 +397,27 @@ def update_track(track_id):
 @library_blueprint.route("/api/tracks/<int:track_id>", methods=["DELETE"])
 @login_required
 def delete_track(track_id):
-    """Remove a track from the library entirely — its file, tape links, and play
-    history. (The cover thumbnail is left; it's keyed by file hash and may be
-    shared.)"""
+    """Move a track to the trash (undoable via /restore). Its tape links and
+    play history are kept until the trash is purged."""
+    _require_admin("Only an admin can delete songs from the library.")
     t = Track.query.get_or_404(track_id)
-    try:
-        (pathlib.Path(current_app.config["MUSIC_DIR"]) / t.file_path).unlink(missing_ok=True)
-    except OSError as e:
-        log.warning("file delete failed for %s: %s", t.file_path, e)
-    PlaylistTrack.query.filter_by(track_id=track_id).delete()
-    Play.query.filter_by(track_id=track_id).delete()
-    db.session.delete(t)
-    db.session.commit()
+    from trash import purge_trash, trash_track
+    trash_track(current_app, t)
+    purge_trash(current_app)
     return "", 204
+
+
+@library_blueprint.route("/api/tracks/<int:track_id>/restore", methods=["POST"])
+@login_required
+def restore_track_route(track_id):
+    """Undo a delete."""
+    _require_admin("Only an admin can delete songs from the library.")
+    from trash import get_trashed, restore_track
+    t = get_trashed(track_id)
+    if t is None:
+        abort(404, "That song isn't in the trash any more.")
+    restore_track(current_app, t)
+    return jsonify(t.to_dict())
 
 
 # ---- plays / playstate ----

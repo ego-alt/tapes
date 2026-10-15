@@ -53,6 +53,10 @@ def create_app(config=None):
     app.config["FINGERPRINT_DEDUP"] = os.environ.get("FINGERPRINT_DEDUP", "1").lower() in ("1", "true", "yes")
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")
+    # Usernames allowed to delete songs from the shared library or rename an
+    # artist everywhere. Unset = everyone (a single-user install).
+    _admins = {u.strip() for u in os.environ.get("TAPES_ADMINS", "").split(",") if u.strip()}
+    app.config["ADMIN_USERS"] = _admins or None
 
     _root = os.environ.get("APPLICATION_ROOT", "").strip()
     app.config["APPLICATION_ROOT"] = _root if _root else "/"
@@ -142,6 +146,8 @@ def create_app(config=None):
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
             "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",
+            "ALTER TABLE tracks ADD COLUMN deleted_at DATETIME",
+            "CREATE INDEX IF NOT EXISTS ix_tracks_deleted_at ON tracks (deleted_at)",
             "ALTER TABLE download_jobs ADD COLUMN outcome VARCHAR",
             "ALTER TABLE download_jobs ADD COLUMN finished_at DATETIME",
             "ALTER TABLE download_jobs ADD COLUMN dismissed BOOLEAN DEFAULT 0",

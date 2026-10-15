@@ -1,5 +1,7 @@
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import event
+from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.sql import func
 
 db = SQLAlchemy()
@@ -40,6 +42,9 @@ class Track(db.Model):
     has_cover = db.Column(db.Boolean, default=False)
     mtime = db.Column(db.Float)
     added_at = db.Column(db.DateTime, server_default=func.now())
+    # Set while the track sits in the trash (file under MUSIC_DIR/.trash/);
+    # every query hides it unless run with execution_options(include_deleted=True).
+    deleted_at = db.Column(db.DateTime, index=True)
 
     def to_dict(self):
         return {
@@ -52,6 +57,16 @@ class Track(db.Model):
             "has_cover": bool(self.has_cover),
             "source_url": self.source_url or "",
         }
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _hide_trashed_tracks(state):
+    """Trashed tracks are invisible to every ORM query — shelves, counts, albums,
+    artists, streaming, dedup — unless a caller opts in with
+    execution_options(include_deleted=True) (scan, restore, purge)."""
+    if state.is_select and not state.execution_options.get("include_deleted", False):
+        state.statement = state.statement.options(
+            with_loader_criteria(Track, Track.deleted_at.is_(None), include_aliases=True))
 
 
 def distinct_artists():

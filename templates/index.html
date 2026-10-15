@@ -284,6 +284,18 @@
     </div>
   </div>
 
+  <!-- In-app confirmation (replaces the browser's confirm()). -->
+  <div class="modal-scrim" id="confirmModal" hidden>
+    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmText">
+      <div class="modal-head" id="confirmText"></div>
+      <div class="confirm-detail" id="confirmDetail"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="confirmOk" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.MUSIC = {
       streamBase: "{{ url_for('stream.stream', track_id=0) }}".slice(0, -1),

@@ -149,6 +149,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 **3.3 Two kinds of dialog**
 - **What:** Edit uses a styled in-app modal. Delete track, delete tape, delete show and delete episode use the browser's `confirm()`, and naming a show uses `prompt()`.
 - **Fix:** Replace confirms with Undo (see 4.3). Use the in-app modal style for naming.
+- **Status:** Partly done. Every `confirm()` (delete tape, show, episode) is now an in-app dialog stating the consequence (e.g. *The songs stay in your library.*), and deleting a song uses Undo instead. The one remaining `prompt()` (naming a show when filing an episode) is replaced with the podcast wording in #9.
 
 **3.4 Feedback depends on which half of the app you're in**
 - **What:** Podcast actions confirm themselves ("Added to …", "Download removed", "No new episodes"). Music actions don't: adding to a tape, queueing, creating or renaming a tape, deleting a track and renaming an artist are all silent. Adding a song that's already on the tape is silently ignored.
@@ -184,6 +185,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Fix:**
   - Move deleted files to `MUSIC_DIR/.trash/` with an Undo toast, and purge after 30 days.
   - Consider limiting library-wide delete and artist rename to an admin.
+- **Status:** Done. Delete from library moves the file to `MUSIC_DIR/.trash/` and stamps the row; one global query rule hides trashed songs everywhere (shelves, counts, albums, artists, tapes, streaming, dedup), and the scanner skips `.trash/`. The toast says *Deleted “X” · Undo*; Undo restores the file, its tapes and its play history. Trashed songs are purged after 30 days (on the next delete, or `flask purge-trash`). Setting `TAPES_ADMINS` limits delete and library-wide artist rename to those users (403 with a plain message for others). Verified in Chrome; tests added.
 
 **4.4 Closing the tab loses your place** (bug, confirmed)
 - **What:** `beforeunload` calls `savePlaystate()`, which only *schedules* a save 400 ms later. The page is gone before it fires. In the test: playing at 14.5 s, close the tab, saved position `0.0`. Music position is otherwise saved only on pause, seek and track change.
@@ -197,10 +199,12 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - Show what will happen: *"Merge 12 tracks into **The Reels** (already 30 tracks)?"*
   - Confirm when the tag writes finish, and offer Undo.
   - Give the rename a visible pencil.
+- **Status:** Done. Before a rename that would merge, an in-app dialog says *Merge into “The Reels”? 2 songs by “DJ Orphan” will join 3 songs already under “The Reels”.* Tags are written in the request, and failures are counted in the toast. *Renamed to “X” · Undo* restores exactly the moved songs, even after a merge. Renamable titles show a pencil. Verified in Chrome; tests added.
 
 **4.6 Tape names save on blur**
 - **What:** Tape titles are edited in place (`contentEditable`) and commit when focus leaves. A stray tap renames the tape, with no confirmation.
 - **Fix:** Save only on Enter or a ✓ button; Esc or tapping away cancels. Toast *"Renamed to …"*.
+- **Status:** Done. Tape and artist names save only on Enter; tapping or clicking away cancels. Tape renames toast *Renamed to “…”*. Verified.
 
 **4.7 Rips can collide on filename** **[code]**
 - **What:** Every rip is saved flat as `MUSIC_DIR/<raw YouTube title>.mp3`, so two different videos with the same title collide. The fallback that picks "the newest MP3 in the folder" breaks if two rips finish together. In a collision, the cleanup can re-tag the *existing* file with the new song's metadata. The roadmap already lists this.
@@ -387,7 +391,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 2 | **Stop losing data:** keep track numbers on edit, add *Remove from tape*, save position on close (`sendBeacon`) | 4.1, 4.2, 4.4 | **Small** | Done |
 | 3 | **Tell me what happened to my rip:** keep finished and failed jobs, show dedups, review card with Play / Edit, human error copy, JSON errors | 2.2, 2.3, 2.5, 1.5, 6 | **Medium** | Done |
 | 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | Done |
-| 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | To do |
+| 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | Done |
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | To do |
 | 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | To do |
 | 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | To do |

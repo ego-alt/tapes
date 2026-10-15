@@ -78,11 +78,17 @@ cd ../dashboard && uv run python scripts/sync_household_users.py
 ## Commands
 
 ```sh
+uv run flask --app app:create_app purge-trash [--days 30]               # empty the library trash
 uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
 uv run flask --app app:create_app retag [--write] [--llm] [--pending]  # clean (and enrich) tags
 uv run flask --app app:create_app art [--write] [--all]     # fetch cover art (MusicBrainz)
 uv run flask --app app:create_app fingerprint [--all]       # backfill acoustic fingerprints
 ```
+
+Deleting a song moves it to `MUSIC_DIR/.trash/` (with an Undo toast); it's
+removed for good after 30 days, on the next delete or via `purge-trash`. Set
+`TAPES_ADMINS` (comma-separated usernames) to limit deleting and library-wide
+artist renames to those users.
 
 `scan` is incremental (mtime/size cache); `--full` re-reads every file, `--prune`
 drops rows for deleted files. `art` looks up cover art on MusicBrainz for tracks
