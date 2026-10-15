@@ -110,4 +110,5 @@ def create_job():
     for job in jobs:
         enqueue(job.id)
 
-    return jsonify({"queued": len(jobs), "playlist": playlist_title}), 201
+    return jsonify({"queued": len(jobs), "playlist": playlist_title,
+                    "job_ids": [j.id for j in jobs]}), 201

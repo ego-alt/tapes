@@ -1098,6 +1098,9 @@
       const r = await jsend("api/downloads", "POST", { url }).then((x) => x.json());
       $("dlUrl").value = "";
       toast(r.playlist ? `Ripping ${r.queued} songs into a new tape, “${r.playlist}”` : "Ripping…");
+      // Count these as in flight, so even an instant result (already in the
+      // library) gets announced.
+      (r.job_ids || []).forEach((id) => { dlPrev[id] = { finished: false }; });
       handleJobs(await jget("api/downloads"));   // show the job right away
       openDlStream();
     } catch (err) {
