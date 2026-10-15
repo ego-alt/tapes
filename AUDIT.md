@@ -436,3 +436,16 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 Close runners-up:
 - **Collision-safe rip filenames in `Artist/Album/` folders** (4.7, medium).
 - **Installable and offline** (2.6, large; already on the roadmap).
+
+---
+
+## Added for the MCP server (2026-10-15)
+
+Endpoints for programmatic clients; the deck doesn't use them. See
+`dashboard/mcp/AUDIT.md` for the server's own audit, including two open items
+here:
+- feed and rip URLs aren't checked against internal addresses (§3.2);
+- deleting a playlist has no trash (§3.6).
+
+- `GET /api/tracks?q=&limit=`: search where every word must appear in the title, artist or album. At most 100 results.
+- `GET /api/playlists/<key>/tracks?limit=`: optional cap, applied in SQL.
