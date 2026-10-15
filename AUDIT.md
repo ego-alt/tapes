@@ -48,6 +48,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **Where:** `routes/library.py` `_is_single`
 - **Why:** As the library grows, Singles becomes a junk drawer with a friendly name.
 - **Fix:** Keep Singles for tracks marked as singles. Route the untagged ones into a "Needs tidying" shelf (see 1.5).
+- **Status:** Done. Singles now means songs with an artist but no album; songs with neither go to Needs tidying. Verified: the untagged file left Singles.
 
 **1.5 Metadata work is invisible**
 - **What:** Several cleanup steps run silently on every rip: the deterministic cleanup, the Claude pass, the MusicBrainz art lookup and the fingerprint dedup. You never see what they changed. Tracks the Claude pass missed (`needs_llm`) and tracks with no cover, album or artist aren't surfaced anywhere. Editing is one track at a time. Renaming an artist is hidden behind clicking the list title.
@@ -58,6 +59,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - Add a **Needs tidying** shelf for missing artist, album or cover and for `needs_llm` tracks, with a "Tidy with AI" action.
   - Add album-level editing (rename, cover, artist across the album).
   - Give artist rename a visible pencil.
+- **Status:** Done. After a rip, the panel shows what it was saved as (title, artist · album) with **Play** and **Edit** (2.3). A **Needs tidying** shelf appears whenever songs lack an artist or cover or missed the Claude pass, each tagged with why. **Tidy all** (or ⋯ → **Tidy up** on any song) re-runs the rip cleanup: deterministic cleanup, Claude when `ANTHROPIC_API_KEY` is set, and a MusicBrainz cover when one is missing. Albums have a renamable title and an **Edit album** sheet (name, one artist for every song, cover image), written to the DB and the file tags. Artist rename has a pencil and a merge preview (4.5). Verified in Chrome; tests added.
 
 ---
 
@@ -114,6 +116,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - **What:** A file with no tags shows its filename as the title and an empty second line. No "Unknown artist", and no artist, album or year at all. It doesn't appear under Artists or Albums, so it can only be found by scrolling All Tracks or searching.
 - **Where:** `scan.py` defaults; `routes/library.py` `artists`/`albums`
 - **Fix:** Show "Unknown artist" in muted italics, and list such tracks in the Needs tidying shelf (1.5).
+- **Status:** Done. A missing artist shows as *Unknown artist* in muted italics, and such songs are listed (with reasons) in Needs tidying instead of being findable only by scrolling.
 
 **2.9 Huge collections render everything at once** (measured)
 - **What:** With 3,010 tracks, opening All Tracks builds all 3,010 rows: 1.1–1.2 s on a fast Mac, so likely several times that on a phone. Search re-renders the whole list on every keystroke (0.14 s here). It only searches the list you have open; there's no library-wide search.
@@ -396,7 +399,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 | 4 | **Phone layout:** library as the main screen with a mini-player, full-screen deck, bottom sheets for Up Next and menus, 44px targets, draggable scrub | 7.6, 7.2, 7.3, 7.4 | **Large** | Done |
 | 5 | **Undoable delete and a trash**, with destructive library actions limited to an admin | 4.3, 4.5 | **Medium** | Done |
 | 6 | **Podcast listening basics:** ±15/30 s, speed, lock-screen seek, stream RSS episodes while they download | 8.1, 5 | **Medium** | Done |
-| 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | To do |
+| 7 | **Visible metadata care:** Needs-tidying shelf, album-level edit, visible artist rename with a merge preview | 1.5, 1.4, 2.8 | **Large** | Done |
 | 8 | **Reassuring first run and failures:** a first-run card on the deck, skip unplayable tracks with a message, remove the stale favorites docs | 2.1, 2.4, 1.1 | **Small** | To do |
 | 9 | **One voice:** shows vs tapes, SVG icons everywhere, toasts for every action, empty states that say what to do | 1.2, 3.1–3.5, 6 | **Medium** | To do |
 | 10 | **Speed and keys:** windowed lists, loading states, remembered sort, library-wide search, shortcut set | 2.9, 2.10, 8.4, 8.5 | **Medium** | To do |

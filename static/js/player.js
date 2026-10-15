@@ -150,7 +150,7 @@
     shelf = await jget("api/playlists");
     const list = $("shelfList");
     list.innerHTML = "";
-    const icon = { all: "▤", singles: "♪", albums: "◉", artists: "♫" };
+    const icon = { all: "▤", singles: "♪", albums: "◉", artists: "♫", tidy: "✦" };
     let sepDone = false;
     shelf.forEach((s) => {
       // Subtle divider between the auto shelves and the user's own tapes.
@@ -209,6 +209,8 @@
         return name;
       }).catch((e) => { toast(errText(e, "Couldn't rename the tape.")); throw e; })) : null;
     $("tapeDelBtn").hidden = kind !== "user";
+    $("tidyBtn").hidden = key !== "tidy";
+    $("albumEditBtn").hidden = true;
     $("search").value = "";
     $("backBtn").textContent = "‹ Tapes";
     trackParent = "shelf";
@@ -287,9 +289,13 @@
     const titleEl = $("tapeTitle");
     titleEl.textContent = title;
     titleEl.contentEditable = "false";
-    const renamable = parent === "artists";
+    const renamable = parent === "artists" || parent === "albums";
     titleEl.classList.toggle("editable", renamable);
-    titleEl.onclick = renamable ? () => startTitleEdit((name, orig) => renameArtist(orig, name)) : null;
+    titleEl.onclick = !renamable ? null : parent === "artists"
+      ? () => startTitleEdit((name, orig) => renameArtist(orig, name))
+      : () => startTitleEdit((name, orig) => saveAlbum(orig, { name }).then((r) => r.album));
+    $("tidyBtn").hidden = true;
+    $("albumEditBtn").hidden = parent !== "albums";
     $("tapeDelBtn").hidden = true;
     $("sortBar").hidden = true;
     $("backBtn").textContent = backLabel;
@@ -654,7 +660,19 @@
         <button class="tl-add tl-addto" title="Add to…">${ICONS.plus}</button>
         <button class="tl-add tl-more" title="More">${ICONS.more}</button>`;
       li.querySelector(".tl-title").textContent = t.title;
-      li.querySelector(".tl-sub").textContent = [t.artist, t.album].filter(Boolean).join(" · ");
+      const sub = li.querySelector(".tl-sub");
+      if (t.artist) sub.textContent = [t.artist, t.album].filter(Boolean).join(" · ");
+      else {
+        const u = document.createElement("span");
+        u.className = "unknown"; u.textContent = "Unknown artist";
+        sub.append(u, t.album ? ` · ${t.album}` : "");
+      }
+      if (t.issues && t.issues.length) {
+        const chips = document.createElement("div");
+        chips.className = "tl-issues";
+        t.issues.forEach((x) => { const c = document.createElement("span"); c.className = "tl-issue"; c.textContent = x; chips.appendChild(c); });
+        li.querySelector(".tl-meta").appendChild(chips);
+      }
       li.querySelector(".tl-addto").addEventListener("click", (e) => { e.stopPropagation(); openAddMenu(e, t); });
       li.querySelector(".tl-more").addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1086,6 +1104,71 @@
     applySearch();
   }
 
+  // ---------- tidying + album edits ----------
+  async function tidy(ids) {
+    let changed = 0, ai = true;
+    for (let i = 0; i < ids.length; i += 25) {
+      const chunk = ids.slice(i, i + 25);
+      if (ids.length > 25) toast(`Tidying ${i + 1}–${i + chunk.length} of ${ids.length}…`);
+      const r = await jsend("api/tracks/tidy", "POST", { track_ids: chunk }).then((x) => x.json());
+      changed += r.changed.length; ai = r.ai;
+    }
+    await loadShelf();
+    await reloadCurrentList();
+    const n = (k) => `${k} song${k === 1 ? "" : "s"}`;
+    toast(`Tidied ${n(ids.length)} — ${changed ? `${changed} changed` : "nothing needed changing"}`
+      + (ai ? "" : ". AI tidying isn't set up (add ANTHROPIC_API_KEY)"));
+  }
+  $("tidyBtn").addEventListener("click", async () => {
+    const btn = $("tidyBtn"); btn.disabled = true; btn.textContent = "Tidying…";
+    try { await tidy(view.map((t) => t.id)); }
+    catch (e) { console.error(e); toast(errText(e, "Couldn't tidy those songs.")); }
+    finally { btn.disabled = false; btn.textContent = "Tidy all"; }
+  });
+
+  async function saveAlbum(album, { name, artist } = {}) {
+    const r = await jsend("api/albums", "PATCH", { album, name, artist }).then((x) => x.json());
+    await loadShelf();
+    if (name && name !== album) toast(`Renamed album to “${r.album}”`);
+    return r;
+  }
+  let albumCoverFile = null;
+  $("albumEditBtn").addEventListener("click", () => {
+    const album = $("tapeTitle").textContent;
+    $("alName").value = album;
+    $("alArtist").value = "";
+    albumCoverFile = null;
+    const withCover = view.find((t) => t.has_cover);
+    if (withCover) $("alCoverPreview").src = coverUrl(withCover.id); else $("alCoverPreview").removeAttribute("src");
+    $("albumModal").hidden = false;
+    $("alName").focus();
+  });
+  $("alCover").addEventListener("change", () => {
+    albumCoverFile = $("alCover").files[0] || null;
+    if (albumCoverFile) $("alCoverPreview").src = URL.createObjectURL(albumCoverFile);
+  });
+  const closeAlbum = () => { $("albumModal").hidden = true; $("alCover").value = ""; };
+  $("alCancel").addEventListener("click", closeAlbum);
+  $("albumModal").addEventListener("click", (e) => { if (e.target === $("albumModal")) closeAlbum(); });
+  $("alSave").addEventListener("click", async () => {
+    const album = $("tapeTitle").textContent;
+    const name = $("alName").value.trim();
+    const artist = $("alArtist").value.trim();
+    try {
+      if (albumCoverFile) {
+        const fd = new FormData();
+        fd.append("album", album); fd.append("cover", albumCoverFile);
+        const r = await fetch("api/albums/cover", { method: "POST", body: fd });
+        if (!r.ok) throw await failure(r, "POST api/albums/cover");
+      }
+      let final = album;
+      if ((name && name !== album) || artist) final = (await saveAlbum(album, { name, artist })).album;
+      closeAlbum();
+      await openAlbumTracks(final);
+      toast("Album saved");
+    } catch (e) { console.error(e); toast(errText(e, "Couldn't save the album.")); }
+  });
+
   // ---------- popover menus (add-to-tape, sleep timer) ----------
   // Measure-then-clamp into the viewport; the caller picks the tentative top/left
   // and the grow-from corner. Shared by both menus.
@@ -1143,6 +1226,7 @@
       menu.appendChild(menuItem("Remove from tape", () => removeFromTape(t), closeMenu));
     }
     menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
+    menu.appendChild(menuItem("Tidy up", () => tidy([t.id]).catch((e) => toast(errText(e, "Couldn't tidy that song."))), closeMenu));
     menu.appendChild(menuSep());
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
     showMenuAt(e);

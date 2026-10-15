@@ -47,6 +47,8 @@
         <div class="tape-nav">
           <button class="btn btn-ghost back-btn" id="backBtn">‹ Tapes</button>
           <button class="btn btn-ghost tape-del" id="tapeDelBtn" hidden>Delete tape</button>
+          <button class="btn btn-ghost tape-act" id="tidyBtn" hidden>Tidy all</button>
+          <button class="btn btn-ghost tape-act" id="albumEditBtn" hidden>Edit album</button>
         </div>
         <div class="search-wrap">
           <input class="input" id="search" type="search" placeholder="Search…" autocomplete="off">
@@ -283,6 +285,24 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="edCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="edSave" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-scrim" id="albumModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit album">
+      <div class="modal-head">Edit album</div>
+      <label class="modal-field">Album<input class="input" id="alName" autocomplete="off"></label>
+      <label class="modal-field">Artist for every song<input class="input" id="alArtist" placeholder="Leave blank to keep each song's artist" autocomplete="off"></label>
+      <div class="modal-field">Cover
+        <div class="album-cover-row">
+          <img class="album-cover-preview" id="alCoverPreview" alt="">
+          <label class="btn btn-secondary album-cover-pick">Choose image…<input type="file" id="alCover" accept="image/*" hidden></label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="alCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="alSave" type="button">Save</button>
       </div>
     </div>
   </div>

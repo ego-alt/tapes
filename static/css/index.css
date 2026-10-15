@@ -426,6 +426,13 @@ body {
     color: var(--color-text-primary);
 }
 
+.tape-act { font-size: var(--text-sm); color: var(--color-accent); }
+.tl-sub .unknown { font-style: italic; }
+.tl-issues { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-top: 2px; }
+.tl-issue { font-size: 0.72rem; color: var(--color-accent); border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 0 6px; }
+.album-cover-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1); }
+.album-cover-preview { width: 64px; height: 64px; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-bg-inset); }
+.album-cover-preview:not([src]) { visibility: hidden; }
 .confirm-detail { color: var(--color-text-muted); font-size: var(--text-sm); margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 .confirm-detail:empty { display: none; }
 #confirmOk.danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }

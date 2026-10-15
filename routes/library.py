@@ -39,9 +39,27 @@ def _tracks_by_ids(ids):
 
 
 def _is_single():
-    """The 'single' rule (no album) in one place, so the shelf count and the
-    Singles track list can't drift apart."""
-    return or_(Track.album.is_(None), Track.album == "")
+    """The 'single' rule in one place, so the shelf count and the Singles list
+    can't drift apart: no album, but a known artist. Songs with neither are
+    'Needs tidying', not singles."""
+    return db.and_(or_(Track.album.is_(None), Track.album == ""),
+                   Track.artist.isnot(None), Track.artist != "")
+
+
+def _needs_tidying():
+    return or_(Track.artist.is_(None), Track.artist == "",
+               Track.has_cover.isnot(True), Track.needs_llm.is_(True))
+
+
+def _issues(t):
+    out = []
+    if not t.artist:
+        out.append("no artist")
+    if not t.has_cover:
+        out.append("no cover")
+    if t.needs_llm:
+        out.append("AI pass missed")
+    return out
 
 
 # ---- shelf ----
@@ -63,6 +81,9 @@ def playlists():
         {"key": "albums", "name": "Albums", "kind": "browse", "count": album_count},
         {"key": "artists", "name": "Artists", "kind": "browse", "count": artist_count},
     ]
+    tidy_count = Track.query.filter(_needs_tidying()).count()
+    if tidy_count:
+        shelf.append({"key": "tidy", "name": "Needs tidying", "kind": "builtin", "count": tidy_count})
     for p in Playlist.query.filter_by(user_id=uid).order_by(Playlist.created_at).all():
         shelf.append({
             "key": str(p.id), "name": p.name, "kind": "user",
@@ -142,6 +163,9 @@ def playlist_tracks(key):
     elif key == "singles":
         base = Track.query.filter(_is_single())
         tracks = _apply_sort(base, sort, _uid())
+    elif key == "tidy":
+        tracks = _apply_sort(Track.query.filter(_needs_tidying()), sort, _uid())
+        return jsonify([{**t.to_dict(), "issues": _issues(t)} for t in tracks])
     else:
         p = Playlist.query.filter_by(id=int(key), user_id=_uid()).first_or_404()
         rows = (db.session.query(Track).join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
@@ -307,6 +331,59 @@ def set_tracks_artist():
     tracks = Track.query.filter(Track.id.in_(ids)).all()
     failures = _set_artist(tracks, name)
     return jsonify({"updated": len(tracks), "tag_failures": failures})
+
+
+@library_blueprint.route("/api/albums", methods=["PATCH"])
+@login_required
+def edit_album_route():
+    """Rename an album and/or set one artist on all its songs (DB + file tags)."""
+    _require_admin("Only an admin can edit an album across the library.")
+    body = request.json or {}
+    album = (body.get("album") or "").strip()
+    name = (body.get("name") or "").strip() or None
+    artist = (body.get("artist") or "").strip() or None
+    if not album or not (name or artist):
+        abort(400, "Nothing to change.")
+    from metadata_ops import edit_album
+    tracks = edit_album(current_app, album, name=name, artist=artist)
+    if not tracks:
+        abort(404, "That album isn't in the library any more.")
+    return jsonify({"album": name or album, "updated": len(tracks)})
+
+
+@library_blueprint.route("/api/albums/cover", methods=["POST"])
+@login_required
+def album_cover():
+    """Set one cover image on every song of an album."""
+    _require_admin("Only an admin can edit an album across the library.")
+    album = (request.form.get("album") or "").strip()
+    upload = request.files.get("cover")
+    if not album or not upload:
+        abort(400, "Choose an image for the cover.")
+    from art import _to_jpeg
+    from metadata_ops import set_cover
+    jpg = _to_jpeg(upload.read())
+    if not jpg:
+        abort(400, "That file isn't an image tapes can read. Try a JPG or PNG.")
+    tracks = Track.query.filter(Track.album == album).all()
+    if not tracks:
+        abort(404, "That album isn't in the library any more.")
+    for t in tracks:
+        set_cover(current_app, t, jpg)
+    db.session.commit()
+    return jsonify({"album": album, "updated": len(tracks), "cover_id": tracks[0].id})
+
+
+@library_blueprint.route("/api/tracks/tidy", methods=["POST"])
+@login_required
+def tidy_route():
+    """Re-run the rip cleanup on these songs (at most 25 per call)."""
+    ids = [i for i in (request.json or {}).get("track_ids", []) if isinstance(i, int)][:25]
+    if not ids:
+        abort(400, "Nothing to tidy.")
+    from metadata_ops import tidy_tracks
+    tracks = Track.query.filter(Track.id.in_(ids)).all()
+    return jsonify(tidy_tracks(current_app, tracks))
 
 
 @library_blueprint.route("/api/albums/tracks")
