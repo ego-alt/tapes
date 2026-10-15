@@ -926,22 +926,20 @@
   // so it changes faster near the empty hub), and the hubs turn at the
   // speed constant tape speed implies: a small pack spins faster.
   const reels = (() => {
-    const HUB = 11, FULL = 25, CX = { L: 98, R: 232 }, CY = 112;
-    const TAPE_SPEED = 26;   // view-box units per second at the tape surface
+    // View-box geometry: hub centres, empty core and full pack radii. On a
+    // real C-cassette the full pack is a little over twice the core.
+    const CORE = 36, FULL = 80, CX = { L: 96.6, R: 238 }, CY = 91.5;
+    const TAPE_SPEED = 55;   // view-box units per second at the tape surface
     const el = (id) => document.getElementById(id);
-    const packL = el("packL"), packR = el("packR"), sheenL = el("sheenL"), sheenR = el("sheenR");
-    const reelL = el("reelL"), reelR = el("reelR"), runL = el("tapeRunL"), runR = el("tapeRunR");
+    const packL = el("packL"), packR = el("packR"), reelL = el("reelL"), reelR = el("reelR");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)");
     let angL = 0, angR = 0, last = 0, raf = 0;
-    const radius = (share) => Math.sqrt(HUB * HUB + share * (FULL * FULL - HUB * HUB));
+    const radius = (share) => Math.sqrt(CORE * CORE + share * (FULL * FULL - CORE * CORE));
     function setPacks() {
       const p = audio.duration ? Math.min(1, Math.max(0, audio.currentTime / audio.duration)) : 0;
       const rL = radius(1 - p), rR = radius(p);
-      packL.setAttribute("r", rL); sheenL.setAttribute("r", Math.max(HUB, rL - 2));
-      packR.setAttribute("r", rR); sheenR.setAttribute("r", Math.max(HUB, rR - 2));
-      // tape leaves each pack from its lower outer edge
-      runL.setAttribute("x1", CX.L - rL * 0.7); runL.setAttribute("y1", CY + rL * 0.7);
-      runR.setAttribute("x1", CX.R + rR * 0.7); runR.setAttribute("y1", CY + rR * 0.7);
+      packL.setAttribute("r", rL);
+      packR.setAttribute("r", rR);
       return [rL, rR];
     }
     function frame(t) {

@@ -17,85 +17,62 @@
 }
 .cassette-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-/* orange band; the reel window is smoked plastic (gradient in the SVG) */
-.band { fill: #ef6219; }
+/* The packs wind from left to right as the song plays and the hubs spin at
+   the speed real tape would turn them (see the reels code in player.js). */
+.tape-pack { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
 
-/* Tape packs wind from left to right as the song plays, and the hubs spin
-   at the speed real tape would turn them (see the reels code in player.js). */
-.tape-pack  { stroke: rgba(0,0,0,0.5); stroke-width: 0.6; }
-.pack-sheen {
-    fill: none; stroke: rgba(255,226,190,0.08); stroke-width: 3;
-    stroke-dasharray: 0.6 1.4;   /* faint winding rings */
-}
-.tape-run   { stroke: #3d2b1d; stroke-width: 1.4; }
-.head-tape  { stroke: #4a3424; stroke-width: 2.2; }
-
-/* band print */
-.band-arrow { fill: rgba(20,16,8,0.8); }
-
-/* ---- white INDEX label on the shell ---- */
+/* ---- the writing area of the paper label (drawn in the SVG) ----
+   Positions are fractions of the 330×206 cassette: the corner box holds the
+   album art, and the title and artist sit on the two printed lines. */
 .cassette-label {
     position: absolute;
-    top: 13%;
-    left: 6%;
-    right: 6%;
-    height: 23%;
-    background: #f4f1e9;
-    border-radius: 2px;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.2);
-    overflow: hidden;
-}
-.label-index {
-    position: absolute;
-    top: 6%;
-    left: 4%;
-    font: 700 clamp(0.38rem, 2.1cqw, 0.5rem) var(--font-sans);
-    letter-spacing: 1px;
-    color: #8f8a7e;
-    border: 1px solid #cfc8ba;
-    border-radius: 2px;
-    padding: 1px 5px;
+    top: 6.8%;
+    left: 4.7%;
+    right: 4.7%;
+    height: 25.2%;
 }
 .label-art {
     position: absolute;
-    top: 7%;
-    right: 4%;
-    height: 62%;
-    aspect-ratio: 1;
-    border-radius: 2px;
+    left: 1.6%;
+    top: 19.5%;
+    width: 7.6%;
+    height: 51%;
     object-fit: cover;
+    clip-path: polygon(17% 0, 100% 0, 100% 100%, 0 100%, 0 14%);   /* the box's cut corner */
     background: #ded3bc;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
 }
 .label-art:not([src]), .label-art[src=""] { display: none; }
-/* leave the thumbnail's corner free */
-.cassette-label:has(.label-art[src]:not([src=""])) .label-write { right: 17%; }
 .label-write {
     position: absolute;
-    left: 4%;
-    right: 4%;
-    bottom: 8%;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    /* faint ruled lines, like a written mixtape label */
-    background-image: repeating-linear-gradient(
-        to bottom, transparent 0, transparent calc(1.25em - 1px),
-        rgba(0,0,0,0.08) calc(1.25em - 1px), rgba(0,0,0,0.08) 1.25em);
+    left: 11.2%;
+    right: 2.6%;
+    top: 4%;
+    height: 69%;          /* down to the second printed line */
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    align-items: end;
+    transform: rotate(-0.5deg);   /* written by hand, not quite level */
+    transform-origin: left bottom;
 }
+/* Written on the label in pen. */
 .label-title {
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: clamp(0.62rem, 3.6cqw, 1rem);
-    line-height: 1.25em;
-    color: #20201d;
+    font-family: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+    font-weight: 700;
+    font-size: clamp(0.8rem, 4.6cqw, 1.45rem);
+    line-height: 1.15;
+    padding-bottom: 0.08em;
+    color: #1c2350;   /* blue-black ballpoint */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .label-artist {
-    font-family: var(--font-sans);
-    font-size: clamp(0.55rem, 2.9cqw, 0.85rem);
-    line-height: 1.25em;
-    color: #5a564d;
+    font-family: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+    font-weight: 500;
+    font-size: clamp(0.7rem, 3.9cqw, 1.2rem);
+    line-height: 1.15;
+    padding-bottom: 0.08em;
+    color: #2e3666;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
