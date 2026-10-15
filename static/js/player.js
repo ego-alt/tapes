@@ -1791,9 +1791,16 @@
   // A song that can't play (missing or damaged file): say so and move on, but
   // stop after three failures in a row rather than racing through the queue.
   let playErrors = 0;
-  audio.addEventListener("error", () => {
+  audio.addEventListener("error", async () => {
     const t = currentTrack();
     if (!t || !audio.getAttribute("src")) return;
+    // A dropped connection isn't a bad file (browsers often report it as an
+    // unsupported source): if the server can't be reached, hold the place and
+    // resume once it's back instead of skipping.
+    if (held || !(await serverReachable())) {
+      holdForReconnect();
+      return;
+    }
     if (t.kind === "episode") { toast("Couldn't play this episode."); return; }
     t.unavailable = true;
     [...$("trackList").children].forEach((li) => {
@@ -1809,6 +1816,59 @@
     next(true);
   });
   audio.addEventListener("playing", () => { playErrors = 0; });
+
+  // ---------- offline ----------
+  // The service worker keeps the app and its lists available offline (see
+  // static/js/sw.js); audio still needs the server. When the connection drops
+  // mid-song, say so, keep the place, and pick up there once it's back.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js", { scope: "./" })
+        .catch((err) => console.warn("Service worker registration failed:", err));
+    });
+  }
+  let held = null;          // { time, playing } while waiting to reconnect
+  let reconnectTimer = null;
+  async function serverReachable() {
+    if (!navigator.onLine) return false;
+    try { return (await fetch("healthz", { cache: "no-store" })).ok; }
+    catch (_) { return false; }
+  }
+  function holdForReconnect() {
+    const spot = { src: audio.currentSrc || audio.src, time: audio.currentTime || 0, playing: !audio.paused };
+    if (held) {
+      // Another failed load while waiting means a song was picked (or picked
+      // again) offline: follow it, and play it once we're back.
+      held = { ...spot, time: spot.src === held.src ? held.time : 0, playing: true };
+      return;
+    }
+    held = spot;
+    toast("Offline — reconnecting…");
+    // navigator.onLine misses a dead Wi-Fi or a server restart, so also poll.
+    reconnectTimer = setInterval(async () => {
+      if (await serverReachable()) resumeAfterReconnect();
+    }, 5000);
+  }
+  function resumeAfterReconnect() {
+    if (!held) return;
+    // A different song picked while offline starts from the top and plays.
+    const same = (audio.currentSrc || audio.src) === held.src;
+    const time = same ? held.time : 0, playing = same ? held.playing : true;
+    held = null;
+    clearInterval(reconnectTimer);
+    toast("Back online");
+    audio.addEventListener("loadedmetadata", function once() {
+      audio.removeEventListener("loadedmetadata", once);
+      audio.currentTime = time;
+      if (playing) audio.play().catch(() => { /* needs a tap */ });
+    });
+    audio.load();
+  }
+  window.addEventListener("offline", () => {
+    if (!audio.paused) toast("You're offline. This song plays on as far as it has loaded.");
+  });
+  window.addEventListener("online", () => { if (held) resumeAfterReconnect(); });
+  audio.addEventListener("waiting", () => { if (!navigator.onLine) holdForReconnect(); });
   $("upnextBar").addEventListener("click", toggleUpNext);
   $("tapeDelBtn").addEventListener("click", async () => {
     if (!currentTape) return;
@@ -2042,8 +2102,17 @@
   updateEpFilterBtns();
   enableReorder($("trackList"), onTrackReorder);
   enableReorder($("queueList"), onQueueReorder);
+  let lastNetToast = 0;
   window.addEventListener("unhandledrejection", (e) => {
     console.error(e.reason);
+    // A request that never reached the server (offline, server restarting):
+    // one calm note, not a toast per background save.
+    if (e.reason instanceof TypeError && !e.reason.userMessage) {
+      if (held || Date.now() - lastNetToast < 15000) return;
+      lastNetToast = Date.now();
+      toast("Can't reach Tapes right now. It'll catch up when the connection's back.");
+      return;
+    }
     toast(errText(e.reason, "Something went wrong — please try again."));
   });
   (async () => {

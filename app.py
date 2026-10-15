@@ -19,6 +19,7 @@ from routes import (
     index_blueprint,
     library_blueprint,
     podcasts_blueprint,
+    pwa_blueprint,
     stream_blueprint,
 )
 from scan import register_cli
@@ -89,6 +90,7 @@ def create_app(config=None):
     app.register_blueprint(library_blueprint)
     app.register_blueprint(downloads_blueprint)
     app.register_blueprint(podcasts_blueprint)
+    app.register_blueprint(pwa_blueprint)
 
     @app.errorhandler(HTTPException)
     def _json_errors(e):

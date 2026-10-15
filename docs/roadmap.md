@@ -52,9 +52,6 @@ choice. Updated 2026-06-15.
   silent stall. *effort: S*
 
 ### Tier 3 — bigger bets
-- **Installable PWA.** manifest + icons + service worker: home-screen install,
-  standalone chrome, themed splash, offline shell. Strong "real product" signal
-  on mobile. *effort: M–L*
 - **Offline downloads.** Cache tracks via the service worker for no-connection
   playback. Defining feature for a phone streamer. *effort: L*
 - **Search podcasts from the shelf too.** `/` and the shelf field search the
