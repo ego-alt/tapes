@@ -234,6 +234,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 **4.9 Edits can be lost by tapping outside**
 - **What:** Tapping the backdrop closes the edit dialog and discards any changes.
 - **Fix:** Ask *"Discard changes?"* when fields changed.
+- **Status:** Done. Tapping outside the song or album dialog, or pressing Escape, closes it straight away when nothing changed; with changes it asks *Discard your changes?* (Discard / keep editing, which returns focus to the form). Cancel still closes without asking.
 
 **4.10 Schema changes fail silently** **[code]**
 - **What:** New columns are added by "best-effort" `ALTER TABLE` statements that swallow every error, as the roadmap notes.
@@ -369,6 +370,7 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
   - Rows aren't focusable (`tabIndex -1`), so you can't Tab through the list.
   - The row **+** and **⋯** buttons are hover-only (`opacity: 0`); measured opacity when focused by keyboard: 0.
 - **Fix:** Make rows focusable (Enter plays), and show row buttons on `:focus-within`.
+- **Status:** Done. Shelf, browse, show, episode and track rows are in the Tab order with an accent focus ring; ↑/↓ move between rows and Enter opens or plays one. A focused row shows its + and ⋯ (they take the duration's place, as on hover), and Tab goes on into them.
 
 ---
 

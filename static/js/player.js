@@ -196,6 +196,7 @@
         sepDone = true;
       }
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.className = "shelf-row";
       li.innerHTML = `<span class="shelf-ico">${icon[s.key] || ICONS.tape}</span>
         <span class="shelf-name"></span><span class="shelf-count">${s.count}</span>`;
@@ -338,6 +339,7 @@
     }
     renderInChunks(el, rows, (r) => {
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.className = "browse-row";
       if (currentBrowse === "albums") {
         const art = r.cover_id
@@ -449,6 +451,7 @@
     }
     data.shows.forEach((s) => {
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.className = "browse-row";
       const art = s.has_image
         ? `<img class="browse-cover" src="${M.epShowCoverBase + s.id}" alt="" loading="lazy" decoding="async">`
@@ -463,6 +466,7 @@
     });
     if (data.loose_count) {
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.className = "browse-row";
       li.innerHTML = `<span class="browse-cover browse-cover--blank">${ICONS.podcast}</span>
         <span class="browse-meta"><span class="browse-name">Unsorted episodes</span></span>
@@ -515,6 +519,7 @@
     }
     renderInChunks(el, list, (e, i) => {
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.dataset.id = e.id;
       li.className = e.played ? "played" : "";   // layout comes from .track-list li
       const pct = (!e.played && e.duration && e.position)
@@ -763,6 +768,7 @@
     const reorderable = !!(currentTape && currentTape.kind === "user") && !$("search").value.trim();
     const makeRow = (t, i) => {
       const li = document.createElement("li");
+      li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
       li.dataset.id = t.id;
       const handle = reorderable ? `<span class="tl-drag drag-handle" title="Drag to reorder" aria-hidden="true">${ICONS.grip}</span>` : "";
       li.innerHTML = `${handle}<span class="tl-num">${i + 1}</span>
@@ -1164,11 +1170,18 @@
     $("edTitle").focus();
   }
   function closeEdit() { $("editModal").hidden = true; editing = null; }
-  async function saveEdit() {
-    if (!editing) return;
-    const id = editing.id;
-    // Send only what changed, so a field the form couldn't show (or the user
-    // didn't touch) is never overwritten with a blank.
+  // Tapping outside or Escape with unsaved changes asks first; Cancel doesn't.
+  async function dismissEdit() {
+    if (editing && Object.keys(editChanges()).length
+        && !(await askConfirm("Discard your changes?", { ok: "Discard", danger: true }))) {
+      $("edTitle").focus();   // keep editing
+      return;
+    }
+    closeEdit();
+  }
+  // Only what changed, so a field the form couldn't show (or the user didn't
+  // touch) is never overwritten with a blank.
+  function editChanges() {
     const before = {
       title: editing.title || "", artist: editing.artist || "",
       album: editing.album || "", track_no: editing.track_no == null ? "" : String(editing.track_no),
@@ -1177,7 +1190,12 @@
       title: $("edTitle").value, artist: $("edArtist").value,
       album: $("edAlbum").value, track_no: $("edTrackNo").value,
     };
-    const changes = Object.fromEntries(Object.entries(after).filter(([k, v]) => v.trim() !== before[k].trim()));
+    return Object.fromEntries(Object.entries(after).filter(([k, v]) => v.trim() !== before[k].trim()));
+  }
+  async function saveEdit() {
+    if (!editing) return;
+    const id = editing.id;
+    const changes = editChanges();
     if (!Object.keys(changes).length) { closeEdit(); return; }
     let updated;
     try {
@@ -1290,7 +1308,13 @@
   });
   const closeAlbum = () => { $("albumModal").hidden = true; $("alCover").value = ""; };
   $("alCancel").addEventListener("click", closeAlbum);
-  $("albumModal").addEventListener("click", (e) => { if (e.target === $("albumModal")) closeAlbum(); });
+  $("albumModal").addEventListener("click", async (e) => {
+    if (e.target !== $("albumModal")) return;
+    const dirty = $("alName").value.trim() !== $("tapeTitle").textContent.trim()
+      || $("alArtist").value.trim() || albumCoverFile;
+    if (dirty && !(await askConfirm("Discard your changes?", { ok: "Discard", danger: true }))) return;
+    closeAlbum();
+  });
   $("alSave").addEventListener("click", async () => {
     const album = $("tapeTitle").textContent;
     const name = $("alName").value.trim();
@@ -1722,10 +1746,9 @@
   $("modePods").addEventListener("click", () => setMode("podcasts"));
   $("edCancel").addEventListener("click", closeEdit);
   $("edSave").addEventListener("click", saveEdit);
-  $("editModal").addEventListener("click", (e) => { if (e.target === $("editModal")) closeEdit(); });
+  $("editModal").addEventListener("click", (e) => { if (e.target === $("editModal")) dismissEdit(); });
   $("editModal").addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
-    if (e.key === "Escape") closeEdit();
   });
   $("epBack").addEventListener("click", () => showView("podcasts"));
   [...document.querySelectorAll(".ep-filter-btn")].forEach((b) =>
@@ -1868,6 +1891,7 @@
     audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !sleepMenu.hidden;
       upnext.classList.remove("expanded"); closeMenu(); closeSleep();
@@ -1876,6 +1900,18 @@
     if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;   // leave browser shortcuts alone
     if (document.querySelector(".modal-scrim:not([hidden])")) return;
+    // A focused list row: Enter opens/plays it, ↑/↓ move between rows.
+    if (e.target.matches && e.target.matches("li[tabindex]")) {
+      if (e.key === "Enter") { e.preventDefault(); e.target.click(); return; }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        let n = e.target;
+        do { n = e.key === "ArrowDown" ? n.nextElementSibling : n.previousElementSibling; }
+        while (n && !n.matches("li[tabindex]"));
+        if (n) n.focus();
+        return;
+      }
+    }
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const handled = {
       " ": () => togglePlay(),

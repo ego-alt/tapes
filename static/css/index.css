@@ -312,7 +312,11 @@ kbd {
     opacity: 0; transition: opacity 0.12s;
 }
 .tl-add .icn { width: 16px; height: 16px; }
-.track-list li:hover .tl-add { opacity: 1; }
+.track-list li:hover .tl-add, .track-list li:focus-within .tl-add { opacity: 1; }
+/* keyboard focus on a row (Tab, then ↑/↓) */
+.track-list li:focus-visible, .shelf-list li:focus-visible {
+    outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: var(--radius-md);
+}
 .tl-add:hover { color: var(--color-text-primary); }
 
 /* ---- download panel ---- */
