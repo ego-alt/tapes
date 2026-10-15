@@ -1638,6 +1638,10 @@
           play.className = "btn btn-ghost dl-act"; play.textContent = "Play";
           play.addEventListener("click", () => playFromList([j.track], 0));
           actions.appendChild(play);
+          const add = document.createElement("button");
+          add.className = "btn btn-ghost dl-act"; add.textContent = "Add to…";
+          add.addEventListener("click", (e) => { e.stopPropagation(); openAddMenu(e, j.track); });
+          actions.appendChild(add);
           if (j.outcome === "added") {
             const edit = document.createElement("button");
             edit.className = "btn btn-ghost dl-act"; edit.textContent = "Edit";

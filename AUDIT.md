@@ -265,6 +265,8 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 - Remember the sort per shelf, and add *Recently played* and *Recently added* rows at the top of Music.
 - Fix the menus (7.1).
 
+**Status: done, except the *Recently played / Recently added* rows.** Tapes opens library-first on a phone with a mini-player (7.6); All Tracks keeps the sort you last chose (8.5) and builds in chunks (2.9); *Search your library* on the shelf (or `/`) searches everything; + and ⋯ menus work on phones as bottom sheets (7.1); the scrub bar drags (7.3); closing the tab keeps your place (4.4). Shortcut rows for recently played/added weren't added: the remembered sort covers *Recently added* in one tap, and they're worth revisiting with real listening data.
+
 ### Second task: rip a song and play it
 
 1. Tap the unlabeled ⬇.
@@ -274,6 +276,8 @@ Tapes' job is to **collect songs and podcasts I own, keep their metadata clean, 
 5. If the metadata is wrong, ⋯ → Edit (desktop only, given 7.1), which also erases the track number (4.1).
 
 **Fix:** After a rip, show the 1.5 review card with **Play now**, **Add to tape** and **Edit**. Ripping into a tape should go straight there.
+
+**Status: done.** The + Add button is labelled (1.3) and the button says *Rip*. The job row appears the moment you submit. When it finishes it stays as a card saying what happened (*Added*, *You already have*, *Same recording as*, or a plain-language failure), with **Play**, **Add to…** (tape or queue) and **Edit**. Ripping a playlist goes straight into a new tape. Edit keeps the track number (4.1), and rips are filed as `Artist/Album/NN Title.mp3` (4.7).
 
 ### Third task: listen to a new podcast episode **[code]**
 
