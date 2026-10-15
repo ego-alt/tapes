@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 import queue
 import re
@@ -6,12 +7,15 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from datetime import datetime
 from urllib.parse import urlparse
 
 import youtube
 from cleaning import clean_meta, clean_title, reconcile_artist
 from models import DownloadJob, Episode, Playlist, PlaylistTrack, Track, db
 from scan import scan_library
+
+log = logging.getLogger("tapes.downloader")
 
 _job_queue: "queue.Queue[int]" = queue.Queue()
 _started = False
@@ -56,6 +60,47 @@ def start_worker(app):
     threading.Thread(target=_loop, args=(app,), daemon=True).start()
 
 
+class RipError(RuntimeError):
+    """A rip failure whose message is already fit to show the user."""
+
+
+# yt-dlp error text -> what to tell the user. First match wins.
+_RIP_ERRORS = [
+    (("private video",), "This video is private."),
+    (("sign in to confirm your age", "age-restricted", "inappropriate for some users"),
+     "This video is age-restricted, so it can't be ripped."),
+    (("available in your country", "geo restrict", "geo-restrict"),
+     "This video isn't available in this region."),
+    (("unsupported url",), "That site or link isn't supported."),
+    (("video unavailable", "has been removed", "no longer available", "does not exist"),
+     "This video is no longer available."),
+    (("unable to download webpage", "name or service not known", "timed out",
+      "temporary failure in name resolution", "connection"),
+     "Couldn't reach that site. Check the connection and try again."),
+]
+_RIP_GENERIC = "Couldn't rip that link. It may be private, region-locked or not a video."
+
+
+def friendly_rip_error(text: str) -> str:
+    """Map yt-dlp's error output (or an exception) to a short, human message."""
+    low = (text or "").lower()
+    if "no module named yt_dlp" in low or "no module named 'yt_dlp'" in low:
+        return "Ripping isn't set up on this server (yt-dlp is missing)."
+    for needles, message in _RIP_ERRORS:
+        if any(n in low for n in needles):
+            return message
+    return _RIP_GENERIC
+
+
+def _finish(job, outcome: str, message: str):
+    job.status = "error" if outcome == "error" else "done"
+    job.outcome = outcome
+    job.message = message[:300]
+    job.finished_at = datetime.now()
+    if outcome != "error":
+        job.progress = 100
+
+
 def _loop(app):
     while True:
         job_id = _job_queue.get()
@@ -63,10 +108,17 @@ def _loop(app):
             try:
                 _process(app, job_id)
             except Exception as e:  # noqa: BLE001
+                log.warning("job %s failed: %s", job_id, e)
+                db.session.rollback()
                 job = db.session.get(DownloadJob, job_id)
                 if job:
-                    job.status = "error"
-                    job.message = str(e)[:300]
+                    msg = str(e) if isinstance(e, RipError) else friendly_rip_error(str(e))
+                    _finish(job, "error", msg)
+                    # A failed episode download goes back to "not downloaded" so
+                    # tapping it retries, instead of showing "downloading…" forever.
+                    ep = db.session.get(Episode, job.episode_id) if job.episode_id else None
+                    if ep is not None and ep.status == "downloading":
+                        ep.status = "new"
                     db.session.commit()
         _job_queue.task_done()
 
@@ -140,9 +192,7 @@ def _process(app, job_id: int):
     if existing is not None:
         _link_playlist(job, existing)
         job.track_id = existing.id
-        job.progress = 100
-        job.status = "done"
-        job.message = f"already in library: {existing.title}"
+        _finish(job, "exists", existing.title)
         db.session.commit()
         return
 
@@ -166,8 +216,11 @@ def _process(app, job_id: int):
     final_mp3 = None
     title = None
     last_pct = -1
+    errors = []
     for line in proc.stdout:
         line = line.strip()
+        if line.startswith("ERROR"):
+            errors.append(line)
         m = re.search(r"\[download\]\s+([\d.]+)%", line)
         if m:
             pct = float(m.group(1))
@@ -189,12 +242,13 @@ def _process(app, job_id: int):
 
     proc.wait()
     if proc.returncode != 0:
-        raise RuntimeError("yt-dlp failed (see server log)")
+        log.warning("yt-dlp failed for %s: %s", job.url, " | ".join(errors) or "no output")
+        raise RipError(friendly_rip_error(" ".join(errors)))
 
     if not final_mp3:
         mp3s = sorted(music_dir.glob("*.mp3"), key=lambda p: p.stat().st_mtime)
         if not mp3s:
-            raise RuntimeError("no mp3 produced")
+            raise RipError(_RIP_GENERIC)
         final_mp3 = str(mp3s[-1])
 
     # Content dedup: a different URL but the same recording? Fingerprint the audio
@@ -210,9 +264,7 @@ def _process(app, job_id: int):
                 _discard(final_mp3)
                 _link_playlist(job, dup)
                 job.track_id = dup.id
-                job.progress = 100
-                job.status = "done"
-                job.message = f"duplicate of: {dup.title}"
+                _finish(job, "duplicate", dup.title)
                 db.session.commit()
                 return
 
@@ -239,9 +291,7 @@ def _process(app, job_id: int):
         if llm_ok is not None:
             track.needs_llm = not llm_ok  # flag misses for `retag --llm --pending`
     job.track_id = track.id if track else None
-    job.progress = 100
-    job.status = "done"
-    job.message = (track.title if track else "done")
+    _finish(job, "added", track.title if track else "Added")
     _link_playlist(job, track)
     db.session.commit()
 
@@ -364,8 +414,7 @@ def _process_podcast(app, job):
 
     ep = db.session.get(Episode, job.episode_id)
     if ep is None:
-        job.status = "error"
-        job.message = "episode gone"
+        _finish(job, "error", "That episode is no longer in your library.")
         db.session.commit()
         return
 
@@ -374,9 +423,7 @@ def _process_podcast(app, job):
 
     # Already downloaded (e.g. a second play queued it again)? Just finish.
     if ep.status == "ready" and ep.file_path and (music_dir / ep.file_path).exists():
-        job.progress = 100
-        job.status = "done"
-        job.message = ep.title
+        _finish(job, "added", ep.title)
         db.session.commit()
         return
 
@@ -405,9 +452,7 @@ def _process_podcast(app, job):
     if duration:
         ep.duration_s = duration
     ep.status = "ready"
-    job.progress = 100
-    job.status = "done"
-    job.message = ep.title
+    _finish(job, "added", ep.title)
     db.session.commit()
 
 
@@ -457,10 +502,10 @@ def _download_youtube_audio(url: str, target: pathlib.Path, job) -> pathlib.Path
                 db.session.commit()
     proc.wait()
     if proc.returncode != 0:
-        raise RuntimeError("yt-dlp failed (see server log)")
+        raise RuntimeError("yt-dlp failed")
     if not target.exists():  # paranoia: find the produced file by stem
         cands = sorted(target.parent.glob(target.stem + ".*"))
         if not cands:
-            raise RuntimeError("no audio produced")
+            raise RipError("Couldn't download that episode.")
         return cands[-1]
     return target

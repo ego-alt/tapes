@@ -3,7 +3,8 @@ import os
 import pathlib
 import secrets
 
-from flask import Flask, request
+from flask import Flask, jsonify, request
+from werkzeug.exceptions import HTTPException
 from flask_login import LoginManager
 from sqlalchemy import event
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -84,6 +85,14 @@ def create_app(config=None):
     app.register_blueprint(downloads_blueprint)
     app.register_blueprint(podcasts_blueprint)
 
+    @app.errorhandler(HTTPException)
+    def _json_errors(e):
+        # The page reads errors as JSON and shows the message; keep Flask's HTML
+        # error page only for plain browser navigation.
+        if request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json":
+            return jsonify({"error": e.description}), e.code
+        return e
+
     @app.get("/healthz")
     def healthz():
         return "", 200
@@ -133,6 +142,9 @@ def create_app(config=None):
             "ALTER TABLE tracks ADD COLUMN source_url VARCHAR",
             "ALTER TABLE tracks ADD COLUMN needs_llm BOOLEAN DEFAULT 0",
             "ALTER TABLE tracks ADD COLUMN fingerprint TEXT",
+            "ALTER TABLE download_jobs ADD COLUMN outcome VARCHAR",
+            "ALTER TABLE download_jobs ADD COLUMN finished_at DATETIME",
+            "ALTER TABLE download_jobs ADD COLUMN dismissed BOOLEAN DEFAULT 0",
             # Indexes for shelf grouping (artist/album) and the re-rip dedup
             # lookup — create_all() won't add these to a pre-existing table.
             "CREATE INDEX IF NOT EXISTS ix_tracks_artist ON tracks (artist)",

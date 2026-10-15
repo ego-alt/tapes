@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime, timedelta
 
 from flask import Blueprint, Response, abort, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
@@ -10,16 +11,41 @@ from models import DownloadJob, Playlist, db
 downloads_blueprint = Blueprint("downloads", __name__)
 
 
+# Finished jobs stay in the panel this long (or until dismissed), so you can
+# see what came of a rip instead of it silently vanishing.
+RECENT = timedelta(minutes=30)
+
+
 def _active_jobs(user_id):
     return (DownloadJob.query.filter_by(user_id=user_id)
             .filter(DownloadJob.status.in_(["queued", "running"]))
             .order_by(DownloadJob.created_at.desc()).all())
 
 
+def _panel_jobs(user_id):
+    """Active jobs plus recently finished, undismissed ones, newest first."""
+    recent = (DownloadJob.query.filter_by(user_id=user_id)
+              .filter(DownloadJob.status.in_(["done", "error"]),
+                      DownloadJob.finished_at >= datetime.now() - RECENT,
+                      DownloadJob.dismissed.isnot(True))
+              .order_by(DownloadJob.finished_at.desc()).all())
+    return _active_jobs(user_id) + recent
+
+
 @downloads_blueprint.route("/api/downloads", methods=["GET"])
 @login_required
 def list_jobs():
-    return jsonify([j.to_dict() for j in _active_jobs(current_user.id)])
+    return jsonify([j.to_dict() for j in _panel_jobs(current_user.id)])
+
+
+@downloads_blueprint.route("/api/downloads/<int:job_id>", methods=["DELETE"])
+@login_required
+def dismiss_job(job_id):
+    """Hide a finished job from the panel."""
+    job = DownloadJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
+    job.dismissed = True
+    db.session.commit()
+    return "", 204
 
 
 @downloads_blueprint.route("/api/downloads/stream")
@@ -36,7 +62,7 @@ def stream_jobs():
         idle = ticks = 0
         while True:
             jobs = _active_jobs(uid)
-            payload = json.dumps([j.to_dict() for j in jobs])
+            payload = json.dumps([j.to_dict() for j in _panel_jobs(uid)])
             if payload != last:
                 last = payload
                 yield f"data: {payload}\n\n"
@@ -64,7 +90,7 @@ def stream_jobs():
 def create_job():
     url = (request.json or {}).get("url", "").strip()
     if not url.startswith(("http://", "https://")):
-        abort(400, "valid url required")
+        abort(400, "Paste a full link starting with https://")
 
     video_urls, playlist_title = expand_playlist(url)
 

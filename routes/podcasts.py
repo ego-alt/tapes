@@ -44,18 +44,19 @@ def _show_dict(s):
 def add():
     url = (request.json or {}).get("url", "").strip()
     if not url.startswith(("http://", "https://")):
-        abort(400, "valid url required")
+        abort(400, "Paste a full link starting with https://")
     stype = podcasts.detect_source(url)
     try:
         show_meta, eps = podcasts.parse_feed(url, stype)
     except Exception as e:  # noqa: BLE001 — surface a clean message to the client
-        abort(400, f"couldn't read that feed: {e}")
+        current_app.logger.info("feed add failed for %s: %s", url, e)
+        abort(400, "That link isn't a podcast feed. Try the show's RSS link or a YouTube channel.")
 
     # Single YouTube video → a loose episode, unless its channel is already linked
     # to a show (opt-in auto-routing), in which case it files into that show.
     if show_meta is None:
         if not eps:
-            abort(400, "nothing to add")
+            abort(400, "There's nothing to add from that link.")
         for m in eps:
             m["source_url"] = podcasts.normalize_video_url(m["source_url"])
         ch = eps[0].get("channel_id")
@@ -91,7 +92,7 @@ def create_show():
     assigned YouTube episode links a channel to it."""
     name = (request.json or {}).get("name", "").strip()
     if not name:
-        abort(400, "name required")
+        abort(400, "Give the show a name.")
     s = Show(user_id=_uid(), title=name, source_type="manual", source_url="")
     db.session.add(s)
     db.session.commit()
@@ -143,7 +144,8 @@ def refresh(sid):
     try:
         _meta, eps = podcasts.parse_feed(show.source_url, show.source_type)
     except Exception as e:  # noqa: BLE001
-        abort(400, f"refresh failed: {e}")
+        current_app.logger.info("refresh failed for show %s: %s", sid, e)
+        abort(400, "Couldn't check for new episodes. Try again later.")
     added = podcasts.upsert_episodes(_uid(), show.id, eps)
     show.last_refreshed_at = datetime.now()
     db.session.commit()
@@ -235,7 +237,7 @@ def assign_episode(eid):
         db.session.add(show)
         db.session.flush()
     else:
-        abort(400, "show_id or new_show_name required")
+        abort(400, "Choose a show, or name a new one.")
 
     ep.show_id = show.id
     if ep.channel_id and not show.channel_id:

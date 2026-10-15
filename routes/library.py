@@ -88,7 +88,7 @@ def playlists():
 def create_playlist():
     name = (request.json or {}).get("name", "").strip()
     if not name:
-        abort(400, "name required")
+        abort(400, "Give the tape a name.")
     p = Playlist(user_id=_uid(), name=name)
     db.session.add(p)
     db.session.commit()
@@ -101,7 +101,7 @@ def rename_playlist(pid):
     p = Playlist.query.filter_by(id=pid, user_id=_uid()).first_or_404()
     name = (request.json or {}).get("name", "").strip()
     if not name:
-        abort(400, "name required")
+        abort(400, "Give the tape a name.")
     p.name = name
     db.session.commit()
     return jsonify({"key": str(p.id), "name": p.name})
@@ -249,10 +249,10 @@ def rename_artist():
     old = (body.get("old") or "").strip()
     new = (body.get("new") or "").strip()
     if not old or not new:
-        abort(400, "old and new required")
+        abort(400, "Type the artist's new name.")
     tracks = Track.query.filter(Track.artist == old).all()
     if not tracks:
-        abort(404, "unknown artist")
+        abort(404, "That artist isn't in the library any more.")
 
     # Snap onto an existing spelling (excluding the one we're renaming away from).
     from cleaning import reconcile_artist
@@ -320,7 +320,7 @@ def update_track(track_id):
 
     title = _clean("title")
     if "title" in data and not title:
-        abort(400, "title can't be empty")
+        abort(400, "A song needs a title.")
     artist = _clean("artist") if "artist" in data else None
     album = _clean("album") if "album" in data else None
     track_no = None
@@ -329,7 +329,7 @@ def update_track(track_id):
         try:
             track_no = int(raw) if raw not in (None, "") else None
         except (TypeError, ValueError):
-            abort(400, "track number must be a number")
+            abort(400, "Track number must be a number.")
 
     if title is not None:
         t.title = title

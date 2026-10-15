@@ -188,8 +188,13 @@ class DownloadJob(db.Model):
     playlist_id = db.Column(db.Integer, db.ForeignKey("playlists.id"), nullable=True)
     episode_id = db.Column(db.Integer, db.ForeignKey("episodes.id"), nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
+    # What came of it, for the panel: added | exists | duplicate | error.
+    outcome = db.Column(db.String)
+    finished_at = db.Column(db.DateTime, index=True)
+    dismissed = db.Column(db.Boolean, default=False)
 
     def to_dict(self):
+        track = db.session.get(Track, self.track_id) if self.track_id else None
         return {
             "id": self.id,
             "url": self.url,
@@ -200,4 +205,6 @@ class DownloadJob(db.Model):
             "track_id": self.track_id,
             "playlist_id": self.playlist_id,
             "episode_id": self.episode_id,
+            "outcome": self.outcome,
+            "track": track.to_dict() if track else None,
         }
