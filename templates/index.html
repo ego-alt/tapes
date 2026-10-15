@@ -215,12 +215,37 @@
                 <stop offset="1" stop-color="#c9cccb"/>
               </radialGradient>
               <!-- one reel hub as seen through its hole: a ring with six teeth -->
+              <linearGradient id="toothGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f2f4f4"/>
+                <stop offset="1" stop-color="#9ea6a7"/>
+              </linearGradient>
+              <filter id="plastic" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="2" seed="11" result="n"/>
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.32  0 0 0 0 0.33  0.7 0 0 0 -0.42" result="g"/>
+                <feComposite in="g" in2="SourceGraphic" operator="atop"/>
+              </filter>
+              <!-- one reel hub as seen through its hole: moulded flange rings, six
+                   drive teeth, and the clip slot that holds the tape leader -->
               <symbol id="hub" viewBox="-16 -16 32 32" overflow="visible">
-                <circle r="15.5" fill="url(#hubGrad)"/>
-                <circle r="10.2" fill="url(#hubHole)" stroke="rgba(0,0,0,0.35)" stroke-width="0.5"/>
-                <rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(0)"/><rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(60)"/><rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(120)"/><rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(180)"/><rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(240)"/><rect x="-1.6" y="-10.2" width="3.2" height="3.4" rx="0.8" fill="url(#hubGrad)" stroke="rgba(0,0,0,0.25)" stroke-width="0.3" transform="rotate(300)"/>
-                <path d="M-12 -9 A15 15 0 0 1 9 -12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="0.8"/>
+                <circle r="15.5" fill="url(#hubGrad)" filter="url(#plastic)"/>
+                <circle r="14.2" fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="0.4"/>
+                <circle r="12.6" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="0.35"/>
+                <circle r="12.2" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="0.35"/>
+                <g stroke="rgba(0,0,0,0.14)" stroke-width="0.5"><path d="M0 -15 V-11.2" transform="rotate(30)"/><path d="M0 -15 V-11.2" transform="rotate(90)"/><path d="M0 -15 V-11.2" transform="rotate(150)"/><path d="M0 -15 V-11.2" transform="rotate(210)"/><path d="M0 -15 V-11.2" transform="rotate(270)"/><path d="M0 -15 V-11.2" transform="rotate(330)"/></g>
+                <circle r="10.6" fill="url(#hubHole)" stroke="rgba(0,0,0,0.4)" stroke-width="0.5"/>
+                <circle r="10.6" fill="none" stroke="rgba(0,0,0,0.12)" stroke-width="1.6"/>
+                <g transform="rotate(0)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g><g transform="rotate(60)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g><g transform="rotate(120)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g><g transform="rotate(180)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g><g transform="rotate(240)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g><g transform="rotate(300)"><path d="M-1.9 -10.4 L1.9 -10.4 L1.3 -6.8 Q0 -6.2 -1.3 -6.8 Z" fill="url(#toothGrad)" stroke="rgba(0,0,0,0.35)" stroke-width="0.25"/><path d="M-1.6 -10.2 L-1.1 -7" stroke="rgba(255,255,255,0.7)" stroke-width="0.3"/></g>
+                <!-- leader clip: a wedge set into the flange -->
+                <path d="M-2.2 15.2 L2.2 15.2 L1.6 11.6 L-1.6 11.6 Z" fill="#8e9596" stroke="rgba(0,0,0,0.35)" stroke-width="0.3"/>
+                <path d="M-1.6 11.6 L1.6 11.6" stroke="rgba(255,255,255,0.6)" stroke-width="0.3"/>
+                <path d="M-12 -9 A15 15 0 0 1 9 -12" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="0.8"/>
               </symbol>
+              <!-- uneven sheen and scuffs on the plastic -->
+              <filter id="wear" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.035 0.06" numOctaves="3" seed="23" result="n"/>
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.9 0 0 0 -0.42"/>
+              </filter>
+              <clipPath id="labelClip"><path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z"/></clipPath>
               <clipPath id="windowClip"><rect x="130" y="73" width="72" height="23" rx="1.5"/></clipPath>
               <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.2"/></filter>
             </defs>
@@ -228,6 +253,7 @@
             <!-- shell -->
             <rect x="1" y="1" width="328" height="204" rx="7" fill="url(#knurl)"/>
             <rect x="1" y="1" width="328" height="204" rx="7" fill="url(#shellLight)"/>
+            <rect x="1" y="1" width="328" height="204" rx="7" filter="url(#wear)" opacity="0.10" clip-path="inset(0 round 7px)"/>
             <rect x="2.6" y="2.6" width="324.8" height="200.8" rx="5.8" fill="none" stroke="#1c1c1c" stroke-width="3.2"/>
             <rect x="1.4" y="1.4" width="327.2" height="203.2" rx="6.6" fill="none" stroke="url(#lip)" stroke-width="1.6"/>
             <rect x="4.4" y="4.4" width="321.2" height="197.2" rx="4.4" fill="none" stroke="rgba(0,0,0,0.7)" stroke-width="0.6"/>
@@ -237,17 +263,29 @@
             <!-- write-protect notch -->
             <path d="M33 2.5 l4 3.5 h4 l-4 -3.5 z" fill="#050505"/>
 
-            <!-- paper label, with a soft shadow where it sits in its recess -->
-            <rect x="15.5" y="15" width="299" height="136" rx="2" fill="#000" opacity="0.6" filter="url(#soft)"/>
-            <rect x="15.5" y="14" width="299" height="136" rx="2" fill="url(#paper)" filter="url(#paperGrain)"/>
-            <rect x="15.5" y="67" width="299" height="7.5" fill="#ef4b2c"/>
-            <rect x="15.5" y="77" width="299" height="6.5" fill="#ab8f6b"/>
-            <rect x="15.5" y="86" width="299" height="7" fill="#ef4b2c"/>
-            <rect x="15.5" y="95.5" width="299" height="6.5" fill="#ab8f6b"/>
-            <rect x="15.5" y="104.5" width="299" height="7.5" fill="#ef4b2c"/>
-            <path d="M15.5 114.5 H314.5 V148 a2 2 0 0 1 -2 2 H17.5 a2 2 0 0 1 -2 -2 Z" fill="#ab8f6b"/>
-            <rect x="15.5" y="14" width="299" height="136" rx="2" fill="url(#paperAge)"/>
-            <rect x="15.9" y="14.4" width="298.2" height="135.2" rx="1.8" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="0.6"/>
+            <!-- paper sticker with chamfered corners, sitting in a shallow recess -->
+            <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="#000" opacity="0.65" transform="translate(0.3 1.1)" filter="url(#soft)"/>
+            <g clip-path="url(#labelClip)">
+              <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paper)" filter="url(#paperGrain)"/>
+              <rect x="15.5" y="67" width="299" height="7.5" fill="#ef4b2c"/>
+              <rect x="15.5" y="77" width="299" height="6.5" fill="#ab8f6b"/>
+              <rect x="15.5" y="86" width="299" height="7" fill="#ef4b2c"/>
+              <rect x="15.5" y="95.5" width="299" height="6.5" fill="#ab8f6b"/>
+              <rect x="15.5" y="104.5" width="299" height="7.5" fill="#ef4b2c"/>
+              <rect x="15.5" y="114.5" width="299" height="36" fill="#ab8f6b"/>
+              <!-- the same fibre over the printed ink, so stripes read as print, not paint -->
+              <rect x="15.5" y="67" width="299" height="83" fill="#fff" opacity="0.07" filter="url(#paperGrain)"/>
+              <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paperAge)"/>
+              <!-- printed marks -->
+              <text x="306" y="144" font-family="Inter, Arial, sans-serif" font-size="7.5" font-weight="700" fill="#f4ede0" fill-opacity="0.85" text-anchor="end" letter-spacing="0.4">C60</text>
+              <text x="24" y="144" font-family="Inter, Arial, sans-serif" font-size="4.2" font-weight="600" fill="#f4ede0" fill-opacity="0.7" letter-spacing="0.8">LOW NOISE · NORMAL POSITION</text>
+              <!-- the bottom-right corner has lifted a little: a highlight on the curl -->
+              <path d="M306 150 L314.5 141.5 V145.5 L310 150 Z" fill="#fff" opacity="0.18"/>
+            </g>
+            <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>
+            <path d="M20 14.5 H310 L314 18.5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="0.5"/>
+            <!-- the side letter, embossed in the corner box (album art covers it when there is some) -->
+            <text x="31.5" y="45" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="800" fill="#2a2a2a" fill-opacity="0.75" text-anchor="middle">A</text>
             <!-- the writing area: a corner box (album art goes here) and two lines -->
             <path d="M19.5 27.5 L23.5 23.5 H43.5 V51.5 H19.5 Z" fill="none" stroke="#2a2a2a" stroke-width="0.6"/>
             <path d="M49 35.5 H307 M49 51.5 H307" stroke="#2a2a2a" stroke-width="0.5"/>
@@ -272,9 +310,20 @@
             <rect x="129" y="72" width="74" height="25" rx="2" fill="#050505"/>
             <g clip-path="url(#windowClip)">
               <rect x="130" y="73" width="72" height="23" fill="url(#windowBack)"/>
+              <!-- clear reel flanges: their rims cross the window as faint arcs -->
+              <circle cx="96.6" cy="91.5" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+              <circle cx="238" cy="91.5" r="84" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
               <circle class="tape-pack" id="packL" cx="96.6" cy="91.5" r="78" fill="url(#pack)"/>
               <circle class="tape-pack" id="packR" cx="238" cy="91.5" r="36" fill="url(#pack)"/>
+              <!-- winding layers, kept just inside each pack's edge (see reels in player.js) -->
+              <g class="pack-layers" id="layersL"></g>
+              <g class="pack-layers" id="layersR"></g>
               <rect x="130" y="73" width="72" height="23" fill="url(#gloss)"/>
+              <!-- dust and a hairline scratch on the window -->
+              <g fill="#fff" opacity="0.5">
+                <circle cx="141" cy="80" r="0.35"/><circle cx="187" cy="91" r="0.3"/><circle cx="160" cy="93.5" r="0.25"/><circle cx="196" cy="77" r="0.3"/>
+              </g>
+              <path d="M150 76 L172 88" stroke="rgba(255,255,255,0.12)" stroke-width="0.25"/>
             </g>
             <!-- printed scale -->
             <g class="window-scale" stroke="#d8d8d8" stroke-width="0.45"><path d="M130.0 99 v3"/><path d="M137.2 99 v1.8"/><path d="M144.4 99 v1.8"/><path d="M151.6 99 v1.8"/><path d="M158.8 99 v1.8"/><path d="M166.0 99 v3"/><path d="M173.2 99 v1.8"/><path d="M180.4 99 v1.8"/><path d="M187.6 99 v1.8"/><path d="M194.8 99 v1.8"/><path d="M202.0 99 v3"/></g>

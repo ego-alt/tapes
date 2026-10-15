@@ -932,6 +932,24 @@
     const TAPE_SPEED = 55;   // view-box units per second at the tape surface
     const el = (id) => document.getElementById(id);
     const packL = el("packL"), packR = el("packR"), reelL = el("reelL"), reelR = el("reelR");
+    // A few winding layers just inside each pack's edge, each a slightly
+    // different shade, like the edge of a real pack of tape.
+    const LAYERS = [[1.6, 0.18, "#7a6a5c"], [3.1, 0.12, "#000"], [4.4, 0.14, "#6b5b4e"],
+                    [6.5, 0.1, "#000"], [8.8, 0.12, "#5e5045"], [12, 0.08, "#000"]];
+    const makeLayers = (g, cx) => LAYERS.map(([, w, color]) => {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", cx); c.setAttribute("cy", 91.5);
+      c.setAttribute("fill", "none"); c.setAttribute("stroke", color);
+      c.setAttribute("stroke-width", 0.5); c.setAttribute("stroke-opacity", w * 3);
+      g.appendChild(c);
+      return c;
+    });
+    const ringsL = makeLayers(el("layersL"), 96.6), ringsR = makeLayers(el("layersR"), 238);
+    const placeLayers = (rings, r) => rings.forEach((c, i) => {
+      const rr = r - LAYERS[i][0];
+      c.setAttribute("r", Math.max(0, rr));
+      c.setAttribute("visibility", rr > CORE ? "visible" : "hidden");
+    });
     const still = window.matchMedia("(prefers-reduced-motion: reduce)");
     let angL = 0, angR = 0, last = 0, raf = 0;
     const radius = (share) => Math.sqrt(CORE * CORE + share * (FULL * FULL - CORE * CORE));
@@ -940,6 +958,8 @@
       const rL = radius(1 - p), rR = radius(p);
       packL.setAttribute("r", rL);
       packR.setAttribute("r", rR);
+      placeLayers(ringsL, rL);
+      placeLayers(ringsR, rR);
       return [rL, rR];
     }
     function frame(t) {
