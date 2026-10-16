@@ -2,7 +2,7 @@
 
 A personal music streamer for the home stack, built around a cassette deck: the tape winds from reel to reel as a song plays, and the label is handwritten with the current track.
 
-![Tapes](images/tapes-2026-10.png)
+![Tapes](images/tapes-2026-10-16.png)
 
 ## Features
 
