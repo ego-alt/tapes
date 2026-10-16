@@ -53,6 +53,9 @@ def create_app(config=None):
     app.config["ART_LOOKUP"] = os.environ.get("ART_LOOKUP", "1").lower() in ("1", "true", "yes")
     # Acoustic-fingerprint dedup on rip (needs the fpcalc binary).
     app.config["FINGERPRINT_DEDUP"] = os.environ.get("FINGERPRINT_DEDUP", "1").lower() in ("1", "true", "yes")
+    # Loudness + gapless measurement (audio_analysis.py): on rip, plus a slow
+    # background pass over the rest of the library.
+    app.config["AUDIO_ANALYSIS"] = os.environ.get("AUDIO_ANALYSIS", "1").lower() in ("1", "true", "yes")
     app.config["AUTH_PROXY_HEADER"] = os.environ.get("AUTH_PROXY_HEADER") or None
     app.config["LOCAL_USER"] = os.environ.get("MUSIC_LOCAL_USER", "local")
     # Usernames allowed to delete songs from the shared library or rename an

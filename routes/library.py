@@ -469,10 +469,17 @@ def update_track(track_id):
         t.title = title
     if "artist" in data:
         t.artist = artist or None
+    old_album = t.album
     if "album" in data:
         t.album = album or None
     if "track_no" in data:
         t.track_no = track_no
+    if t.album != old_album:   # album levelling figures follow the move
+        import audio_analysis
+        for name in {old_album, t.album}:
+            audio_analysis.refresh_album(name)
+        if not t.album:
+            t.album_loudness_lufs = t.album_peak_db = None
     db.session.commit()
 
     # Mirror into the file tag (best-effort; DB stays the source of truth).

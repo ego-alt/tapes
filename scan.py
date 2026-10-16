@@ -338,6 +338,36 @@ def register_cli(app):
             r = scan_library(app.config["MUSIC_DIR"], app.config["COVER_DIR"], full=True)
             click.echo(f"rescan: ~{r.get('updated', 0)} updated")
 
+    @app.cli.command("analyze")
+    @click.option("--all", "do_all", is_flag=True, help="Re-measure every track, not just new ones.")
+    @click.option("--no-tags", is_flag=True, help="Don't write ReplayGain tags into the files.")
+    def analyze(do_all, no_tags):
+        """Measure loudness (EBU R128) and gapless info for volume levelling and
+        gapless playback. The server also does this in the background."""
+        import audio_analysis as aa
+
+        music_dir = app.config["MUSIC_DIR"]
+        q = Track.query if do_all else Track.query.filter(Track.audio_analyzed_at.is_(None))
+        tracks = q.order_by(Track.artist, Track.album, Track.track_no).all()
+        albums = set()
+        for t in tracks:
+            ok = aa.analyze_track(t, music_dir)
+            lufs = f"{t.loudness_lufs:6.1f} LUFS" if ok else "  failed  "
+            gap = "gapless" if t.audio_samples else "no gapless info"
+            click.echo(f"[{lufs}] {t.artist or '?'} — {t.title} ({gap})")
+            albums.add(t.album)
+            db.session.commit()
+        for album in albums:
+            if album:
+                aa.refresh_album(album, music_dir, write_tags=not no_tags)
+        if not no_tags:
+            for t in tracks:
+                if not t.album and t.loudness_lufs is not None:
+                    aa.write_replaygain_tags(str(pathlib.Path(music_dir) / t.file_path),
+                                             aa.Loudness(t.loudness_lufs, t.true_peak_db), None)
+        db.session.commit()
+        click.echo(f"\nmeasured {len(tracks)} track(s) in {len([a for a in albums if a])} album(s)")
+
     @app.cli.command("fingerprint")
     @click.option("--all", "do_all", is_flag=True,
                   help="Re-fingerprint every track, not just those missing one.")

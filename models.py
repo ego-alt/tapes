@@ -40,6 +40,19 @@ class Track(db.Model):
     bitrate = db.Column(db.Integer)
     size_bytes = db.Column(db.Integer)
     has_cover = db.Column(db.Boolean, default=False)
+    # Loudness (EBU R128) and gapless info, measured once (audio_analysis.py).
+    # The player levels volume with them and joins songs without a gap.
+    # audio_analyzed_at is set even when a measurement fails, so a bad file
+    # isn't retried on every run.
+    loudness_lufs = db.Column(db.Float)
+    true_peak_db = db.Column(db.Float)
+    album_loudness_lufs = db.Column(db.Float)
+    album_peak_db = db.Column(db.Float)
+    sample_rate = db.Column(db.Integer)
+    enc_delay = db.Column(db.Integer)
+    enc_padding = db.Column(db.Integer)
+    audio_samples = db.Column(db.Integer)
+    audio_analyzed_at = db.Column(db.DateTime)
     mtime = db.Column(db.Float)
     added_at = db.Column(db.DateTime, server_default=func.now())
     # Set while the track sits in the trash (file under MUSIC_DIR/.trash/);
@@ -56,6 +69,14 @@ class Track(db.Model):
             "duration": self.duration_s or 0,
             "has_cover": bool(self.has_cover),
             "source_url": self.source_url or "",
+            # For the player: volume levelling and gapless joins (null = unknown).
+            "lufs": self.loudness_lufs,
+            "peak": self.true_peak_db,
+            "album_lufs": self.album_loudness_lufs,
+            "album_peak": self.album_peak_db,
+            "gapless": ({"rate": self.sample_rate, "delay": self.enc_delay,
+                         "padding": self.enc_padding, "samples": self.audio_samples}
+                        if self.audio_samples else None),
         }
 
 

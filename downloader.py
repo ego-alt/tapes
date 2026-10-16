@@ -60,6 +60,10 @@ def start_worker(app):
             _job_queue.put(j.id)
         db.session.commit()
     threading.Thread(target=_loop, args=(app,), daemon=True).start()
+    if app.config.get("AUDIO_ANALYSIS", True):
+        # Measure loudness + gapless info for the rest of the library, slowly.
+        import audio_analysis
+        threading.Thread(target=audio_analysis.backfill, args=(app,), daemon=True).start()
 
 
 class RipError(RuntimeError):
@@ -357,6 +361,9 @@ def _rip(app, job, music_dir: pathlib.Path, work: pathlib.Path):
             track.fingerprint = fpr.encode(fp)
         if llm_ok is not None:
             track.needs_llm = not llm_ok  # flag misses for `retag --llm --pending`
+        if app.config.get("AUDIO_ANALYSIS", True):
+            import audio_analysis
+            audio_analysis.analyze_new_track(track, music_dir)   # loudness + gapless
     job.track_id = track.id if track else None
     _finish(job, "added", track.title if track else "Added")
     _link_playlist(job, track)

@@ -12,7 +12,7 @@ from models import Track, db
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
-    for flag in ("LLM_CLEANING", "ART_LOOKUP", "FINGERPRINT_DEDUP"):
+    for flag in ("LLM_CLEANING", "ART_LOOKUP", "FINGERPRINT_DEDUP", "AUDIO_ANALYSIS"):
         monkeypatch.setenv(flag, "0")
     monkeypatch.delenv("AUTH_PROXY_HEADER", raising=False)
     music = tmp_path / "music"
