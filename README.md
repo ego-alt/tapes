@@ -1,158 +1,60 @@
 # Tapes
 
-A personal cassette-deck music streamer for the home stack. The home page is a
-cassette deck — the reels spin while a track plays and the paper label re-skins
-to the current song.
+A personal music streamer for the home stack, built around a cassette deck: the tape winds from reel to reel as a song plays, and the label is handwritten with the current track.
 
 ![Tapes](images/tapes.png)
 
 ## Features
 
-- **Cassette-deck player** — a detailed cassette whose tape winds from reel to
-  reel as the song plays (the emptier reel spins faster, as real tape does),
-  with the title and artist handwritten on its label; scrubber, shuffle / repeat,
-  keyboard shortcuts (`Space`, `←/→` seek, `Shift + ←/→` skip, `↑/↓` volume,
-  `M` `S` `R` `Q`, `/` search, `?` for the list), lock-screen controls,
-  and it resumes your queue across sessions and devices.
-- **Browse** — All Tracks (sortable: by artist / recently added / recently
-  played / most played; the sort is remembered per shelf), Singles, Albums,
-  Artists, and your own tapes. Search your whole library from the shelf.
-- **Installable** — add it to your home screen; the app and your lists open
-  offline, and a song cut off by a dropped connection resumes where it was.
-- **Up Next** queue with drag-to-reorder; *Play next* / *Add to queue* per track.
-- **Rip** any URL to MP3 with cover art via `yt-dlp` + `ffmpeg`, with live
-  progress over SSE; paste a YouTube playlist to rip it into a new tape. The
-  original source URL is saved with each track. Re-ripping a URL you already have
-  is skipped, and acoustic fingerprinting (Chromaprint) catches the same
-  recording even from a different URL — adding it to your tape without making a
-  duplicate. Each finished rip stays in the panel saying what happened, with
-  Play, Add to… and Edit.
-- **Podcasts** — follow an RSS feed or a YouTube channel/playlist, or add a
-  single video. Episodes stream straight from the feed while they download;
-  ±15/30 s skips, playback speed, played/unplayed and resume position. Hide an
-  episode of a followed show and refreshes won't bring it back.
-- **Safe edits** — deleting a song moves it to a 30-day trash with Undo; edits
-  only touch the fields you changed; artist renames preview any merge first.
-- **Tidy metadata** — ripped tags are cleaned automatically (YouTube cruft
-  stripped, `Artist - Title` split). With `ANTHROPIC_API_KEY` set, a Claude
-  (Haiku) pass then refines title/artist and fills in a blank album when it's
-  confident — using the source URL, channel/uploader, and yt-dlp's own parsed
-  fields as signals; without a key it falls back to the deterministic cleanup.
-- **Cover art** — on rip, the weak YouTube thumbnail is replaced with real album
-  art from **MusicBrainz** + the Cover Art Archive when a confident artist/album
-  match exists. `flask art` backfills the library.
-  `flask retag` re-cleans an existing library (`--llm` to use Claude in bulk).
+- **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder, a sleep timer, lock-screen controls, and your queue resumes across devices.
+- **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
+- **Rip** any link to MP3 with `yt-dlp` and `ffmpeg`; a playlist link becomes a new tape. Duplicates are caught by URL and by acoustic fingerprint.
+- **Tidy tags**: titles and artists are cleaned on rip, optionally refined by Claude (Haiku); cover art comes from MusicBrainz when there's a confident match.
+- **Podcasts**: follow RSS feeds or YouTube channels; episodes stream while they download, with skips, speed and resume.
+- **Safe edits**: deletes go to a 30-day trash with Undo; artist renames show any merge first.
+- **Installable**, and works offline once loaded. `?` lists the keyboard shortcuts.
 
-## Run it — standalone
+## Run it
 
 ```sh
 uv sync
-export MUSIC_DIR=/path/to/mp3s            # optional; defaults to ./music
-uv run flask --app app:create_app db upgrade   # create / update the database
-uv run flask --app app:create_app scan    # index the library
-uv run flask --app app:create_app run --port 5003
-# open http://127.0.0.1:5003
+export MUSIC_DIR=/path/to/mp3s                  # optional; defaults to ./music
+uv run flask --app app:create_app db upgrade
+uv run flask --app app:create_app scan          # index the library
+uv run flask --app app:create_app run --port 5003   # http://127.0.0.1:5003
 ```
 
-`ffmpeg` must be on your `PATH` for ripping, and `fpcalc` (Debian
-`libchromaprint-tools`) for the acoustic dedup. Set `ANTHROPIC_API_KEY` to
-enable the LLM tag pass (optional — rips work without it). `LLM_CLEANING=0` /
-`ART_LOOKUP=0` / `FINGERPRINT_DEDUP=0` turn off each pass.
-There's no login in standalone mode
-— a single local user is attached automatically. To try it without your own
-music, `uv run python scripts/generate_samples.py` writes tagged demo tracks
-into `./music`.
+Ripping needs `ffmpeg` on your `PATH`, and duplicate detection needs `fpcalc` (Debian: `libchromaprint-tools`). Standalone mode has no sign-in: a local user is attached automatically. For demo tracks, run `uv run python scripts/generate_samples.py`.
 
-## Run it — home stack
+Tests and lint: `uv run pytest` and `uv run ruff check .`
 
-Served at `/music/` behind the [dashboard](../dashboard) nginx proxy: gated by
-its `auth_request` and streaming audio via `X-Accel-Redirect`. The service is
-wired into `../dashboard/docker-compose.yml` (internal port `5003`).
+### Settings
 
-```sh
-cd ../dashboard
-MUSIC_HOST_DIR=/mnt/backup/music docker compose up -d --build music
-```
+| Variable | Does |
+|---|---|
+| `MUSIC_DIR` | Where the MP3s live |
+| `ANTHROPIC_API_KEY` | Turns on the Claude tag pass (optional) |
+| `LLM_CLEANING`, `ART_LOOKUP`, `FINGERPRINT_DEDUP` | Set to `0` to turn a pass off |
+| `MUSICBRAINZ_CONTACT` | Your email or URL, for MusicBrainz's user-agent policy |
+| `TAPES_ADMINS` | Usernames allowed to delete songs and rename artists library-wide |
 
-Dashboard handles login; tapes trusts the `X-Forwarded-User` header and keeps
-its own `users` rows for tapes and playback state.
+## Home stack
 
-After adding a user in dashboard, sync shadow accounts:
+Served at `/music/` behind the [dashboard](../dashboard)'s nginx, which signs people in and serves the audio itself (`X-Accel-Redirect`). On the Pi, set `MUSIC_HOST_DIR` to the library's location. After adding a user in the dashboard, run `uv run python scripts/sync_household_users.py` there.
 
-```sh
-cd ../dashboard && uv run python scripts/sync_household_users.py
-```
-
-> On the Pi, merged commits that pass CI deploy themselves within about five
-> minutes (see the dashboard README, "Deploying"). To deploy by hand: code is
-> baked into the image at build time, so after pulling run
-> `docker compose build music && docker compose up -d music`. A bare `up -d`
-> reuses the old image.
->
-> The container applies database migrations itself on start (a gunicorn hook,
-> before any worker runs); if one fails, it stops instead of serving on a
-> half-updated schema. A database from before migrations is brought up to date
-> by the first one, with nothing to run by hand.
+Commits merged to `main` that pass CI deploy to the Pi on their own (see the dashboard README). The container applies database migrations when it starts.
 
 ## Commands
 
 ```sh
-uv run flask --app app:create_app purge-trash [--days 30]               # empty the library trash
 uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
-uv run flask --app app:create_app retag [--write] [--llm] [--pending]  # clean (and enrich) tags
-uv run flask --app app:create_app art [--write] [--all]     # fetch cover art (MusicBrainz)
-uv run flask --app app:create_app fingerprint [--all]       # backfill acoustic fingerprints
-uv run flask --app app:create_app db upgrade                # apply database migrations
+uv run flask --app app:create_app retag [--write] [--llm] [--pending]   # clean tags
+uv run flask --app app:create_app art [--write] [--all]     # cover art from MusicBrainz
+uv run flask --app app:create_app fingerprint [--all]       # backfill fingerprints
+uv run flask --app app:create_app purge-trash [--days 30]   # empty the trash
+uv run flask --app app:create_app db migrate -m "what changed"   # after editing models.py
 ```
 
-Changing the schema: edit `models.py`, then
-`uv run flask --app app:create_app db migrate -m "what changed"`, review the
-file it writes under `migrations/versions/`, and commit it.
+`retag` and `art` only preview until you add `--write`. `retag --llm` uses the Message Batches API (about half price, can take up to an hour); `retag --llm --pending` sweeps up rips whose Claude pass was skipped.
 
-Rips are filed as `MUSIC_DIR/Artist/Album/NN Title.mp3` (or `Artist/Title.mp3`
-without an album) once their tags are cleaned; same-named rips get " (2)".
-While a rip runs it works in `MUSIC_DIR/.incoming/<job>/`, which scans skip.
-Songs you add by hand can live anywhere under `MUSIC_DIR`.
-
-Deleting a song moves it to `MUSIC_DIR/.trash/` (with an Undo toast); it's
-removed for good after 30 days, on the next delete or via `purge-trash`. Set
-`TAPES_ADMINS` (comma-separated usernames) to limit deleting and library-wide
-artist renames to those users.
-
-`scan` is incremental (mtime/size cache); `--full` re-reads every file, `--prune`
-drops rows for deleted files. `art` looks up cover art on MusicBrainz for tracks
-with a known artist + album (preview by default; `--write` embeds it, `--all`
-also upgrades tracks that already have a thumbnail) — throttled to ~1 lookup/sec
-per MusicBrainz policy. `retag` previews by default; `--write` applies the
-cleanup in place and rescans. `--llm` routes the (already deterministically
-cleaned) tags through Claude via the **Message Batches API** to correct
-title/artist and fill in a blank album — needs `ANTHROPIC_API_KEY`, costs ~half
-the standard rate, and takes up to ~an hour for a large library. Enrichment only
-fills an empty album; it never overwrites existing tags. If the LLM pass is
-skipped on a rip (no key / API error) the track is flagged `needs_llm`;
-`retag --llm --pending` sweeps up just those misses in one batch and clears the
-flag — handy to schedule, or to run after topping up credit.
-
-## Layout
-
-```
-app.py            create_app: db + migrations, login, blueprints, cache-busting
-gunicorn.conf.py  server config; runs `db upgrade` before workers start
-models.py         SQLAlchemy models (soft-deleted tracks hidden by default)
-migrations/       Flask-Migrate / Alembic revisions
-scan.py           flask scan / retag / purge-trash — mutagen tags + Pillow thumbnails
-downloader.py     rip worker: yt-dlp, playlist expansion, tagging, filing, dedup
-cleaning.py       deterministic title/artist cleanup for rips
-llm_cleaning.py   Claude (Haiku) tag correction + album fill; sync per-rip, Batches for retag
-art.py            MusicBrainz + Cover Art Archive lookup
-fingerprint.py    Chromaprint acoustic fingerprint + local match for content dedup
-metadata_ops.py   tidy, album edit, cover replacement
-trash.py          move to / restore from MUSIC_DIR/.trash, purge after 30 days
-podcasts.py       RSS + YouTube feed parsing, episode upsert, show images
-youtube.py        YouTube URL helpers
-proxy_auth.py     standalone local user vs. dashboard proxy-header sign-in
-routes/           index · stream · library · downloads · podcasts · pwa · auth
-static/           css (tokens · structural · index · player), js (player.js, sw.js), icons
-templates/        index.html
-tests/            pytest suite (run by CI)
-```
+Rips are filed as `MUSIC_DIR/Artist/Album/NN Title.mp3`. Deleted songs wait in `MUSIC_DIR/.trash/` for 30 days.
