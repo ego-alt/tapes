@@ -1,7 +1,8 @@
 (() => {
   const M = window.MUSIC;
   const $ = (id) => document.getElementById(id);
-  const audio = $("audio"), cassette = $("cassette");
+  // Music plays gapless and levelled; podcasts on their own element (deck-audio.js).
+  const audio = new DeckAudio($("audio"), $("episodeAudio")), cassette = $("cassette");
   const labelArt = $("labelArt"), labelTitle = $("labelTitle"), labelArtist = $("labelArtist");
   const playBtn = $("playBtn");
   const scrub = $("scrub"), scrubFill = $("scrubFill"), curTime = $("curTime"), durTime = $("durTime");
@@ -896,7 +897,7 @@
     // kick off the fetch and let onPodcastJobDone resume playback when it's ready.
     if (isEp && t.status !== "ready" && !canStreamRemote(t)) { loadPendingEpisode(t); return; }
     if (isEp && t.status !== "ready") fetchEpisodeQuietly(t);   // stream now, keep a copy
-    audio.src = srcUrl(t);
+    audio.open(t, srcUrl(t), { album: inAlbumRun(qi) });
     $("cassette").closest(".deck").classList.toggle("is-episode", isEp);
     audio.playbackRate = isEp ? episodeSpeed : 1;
     // Resume an episode where you left off (music resume rides the playstate path).
@@ -997,19 +998,23 @@
   }
   window.addEventListener("resize", () => { if (currentTrack()) fitLabel(); });
 
-  // Warm the browser/nginx cache for the next track so skips start instantly.
-  let prefetchEl = null, prefetchId = null;
+  // The song after this one streams in behind it, for a gapless join (and an
+  // instant skip). Repeat-one replays instead, so nothing follows.
+  function upcomingIndex() {
+    if (activeIsEpisode() || repeatMode === "one") return -1;
+    if (qi + 1 < queue.length) return qi + 1;
+    return repeatMode === "all" && queue.length > 1 ? 0 : -1;
+  }
   function prefetchNext() {
-    const next = queue[qi + 1];
-    if (!next || next.id === prefetchId) return;
-    if (prefetchEl) prefetchEl.src = "";  // abort the previous prefetch
-    prefetchId = next.id;
-    prefetchEl = new Audio();
-    prefetchEl.preload = "auto";
-    // Don't warm an undownloaded episode — its stream 404s until it's fetched
-    // (and a remote feed's file isn't ours to pre-pull).
-    if (next.kind === "episode" && next.status !== "ready") { prefetchEl = null; prefetchId = null; return; }
-    prefetchEl.src = srcUrl(next);
+    const i = upcomingIndex(), next = i >= 0 ? queue[i] : null;
+    audio.setNext(next, next ? srcUrl(next) : null, { album: next ? inAlbumRun(i) : false });
+  }
+  // An album playing in order gets album gain (its quiet and loud songs keep
+  // their balance): true when a neighbour in the queue is from the same album.
+  function inAlbumRun(i) {
+    const t = queue[i];
+    if (!t || !t.album) return false;
+    return [queue[i - 1], queue[i + 1]].some((n) => n && n.album === t.album);
   }
   const currentTrack = () => queue[qi] || null;
   // The active deck queue is kind-pure: when an episode is playing, music's
@@ -1109,6 +1114,7 @@
     repeatMode = repeatMode === "off" ? "all" : repeatMode === "all" ? "one" : "off";
     localStorage.setItem("tapes-repeat", repeatMode);
     updateRepeatBtn();
+    prefetchNext();   // what follows depends on the repeat mode
   }
   function updateRepeatBtn() {
     const b = $("repeatBtn");
@@ -2078,6 +2084,7 @@
       s: () => { setShuffle(!shuffleOn); toast(shuffleOn ? "Shuffle on" : "Shuffle off"); },
       r: () => { cycleRepeat(); toast(repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat off"); },
       q: () => { if (!upnext.hidden) toggleUpNext(); },
+      l: () => toggleLevelling(),
       "/": () => focusSearch(),
       "?": () => { $("keysModal").hidden = false; $("keysClose").focus(); },
     }[key];
@@ -2090,6 +2097,15 @@
     audio.volume = Math.round(Math.max(0, Math.min(1, audio.volume + d)) * 10) / 10;
     try { localStorage.setItem("tapes-volume", String(audio.volume)); } catch (_) { /* private mode */ }
     toast(`Volume ${Math.round(audio.volume * 100)}%`);
+  }
+  // Volume levelling: every song (or album) at the same loudness. On by default.
+  let levelling = localStorage.getItem("tapes-levelling") !== "off";
+  audio.setLevelling(levelling);
+  function toggleLevelling() {
+    levelling = !levelling;
+    try { localStorage.setItem("tapes-levelling", levelling ? "on" : "off"); } catch (_) { /* private mode */ }
+    audio.setLevelling(levelling);
+    toast(levelling ? "Volume levelling on" : "Volume levelling off");
   }
   function toggleMute() {
     audio.muted = !audio.muted;

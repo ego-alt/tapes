@@ -7,6 +7,7 @@ A personal music streamer for the home stack, built around a cassette deck: the 
 ## Features
 
 - **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder, a sleep timer, lock-screen controls, and your queue resumes across devices.
+- **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. `L` turns levelling off.
 - **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
 - **Rip** any link to MP3 with `yt-dlp` and `ffmpeg`; a playlist link becomes a new tape. Duplicates are caught by URL and by acoustic fingerprint.
 - **Tidy tags**: titles and artists are cleaned on rip, optionally refined by Claude (Haiku); cover art comes from MusicBrainz when there's a confident match.
@@ -37,6 +38,7 @@ Tests and lint: `uv run pytest` and `uv run ruff check .`
 | `LLM_CLEANING`, `ART_LOOKUP`, `FINGERPRINT_DEDUP` | Set to `0` to turn a pass off |
 | `MUSICBRAINZ_CONTACT` | Your email or URL, for MusicBrainz's user-agent policy |
 | `TAPES_ADMINS` | Usernames allowed to delete songs and rename artists library-wide |
+| `AUDIO_ANALYSIS` | Set to `0` to stop measuring loudness and gapless info (on rip, and slowly in the background) |
 
 ## Home stack
 
@@ -51,10 +53,13 @@ uv run flask --app app:create_app scan [--full] [--prune]   # index MUSIC_DIR
 uv run flask --app app:create_app retag [--write] [--llm] [--pending]   # clean tags
 uv run flask --app app:create_app art [--write] [--all]     # cover art from MusicBrainz
 uv run flask --app app:create_app fingerprint [--all]       # backfill fingerprints
+uv run flask --app app:create_app analyze [--all] [--no-tags]   # loudness + gapless info (also runs in the background)
 uv run flask --app app:create_app purge-trash [--days 30]   # empty the trash
 uv run flask --app app:create_app db migrate -m "what changed"   # after editing models.py
 ```
 
 `retag` and `art` only preview until you add `--write`. `retag --llm` uses the Message Batches API (about half price, can take up to an hour); `retag --llm --pending` sweeps up rips whose Claude pass was skipped.
+
+`analyze` writes standard ReplayGain tags into each file (tags only; the audio is untouched), so other players get the same levelling.
 
 Rips are filed as `MUSIC_DIR/Artist/Album/NN Title.mp3`. Deleted songs wait in `MUSIC_DIR/.trash/` for 30 days.

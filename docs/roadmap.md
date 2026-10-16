@@ -38,6 +38,16 @@ choice. Updated 2026-10-15, after the UX audit (`AUDIT.md`).
     full keyboard shortcuts (`?`), keyboard-reachable rows;
   - installable PWA with an offline app shell; reconnects resume mid-song;
   - Flask-Migrate (migrations run on start), `tests/` + CI, Pi auto-deploy.
+- **Gapless playback + volume levelling** (2026-10-16). Music plays on one
+  MediaSource stream with each MP3's encoder delay and padding trimmed
+  (sample-exact joins, measured), and through a Web Audio gain set from EBU
+  R128 loudness: album gain for an album in order, track gain otherwise, true
+  peak kept under -1 dBTP. Loudness and gapless info are measured on the
+  server (on rip, plus a background pass) and written as ReplayGain tags.
+  Tracks over 15 minutes, and far seeks in a song that hit the browser's
+  memory limit, play the plain way. Podcasts keep a plain element (their
+  streams can be cross-origin). `L` toggles levelling; a visible control is
+  still to come.
 
 ## Open loops
 

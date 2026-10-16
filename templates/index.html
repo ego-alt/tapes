@@ -446,6 +446,7 @@
       </div>
 
       <audio id="audio" preload="metadata"></audio>
+      <audio id="episodeAudio" preload="metadata"></audio>
     </main>
 
   </div>
@@ -510,6 +511,7 @@
         <dt><kbd>S</kbd></dt><dd>Shuffle</dd>
         <dt><kbd>R</kbd></dt><dd>Repeat</dd>
         <dt><kbd>Q</kbd></dt><dd>Up Next</dd>
+        <dt><kbd>L</kbd></dt><dd>Volume levelling on / off</dd>
         <dt><kbd>/</kbd></dt><dd>Search</dd>
         <dt><kbd>?</kbd></dt><dd>This list</dd>
       </dl>
@@ -538,6 +540,7 @@
       epEpisodeCoverBase: "{{ url_for('podcasts.episode_cover', eid=0) }}".slice(0, -1),
     };
   </script>
+  <script src="{{ url_for('static', filename='js/deck-audio.js') }}"></script>
   <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>
