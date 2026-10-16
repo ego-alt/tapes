@@ -24,7 +24,7 @@ body {
 .sidebar {
     width: 320px;
     flex-shrink: 0;
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-pane);
     border-right: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;

@@ -7,6 +7,7 @@
 :root {
     --color-bg-base: #282828;
     --color-bg-elevated: #3c3836;
+    --color-bg-pane: #151515;          /* the library sidebar: near-black, like calendar's drawers */
     --color-bg-inset: rgba(40, 40, 40, 0.5);
     --color-bg-inset-soft: rgba(40, 40, 40, 0.3);
     --color-bg-overlay: rgba(40, 40, 40, 0.85);

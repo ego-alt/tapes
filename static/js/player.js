@@ -1957,6 +1957,15 @@
   });
   $("navToggle").addEventListener("click", () =>
     isMobile() ? closeDeck() : app.classList.toggle("nav-collapsed"));
+  // Desktop: a click outside the library collapses it, except on the deck's
+  // controls (play, skip, scrubber…), menus and dialogs, so playing a song
+  // doesn't also hide the list.
+  document.addEventListener("click", (e) => {
+    if (isMobile() || app.classList.contains("nav-collapsed") || !e.target.isConnected) return;
+    const t = e.target;
+    if (t.closest(".sidebar, button, a, input, select, textarea, [role='slider'], [role='menu'], .menu, .modal-scrim, .toast, .upnext, #navToggle")) return;
+    app.classList.add("nav-collapsed");
+  });
   $("miniOpen").addEventListener("click", openDeck);
   $("miniPlay").addEventListener("click", togglePlay);
   $("search").addEventListener("input", debounce(applySearch, 120));
