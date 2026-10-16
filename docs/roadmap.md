@@ -1,7 +1,7 @@
 # Tapes roadmap
 
 Living plan for making tapes feel like a polished music product. MP3-only by
-choice. Updated 2026-10-15, after the UX audit (`AUDIT.md`).
+choice. Updated 2026-10-15, after the UX audit.
 
 ## Shipped
 
@@ -24,7 +24,7 @@ choice. Updated 2026-10-15, after the UX audit (`AUDIT.md`).
   strips YouTube cruft, splits "Artist - Song" titles, distrusts label/uploader
   artists, preserves Chinese tags. Wired into the download worker; `flask retag`
   command (dry-run default, `--write` applies + rescans). Applied: 20/33 cleaned.
-- **UX audit, all 44 findings** (2026-10-15, details in `AUDIT.md`):
+- **UX audit, all 44 findings** (2026-10-15; the audit itself is in git history):
   - phone layout library-first with a mini-player, bottom-sheet menus, 44px
     targets, draggable scrub bar;
   - in-app dialogs instead of `confirm()`/`prompt()`, a toast for every action,
