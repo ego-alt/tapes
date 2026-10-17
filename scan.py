@@ -205,6 +205,7 @@ def register_cli(app):
                              if PODCAST_DIRNAME not in p.relative_to(music_dir).parts)
 
         # Read tags + run the deterministic pass for every file up front.
+        library_artists = distinct_artists()
         entries = []
         for p in targets:
             try:
@@ -214,7 +215,7 @@ def register_cli(app):
             title = (audio.get("title") or [None])[0]
             artist = (audio.get("artist") or [None])[0]
             album = (audio.get("album") or [None])[0]
-            dt_title, dt_artist = clean_meta(title, artist)
+            dt_title, dt_artist = clean_meta(title, artist, library_artists)
             entries.append({
                 "path": p, "audio": audio, "title": title, "artist": artist,
                 "album": album, "dt_title": dt_title, "dt_artist": dt_artist,

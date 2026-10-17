@@ -92,7 +92,7 @@ def create_job():
     if not url.startswith(("http://", "https://")):
         abort(400, "Paste a full link starting with https://")
 
-    video_urls, playlist_title = expand_playlist(url)
+    video_urls, playlist_title, source = expand_playlist(url)
 
     playlist_id = None
     if playlist_title:
@@ -102,8 +102,11 @@ def create_job():
         playlist_id = pl.id
 
     jobs = []
-    for u in video_urls:
+    for i, u in enumerate(video_urls, start=1):
         job = DownloadJob(user_id=current_user.id, url=u, status="queued", playlist_id=playlist_id)
+        if source:
+            job.source_playlist = json.dumps(source)
+            job.playlist_index = i
         db.session.add(job)
         jobs.append(job)
     db.session.commit()

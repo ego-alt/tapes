@@ -24,16 +24,19 @@ _started = False
 
 
 def expand_playlist(url: str):
-    """Return (video_url_list, playlist_title) or ([url], None) for non-playlist URLs."""
+    """Return (video_url_list, playlist_title, source) for a playlist, or
+    ([url], None, None) otherwise. `source` is {"id", "title", "owner"}, kept
+    with each job so the rip can tell whether the playlist is an album."""
     try:
-        if urlparse(url).path.rstrip("/") != "/playlist":
-            return [url], None
+        path = urlparse(url).path.rstrip("/")
+        if path != "/playlist" and not path.startswith("/browse/MPREb"):   # MPREb: a YouTube Music album
+            return [url], None, None
     except Exception:
-        return [url], None
+        return [url], None, None
 
     data = youtube.flat_playlist_json(url, end=500, timeout=60)
     if data is None or data.get("_type") != "playlist":
-        return [url], None
+        return [url], None, None
 
     title = data.get("title") or "Playlist"
     urls = [
@@ -41,7 +44,11 @@ def expand_playlist(url: str):
         for e in (data.get("entries") or [])
         if e and e.get("id")
     ]
-    return (urls or [url]), title
+    if not urls:
+        return [url], title, None
+    source = {"id": data.get("id") or "", "title": data.get("title") or "",
+              "owner": data.get("uploader") or data.get("channel") or ""}
+    return urls, title, source
 
 
 def enqueue(job_id: int):
@@ -340,13 +347,21 @@ def _rip(app, job, music_dir: pathlib.Path, work: pathlib.Path):
 
     source = _read_source_meta(final_mp3, job.url)
     # A playlist rip downloads each video with --no-playlist, so the per-video
-    # info.json carries no playlist context. Supply the tape name we captured at
-    # submit time as the playlist signal so the LLM can enrich the album from it.
+    # info.json carries no playlist context. Supply what we captured at submit
+    # time: the playlist (title, owner) and this video's place in it.
+    if job.source_playlist:
+        try:
+            source["source_playlist"] = json.loads(job.source_playlist)
+        except ValueError:
+            pass
+        if job.playlist_index:
+            source["playlist_index"] = job.playlist_index
     if job.playlist_id and not source.get("playlist"):
         pl = db.session.get(Playlist, job.playlist_id)
         if pl and pl.name:
             source["playlist"] = pl.name
-    llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True))
+    llm_ok = _clean_tag(final_mp3, source=source, use_llm=app.config.get("LLM_CLEANING", True),
+                        verify_album=app.config.get("ART_LOOKUP", True))
     if app.config.get("ART_LOOKUP", True):
         _fetch_art(final_mp3)
     final_mp3 = str(_move_into_library(final_mp3, _library_path(music_dir, final_mp3)))
@@ -417,65 +432,98 @@ def _fetch_art(path: str):
         pass
 
 
-def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True):
+def _clean_tag(path: str, *, source: dict | None = None, use_llm: bool = True, verify_album: bool = False):
     """Returns True/False when the LLM pass was attempted (succeeded/failed), or
     None when it wasn't — so the caller can flag the track for a later retry."""
     llm_ok = None
+    source = source or {}
     try:
         from mutagen.easyid3 import EasyID3
+
+        from albums import album_from_playlist
+        from models import distinct_artists
         audio = EasyID3(path)
         title = (audio.get("title") or [None])[0]
         artist = (audio.get("artist") or [None])[0]
-        album = (audio.get("album") or [None])[0]
+        album = (audio.get("album") or [None])[0]       # YouTube's own, for Topic uploads
+        library_artists = distinct_artists()
+        ctx = source.get("source_playlist")
 
-        # 1. Deterministic pass — offline, can't mistag; also the LLM fallback.
-        new_title, new_artist = clean_meta(title, artist)
+        # 1. Deterministic pass — offline, can't mistag; the LLM's starting point
+        #    and its fallback. Library artists tell "Song - Artist" from "Artist - Song".
+        new_title, new_artist = clean_meta(title, artist, library_artists)
+        playlist_album = None if album else album_from_playlist(ctx, new_artist or artist or "")
 
-        # 2. LLM correction + enrichment. Falls back to the deterministic result
-        #    when unavailable or low-confidence; enrichment only fills blanks.
-        enrich = {}
+        # 2. LLM correction, and the album decision when the playlist could be one.
+        #    Falls back to the deterministic result when unavailable or unsure.
+        llm = None
         if use_llm:
             from llm_cleaning import correct_track
-            meta = {
-                "filename": pathlib.Path(path).stem,
-                "title": new_title or title,
-                "artist": new_artist or artist,
-                "album": album,
-            }
-            if source:
-                for k in ("url", "channel", "yt_track", "yt_artist", "yt_album", "year", "playlist"):
-                    if source.get(k):
-                        meta[k] = source[k]
+            meta = {"filename": pathlib.Path(path).stem, "title": new_title or title, "artist": new_artist or artist, "album": album}
+            for k in ("url", "channel", "yt_track", "yt_artist", "yt_album", "year", "playlist", "playlist_index"):
+                if source.get(k):
+                    meta[k] = source[k]
+            if ctx:
+                meta.update(playlist_id=ctx.get("id"), playlist_owner=ctx.get("owner"), playlist_album=playlist_album)
             result = correct_track(meta)
             llm_ok = result is not None
             if result and result["confidence"] in ("high", "medium"):
                 new_title = result["title"] or new_title
                 new_artist = result["artist"] or new_artist
-                enrich = result
+                llm = result
 
         # Snap the artist onto an existing library spelling (a casing/punctuation
         # variant) so the same act doesn't split into two shelves. This new rip
         # isn't in the DB yet, so the candidates are every *other* track's artist.
         if new_artist:
-            from models import distinct_artists
-            new_artist = reconcile_artist(new_artist, distinct_artists())
+            new_artist = reconcile_artist(new_artist, library_artists)
+
+        # 3. Album, track number, year.
+        tags = _album_tags(album, new_artist or artist, source, llm, verify_album)
 
         changed = False
-        if new_title and new_title != title:
-            audio["title"] = new_title
-            changed = True
-        if new_artist and new_artist != artist:
-            audio["artist"] = new_artist
-            changed = True
-        # Enrichment fills a blank album only — never overwrite source metadata.
-        if enrich.get("album") and not (audio.get("album") or [None])[0]:
-            audio["album"] = enrich["album"]
-            changed = True
+        for key, value in (("title", new_title), ("artist", new_artist), *tags.items()):
+            if value and (audio.get(key) or [None])[0] != value:
+                audio[key] = value
+                changed = True
         if changed:
             audio.save()
     except Exception:  # noqa: BLE001
         pass
     return llm_ok
+
+
+def _album_tags(album: str | None, artist: str | None, source: dict, llm: dict | None, verify: bool) -> dict:
+    """Album, track number and year for a rip.
+
+    The album comes from, in order: YouTube's own (Topic uploads); the LLM,
+    which weighs the playlist's title, owner and position; and, when the LLM
+    is unavailable, albums.album_from_playlist (optionally confirmed against
+    MusicBrainz). An album spelled differently from one already in the library
+    takes the library's spelling, so it doesn't split in two."""
+    from albums import album_from_playlist, is_album_order, reconcile_album
+    from models import Track
+
+    ctx = source.get("source_playlist")
+    track_no = None
+    if not album and llm is not None:
+        album, track_no = llm.get("album"), llm.get("track_no")
+    elif not album:
+        confirm = None
+        if verify:
+            from art import confirm_album as confirm
+        album = album_from_playlist(ctx, artist or "", verify=confirm)
+    tags = {}
+    if album:
+        existing = [r[0] for r in db.session.query(Track.album).filter(Track.artist == artist).distinct()]
+        tags["album"] = reconcile_album(album, existing)
+        if not track_no and source.get("playlist_index") and is_album_order(ctx, artist or "", album):
+            track_no = source["playlist_index"]
+        if track_no:
+            tags["tracknumber"] = str(track_no)
+    if source.get("year"):
+        tags["date"] = str(source["year"])
+    return tags
 
 
 # ---------- podcasts (download-on-play) ----------
