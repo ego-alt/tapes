@@ -9,6 +9,7 @@ Cover Art Archive has no key and no hard limit, but we stay polite.
 
 Everything returns None / no-ops on a miss so callers keep the existing art.
 """
+import functools
 import json
 import os
 import threading
@@ -56,6 +57,26 @@ def _search_releases(artist: str, album: str, limit: int = 5):
     data = json.loads(_get(url, "application/json"))
     releases = data.get("releases") or []
     return [r for r in releases if (r.get("score") or 0) >= _MIN_SCORE]
+
+
+@functools.lru_cache(maxsize=256)
+def confirm_album(artist: str, album: str) -> str | None:
+    """MusicBrainz's name for `album` by `artist` when it has a release by that
+    name, else None. Used to confirm an album read from a playlist title and to
+    take its proper spelling ("good kid, m.A.A.d city")."""
+    if not (artist and album):
+        return None
+    norm = lambda s: "".join(c for c in (s or "").lower().replace("’", "'") if c.isalnum())  # noqa: E731
+    try:
+        releases = _search_releases(artist, album)
+    except Exception:  # noqa: BLE001 — offline or rate-limited: unconfirmed, not an error
+        return None
+    for rel in releases:
+        title = rel.get("title") or ""
+        credit = " ".join(c.get("name", "") for c in rel.get("artist-credit") or [] if isinstance(c, dict))
+        if norm(title) == norm(album) and norm(artist) in norm(credit):
+            return title
+    return None
 
 
 def fetch_cover(artist: str, album: str, *, size: int = 500) -> bytes | None:

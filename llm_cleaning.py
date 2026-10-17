@@ -10,9 +10,12 @@ What the model does:
   - Corrects title/artist (cruft removal, capitalization, Artist/Title split,
     featured-artist handling). It is told NOT to invent — clean input passes
     through unchanged.
-  - Enriches the album, but ONLY when it lists "album" in `enriched` (its own
-    high-confidence signal); otherwise album comes back null and is left alone.
-    Enrichment fills a blank album; it never overwrites an existing tag.
+  - Decides the album, using the playlist the track was ripped from (its title,
+    owner and this track's position) as the main evidence: an artist's own
+    playlist, a "Artist - Album (Full Album)" upload or a YouTube Music album
+    is that album. Applied only when it lists "album" in `enriched`; it fills a
+    blank album and never overwrites YouTube's own.
+  - Gives the track number when the playlist is the album in order.
 
 Two entry points share one request shape:
   correct_track(meta)           -> one synchronous call (per rip)
@@ -52,10 +55,11 @@ _TOOL = {
             },
             "album": {
                 "type": ["string", "null"],
-                "description": (
-                    "Original studio/EP album for THIS exact recording, only if you are "
-                    "highly confident from your own knowledge; otherwise null. Never guess."
-                ),
+                "description": "The album this recording belongs to, spelled as officially released; null if unknown or if the playlist is not an album.",
+            },
+            "track_no": {
+                "type": ["integer", "null"],
+                "description": "Track number on that album; null unless you know it or the playlist is the album in order.",
             },
             "confidence": {
                 "type": "string",
@@ -68,7 +72,7 @@ _TOOL = {
                 "description": "Include \"album\" only if you are confident enough to apply it; otherwise leave empty.",
             },
         },
-        "required": ["title", "artist", "album", "confidence", "enriched"],
+        "required": ["title", "artist", "album", "track_no", "confidence", "enriched"],
         "additionalProperties": False,
     },
 }
@@ -85,12 +89,23 @@ _SYSTEM = (
     "- Do NOT invent or translate. If the title/artist are already clean, return them "
     "unchanged.\n"
     "You may also be given the source URL, the uploader/channel (often the artist, or "
-    "their VEVO/'- Topic'/label channel), the source playlist name, and yt-dlp's own "
-    "parsed track/artist/album/year. Treat these as evidence — the channel is a strong "
-    "artist hint and yt-dlp's album is usually reliable — but still never invent.\n"
-    "Enrichment (album): fill it ONLY when you are confident from the signals above or "
-    "your own knowledge of this exact recording. If unsure, set album to null and leave "
-    "`enriched` empty. Prefer null over a plausible-but-uncertain guess.\n"
+    "their VEVO/'- Topic'/label channel), yt-dlp's own parsed track/artist/album/year, "
+    "and the playlist the track was downloaded from: its title, its owner, and this "
+    "track's position in it. Treat these as evidence — the channel is a strong artist "
+    "hint and yt-dlp's album is reliable — but never invent.\n"
+    "Album: decide whether the playlist IS an album by this artist. It is when its owner "
+    "is the artist (e.g. 'Sunburn' on Dominic Fike's channel), when the title names the "
+    "artist and an album ('Dominic Fike - Sunburn (Full Album)', 'SZA 'SOS' Album', "
+    "'Sunburn by Dominic Fike'), or when it is a YouTube Music album (id starting "
+    "OLAK5uy_). It is NOT when it is a mood or mix ('chill vibes', 'Frank Ocean but "
+    "slowed', '8D', 'sped up'), a channel section ('Uploads', 'Music Videos', 'Singles'), "
+    "a compilation of several artists, or names a different artist. A parsed guess may be "
+    "given; correct it if wrong. Give the album its official name and capitalisation "
+    "('don’t forget about me, demos' → \"Don't Forget About Me, Demos\"). If the playlist "
+    "is not an album, you may still give the album from your own knowledge of this exact "
+    "recording, but only when certain. When the playlist is the album in order, its "
+    "position is the track number. List \"album\" in `enriched` only when you are "
+    "confident; prefer null over a plausible guess.\n"
     "Always call the corrected_metadata tool exactly once."
 )
 
@@ -114,6 +129,10 @@ def _user_content(meta: dict) -> str:
         ("Source URL", meta.get("url")),
         ("Source channel/uploader", meta.get("channel")),
         ("Source playlist", meta.get("playlist")),
+        ("Playlist id", meta.get("playlist_id")),
+        ("Playlist owner", meta.get("playlist_owner")),
+        ("Position in playlist", meta.get("playlist_index")),
+        ("Album parsed from the playlist", meta.get("playlist_album")),
         ("Current title", meta.get("title")),
         ("Current artist", meta.get("artist")),
         ("Current album", meta.get("album")),
@@ -145,11 +164,14 @@ def _normalize(raw: dict) -> dict:
         v = raw.get(key)
         return v.strip() if isinstance(v, str) and v.strip() else None
 
+    track_no = raw.get("track_no")
+    album = _str("album") if "album" in enriched else None
     return {
         "title": _str("title"),
         "artist": _str("artist"),
         "confidence": raw.get("confidence") or "low",
-        "album": _str("album") if "album" in enriched else None,
+        "album": album,
+        "track_no": track_no if album and isinstance(track_no, int) and 0 < track_no < 1000 else None,
     }
 
 

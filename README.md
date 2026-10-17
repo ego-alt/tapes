@@ -10,7 +10,7 @@ A personal music streamer for the home stack, built around a cassette deck: the 
 - **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. `L` turns levelling off.
 - **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
 - **Rip** any link to MP3 with `yt-dlp` and `ffmpeg`; a playlist link becomes a new tape. Duplicates are caught by URL and by acoustic fingerprint.
-- **Tidy tags**: titles and artists are cleaned on rip, optionally refined by Claude (Haiku); cover art comes from MusicBrainz when there's a confident match.
+- **Tidy tags**: titles and artists are cleaned on rip and refined by Claude (Haiku) when a key is set. Rips from an album playlist (the artist's own, a "Full Album" upload, or a YouTube Music album) get the album, track number and year. Cover art comes from MusicBrainz when there's a confident match.
 - **Podcasts**: follow RSS feeds or YouTube channels; episodes stream while they download, with skips, speed and resume.
 - **Safe edits**: deletes go to a 30-day trash with Undo; artist renames show any merge first.
 - **Installable**, and works offline once loaded. `?` lists the keyboard shortcuts.
@@ -58,7 +58,7 @@ uv run flask --app app:create_app purge-trash [--days 30]   # empty the trash
 uv run flask --app app:create_app db migrate -m "what changed"   # after editing models.py
 ```
 
-`retag` and `art` only preview until you add `--write`. `retag --llm` uses the Message Batches API (about half price, can take up to an hour); `retag --llm --pending` sweeps up rips whose Claude pass was skipped.
+`retag` and `art` only preview until you add `--write`. `uv run python scripts/eval_metadata.py [--llm]` scores the cleanup against ~670 real YouTube titles and playlists in `tests/fixtures`. `retag --llm` uses the Message Batches API (about half price, can take up to an hour); `retag --llm --pending` sweeps up rips whose Claude pass was skipped.
 
 `analyze` writes standard ReplayGain tags into each file (tags only; the audio is untouched), so other players get the same levelling.
 

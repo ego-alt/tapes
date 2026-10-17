@@ -226,6 +226,10 @@ class DownloadJob(db.Model):
     kind = db.Column(db.String, nullable=False, default="music")  # music | podcast
     track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"))
     playlist_id = db.Column(db.Integer, db.ForeignKey("playlists.id"), nullable=True)
+    # The YouTube playlist this came from, as JSON {"id", "title", "owner"}, and
+    # its position there: what albums.album_from_playlist reads at rip time.
+    source_playlist = db.Column(db.Text)
+    playlist_index = db.Column(db.Integer)
     episode_id = db.Column(db.Integer, db.ForeignKey("episodes.id"), nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
     # What came of it, for the panel: added | exists | duplicate | error.
