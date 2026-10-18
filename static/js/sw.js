@@ -1,6 +1,6 @@
 // Offline support for Tapes.
 //
-// One cache, "shell": the page, our static files, fonts, covers and the JSON
+// One cache, "shell": the page, our static files (fonts included), covers and the JSON
 // lists (shelves, tapes, albums, artists, shows, episodes). Pages and JSON are
 // network-first (fresh online, last copy offline); static files are
 // stale-while-revalidate. Audio is never cached here: streams use Range
@@ -9,9 +9,8 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/music/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'tapes-shell-v1';
+const SHELL_CACHE = 'tapes-shell-v2';
 const ROOT = new URL(self.registration.scope).pathname;   // always ends in "/"
-const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
 
 // Never touched: audio, the live rip stream, auth, health and the worker.
 const PASSTHROUGH = ['stream/', 'podcast/stream/', 'api/downloads', 'auth/', 'login', 'logout',
@@ -39,11 +38,7 @@ self.addEventListener('fetch', (event) => {
     if (request.method !== 'GET' || request.headers.has('range')) return;
     const url = new URL(request.url);
 
-    if (url.origin !== self.location.origin) {
-        if (FONT_HOSTS.has(url.hostname)) event.respondWith(staleWhileRevalidate(request));
-        return;
-    }
-    if (!url.pathname.startsWith(ROOT)) return;
+    if (url.origin !== self.location.origin || !url.pathname.startsWith(ROOT)) return;
     const path = url.pathname.slice(ROOT.length);
     if (PASSTHROUGH.some((p) => path.startsWith(p))) return;
 
@@ -76,7 +71,7 @@ async function staleWhileRevalidate(request) {
     const cache = await caches.open(SHELL_CACHE);
     const cached = await cache.match(request);
     const network = fetch(request).then((response) => {
-        if (response.ok || response.type === 'opaque') cache.put(request, response.clone());
+        if (response.ok) cache.put(request, response.clone());
         return response;
     }).catch(() => cached);
     return cached || network;

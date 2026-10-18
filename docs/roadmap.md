@@ -46,18 +46,14 @@ choice. Updated 2026-10-15, after the UX audit.
   server (on rip, plus a background pass) and written as ReplayGain tags.
   Tracks over 15 minutes, and far seeks in a song that hit the browser's
   memory limit, play the plain way. Podcasts keep a plain element (their
-  streams can be cross-origin). `L` toggles levelling; a visible control is
-  still to come.
+  streams can be cross-origin). `L` or the bars button beside the sleep
+  timer toggles levelling.
 
 ## Open loops
 
 1. **Check the one mispointed tape.** An old DB incident (SQLite id reuse) left
    one tape's contents pointing at the wrong songs; the original mapping is
    unrecoverable, so clearing that tape is the honest fix.
-2. **One rip queue per gunicorn worker.** With 2 workers, each keeps its own
-   in-memory queue and both requeue unfinished jobs on start, so a rip left
-   mid-flight by a restart can run twice. Fix: claim jobs in the database
-   (`UPDATE … WHERE status='queued'`) or run one worker for rips. *effort: S*
 
 ## Next features (prioritised)
 

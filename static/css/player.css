@@ -172,6 +172,8 @@
 
 /* Podcast-only controls (skip ±, speed) appear while an episode is loaded. */
 .deck:not(.is-episode) .ep-only { display: none; }
+/* Levelling applies to music only. */
+.deck.is-episode .music-only { display: none; }
 .speed-btn {
     font: 600 var(--text-sm) var(--font-mono);
     color: var(--color-text-secondary);
@@ -300,7 +302,7 @@
     .upnext-bar { justify-content: center; min-height: 44px; }
     .upnext-panel { width: 100%; max-height: 60dvh; border: 0; box-shadow: none; background: none; }
     .q-drag, .q-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-    .tbtn.sleep { width: 46px; height: 46px; }
+    .tbtn.sleep, .tbtn.level { width: 46px; height: 46px; }
 }
 
 /* Short viewports (landscape phones): shrink the deck so transport stays on-screen. */

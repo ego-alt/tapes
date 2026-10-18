@@ -157,6 +157,7 @@
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
+    level: svgIcon('<path d="M6 7v10M10 7v10M14 7v10M18 7v10"/>'),   // bars at one height
   };
 
   let shelf = [];         // tapes
@@ -1944,16 +1945,23 @@
   window.addEventListener("online", () => { if (held) resumeAfterReconnect(); });
   audio.addEventListener("waiting", () => { if (!navigator.onLine) holdForReconnect(); });
   $("upnextBar").addEventListener("click", toggleUpNext);
+  // Like songs, a deleted tape goes to the trash; the toast's Undo brings it
+  // back with its track list. The songs themselves never leave the library.
   $("tapeDelBtn").addEventListener("click", async () => {
     if (!currentTape) return;
-    if (!await askConfirm(`Delete the tape “${currentTape.name}”?`, {
-      detail: "The songs stay in your library.", ok: "Delete", danger: true })) return;
-    try { await jsend(`api/playlists/${currentTape.key}`, "DELETE"); }
+    const tape = currentTape;
+    try { await jsend(`api/playlists/${tape.key}`, "DELETE"); }
     catch (e) { console.error(e); toast(errText(e, "Couldn't delete the tape.")); return; }
     currentTape = null;
     $("tracksView").hidden = true;
     $("shelfView").hidden = false;
     loadShelf();
+    toast(`Deleted the tape “${tape.name}”`, { action: "Undo", onAction: async () => {
+      try { await jsend(`api/playlists/${tape.key}/restore`, "POST"); }
+      catch (e) { console.error(e); toast(errText(e, "Couldn't bring the tape back.")); return; }
+      await loadShelf();
+      toast(`Restored “${tape.name}”`);
+    } });
   });
   $("navToggle").addEventListener("click", () =>
     isMobile() ? closeDeck() : app.classList.toggle("nav-collapsed"));
@@ -2110,10 +2118,20 @@
   // Volume levelling: every song (or album) at the same loudness. On by default.
   let levelling = localStorage.getItem("tapes-levelling") !== "off";
   audio.setLevelling(levelling);
+  const levelBtn = $("levelBtn");
+  levelBtn.innerHTML = ICONS.level;
+  function showLevelling() {
+    levelBtn.classList.toggle("active", levelling);
+    levelBtn.setAttribute("aria-pressed", String(levelling));
+    levelBtn.title = levelling ? "Volume levelling on (L)" : "Volume levelling off (L)";
+  }
+  showLevelling();
+  levelBtn.addEventListener("click", () => toggleLevelling());
   function toggleLevelling() {
     levelling = !levelling;
     try { localStorage.setItem("tapes-levelling", levelling ? "on" : "off"); } catch (_) { /* private mode */ }
     audio.setLevelling(levelling);
+    showLevelling();
     toast(levelling ? "Volume levelling on" : "Volume levelling off");
   }
   function toggleMute() {

@@ -364,8 +364,11 @@ kbd {
 .sort-bar .sort-select { width: 100%; cursor: pointer; }
 
 /* sleep timer button */
-.tbtn.sleep { width: 40px; height: 40px; }
+.tbtn.sleep, .tbtn.level { width: 40px; height: 40px; }
 .tbtn.sleep.active { color: var(--color-accent); border-color: var(--color-accent); }
+/* Levelling is on by default, so "on" looks like any other control; off is dimmed. */
+.tbtn.level:not(.active) { color: var(--color-text-muted); }
+.tbtn.level:not(.active) .icn { opacity: 0.45; }
 .sleep-count { font-size: 0.72rem; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* transient toast (fetch/error feedback) */

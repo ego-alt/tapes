@@ -8,9 +8,8 @@
   <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400..700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='fonts/caveat/caveat.css') }}" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/structural.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
@@ -427,6 +426,7 @@
             <button class="tbtn" id="nextBtn" title="Next" aria-label="Next"></button>
             <button class="tbtn ep-only" id="fwd30Btn" title="Forward 30 seconds" aria-label="Forward 30 seconds"></button>
             <button class="tbtn sleep" id="sleepBtn" title="Sleep timer" aria-label="Sleep timer" aria-pressed="false"></button>
+            <button class="tbtn level music-only" id="levelBtn" title="Volume levelling" aria-label="Volume levelling" aria-pressed="true"></button>
           </div>
           <button class="speed-btn ep-only" id="speedBtn" title="Playback speed" aria-label="Playback speed 1×">1×</button>
         </div>
@@ -540,6 +540,7 @@
       epEpisodeCoverBase: "{{ url_for('podcasts.episode_cover', eid=0) }}".slice(0, -1),
     };
   </script>
+  <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
   <script src="{{ url_for('static', filename='js/deck-audio.js') }}"></script>
   <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
