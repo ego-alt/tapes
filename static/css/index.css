@@ -153,6 +153,9 @@ body {
     font-size: var(--text-lg);
     line-height: 1;
 }
+/* Icons take their size from their container; without this the toggle drew
+   at 0×0 on desktop, so a closed library couldn't be opened again. */
+.nav-toggle .icn { width: 20px; height: 20px; }
 
 /* The mini-player only exists on phones. */
 .mini { display: none; }
