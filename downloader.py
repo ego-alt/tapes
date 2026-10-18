@@ -55,17 +55,27 @@ def enqueue(job_id: int):
     _job_queue.put(job_id)
 
 
+def recover_interrupted_jobs():
+    """Put jobs a restart cut off ("running" with no one running them) back in
+    the queue. Under gunicorn this runs once in the master, before any worker
+    starts; in a worker it could reset a job its sibling is busy with."""
+    n = DownloadJob.query.filter_by(status="running").update({"status": "queued"})
+    db.session.commit()
+    return n
+
+
 def start_worker(app):
     global _started
     if _started:
         return
     _started = True
     with app.app_context():
-        # Requeue anything left mid-flight by a previous run.
-        for j in DownloadJob.query.filter(DownloadJob.status.in_(["queued", "running"])).all():
-            j.status = "queued"
-            _job_queue.put(j.id)
-        db.session.commit()
+        if not os.environ.get("TAPES_JOBS_RECOVERED"):   # set by gunicorn's on_starting
+            recover_interrupted_jobs()
+        # Each worker process has its own queue; a job is run by whichever
+        # worker claims it first (see _claim), so listing it in both is safe.
+        for (job_id,) in db.session.query(DownloadJob.id).filter_by(status="queued").all():
+            _job_queue.put(job_id)
     threading.Thread(target=_loop, args=(app,), daemon=True).start()
     if app.config.get("AUDIO_ANALYSIS", True):
         # Measure loudness + gapless info for the rest of the library, slowly.
@@ -242,10 +252,19 @@ def _move_into_library(src: str, dest: pathlib.Path) -> pathlib.Path:
         return cand
 
 
+def _claim(job_id: int) -> bool:
+    """Mark a queued job running, atomically: with more than one worker process
+    each holding its own queue, only the one that wins this update runs it."""
+    claimed = (DownloadJob.query.filter_by(id=job_id, status="queued")
+               .update({"status": "running", "progress": 0, "message": ""}))
+    db.session.commit()
+    return claimed == 1
+
+
 def _process(app, job_id: int):
+    if not _claim(job_id):
+        return                                       # done, or another worker has it
     job = db.session.get(DownloadJob, job_id)
-    if not job or job.status == "done":
-        return
 
     if job.kind == "podcast":
         _process_podcast(app, job)
@@ -260,11 +279,6 @@ def _process(app, job_id: int):
         _finish(job, "exists", existing.title)
         db.session.commit()
         return
-
-    job.status = "running"
-    job.progress = 0
-    job.message = ""
-    db.session.commit()
 
     music_dir = pathlib.Path(app.config["MUSIC_DIR"])
     # Each rip works in its own folder (a dot-dir, so scans skip it) and only
