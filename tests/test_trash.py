@@ -98,3 +98,35 @@ def test_artist_rename_preview_merge_and_undo(app, client, add_track):
     assert u.status_code == 200
     assert db.session.get(Track, b1.id).artist == "the reels."
     assert db.session.get(Track, a1.id).artist == db.session.get(Track, a2.id).artist == "The Reels"
+
+
+def test_deleted_tape_waits_in_the_trash_and_comes_back(app, client, add_track):
+    a, b = add_track(title="One"), add_track(title="Two")
+    key = client.post("/api/playlists", json={"name": "Road trip"}).get_json()["key"]
+    for t in (a, b):
+        client.post(f"/api/playlists/{key}/tracks", json={"track_id": t.id})
+    assert client.delete(f"/api/playlists/{key}").status_code == 204
+    assert key not in [s["key"] for s in client.get("/api/playlists").get_json()]
+    assert client.get(f"/api/playlists/{key}/tracks").status_code == 404
+    r = client.post(f"/api/playlists/{key}/restore")
+    assert r.status_code == 200 and r.get_json()["name"] == "Road trip"
+    assert [t["title"] for t in client.get(f"/api/playlists/{key}/tracks").get_json()] == ["One", "Two"]
+    assert client.post(f"/api/playlists/{key}/restore").status_code == 404   # not in the trash now
+
+
+def test_old_deleted_tapes_are_purged(app, client, add_track):
+    from datetime import datetime, timedelta
+
+    from models import Playlist, PlaylistTrack, db
+    from trash import purge_trash
+    t = add_track(title="Kept")
+    key = client.post("/api/playlists", json={"name": "Old"}).get_json()["key"]
+    client.post(f"/api/playlists/{key}/tracks", json={"track_id": t.id})
+    client.delete(f"/api/playlists/{key}")
+    p = Playlist.query.execution_options(include_deleted=True).filter_by(id=int(key)).one()
+    p.deleted_at = datetime.now() - timedelta(days=31)
+    db.session.commit()
+    purge_trash(app)
+    assert Playlist.query.execution_options(include_deleted=True).filter_by(id=int(key)).first() is None
+    assert PlaylistTrack.query.filter_by(playlist_id=int(key)).count() == 0
+    assert client.get("/api/playlists/all/tracks").get_json()[0]["title"] == "Kept"   # songs stay

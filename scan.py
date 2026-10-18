@@ -162,7 +162,7 @@ def register_cli(app):
     def purge_trash_cmd(days):
         """Permanently remove old songs from the library trash."""
         from trash import purge_trash
-        click.echo(f"Purged {purge_trash(app, days)} song(s) from the trash.")
+        click.echo(f"Purged {purge_trash(app, days)} song(s) from the trash (and any tapes deleted as long ago).")
 
     @app.cli.command("scan")
     @click.option("--full", is_flag=True, help="Re-read every file, ignore the mtime cache.")

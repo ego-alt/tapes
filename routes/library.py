@@ -121,11 +121,25 @@ def rename_playlist(pid):
 @library_blueprint.route("/api/playlists/<int:pid>", methods=["DELETE"])
 @login_required
 def delete_playlist(pid):
+    """Move a tape to the trash (undoable via /restore); its songs stay in the
+    library and its track list is kept until the trash is purged."""
     p = Playlist.query.filter_by(id=pid, user_id=_uid()).first_or_404()
-    PlaylistTrack.query.filter_by(playlist_id=p.id).delete()
-    db.session.delete(p)
-    db.session.commit()
+    from trash import purge_trash, trash_playlist
+    trash_playlist(p)
+    purge_trash(current_app)
     return "", 204
+
+
+@library_blueprint.route("/api/playlists/<int:pid>/restore", methods=["POST"])
+@login_required
+def restore_playlist_route(pid):
+    """Undo a tape delete."""
+    from trash import get_trashed_playlist, restore_playlist
+    p = get_trashed_playlist(pid, _uid())
+    if p is None:
+        abort(404, "That tape isn't in the trash any more.")
+    restore_playlist(p)
+    return jsonify({"key": str(p.id), "name": p.name, "kind": "user"})
 
 
 # Sort orders offered for the All Tracks / Singles views. The play-based ones

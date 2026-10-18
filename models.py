@@ -81,13 +81,14 @@ class Track(db.Model):
 
 
 @event.listens_for(Session, "do_orm_execute")
-def _hide_trashed_tracks(state):
-    """Trashed tracks are invisible to every ORM query — shelves, counts, albums,
-    artists, streaming, dedup — unless a caller opts in with
+def _hide_trashed(state):
+    """Trashed tracks and tapes are invisible to every ORM query — shelves,
+    counts, albums, artists, streaming, dedup — unless a caller opts in with
     execution_options(include_deleted=True) (scan, restore, purge)."""
     if state.is_select and not state.execution_options.get("include_deleted", False):
         state.statement = state.statement.options(
-            with_loader_criteria(Track, Track.deleted_at.is_(None), include_aliases=True))
+            with_loader_criteria(Track, Track.deleted_at.is_(None), include_aliases=True),
+            with_loader_criteria(Playlist, Playlist.deleted_at.is_(None), include_aliases=True))
 
 
 def distinct_artists():
@@ -107,6 +108,8 @@ class Playlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     name = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, server_default=func.now())
+    # Set while the tape sits in the trash; hidden like trashed tracks.
+    deleted_at = db.Column(db.DateTime, index=True)
 
 
 class PlaylistTrack(db.Model):
