@@ -22,4 +22,5 @@ ENV FLASK_APP=app:create_app
 EXPOSE 5003
 
 # gunicorn.conf.py runs the database migrations before starting workers.
-CMD ["sh", "-c", "exec uv run gunicorn 'app:create_app()' -c gunicorn.conf.py"]
+# Straight from the virtualenv: `uv run` would install the dev tools on every start.
+CMD [".venv/bin/gunicorn", "app:create_app()", "-c", "gunicorn.conf.py"]
