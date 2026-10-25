@@ -152,7 +152,7 @@
     border: 1px solid var(--color-border);
     background: var(--color-bg-elevated);
     color: var(--color-text-primary);
-    font-size: 1rem;
+    font-size: var(--text-base);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -163,7 +163,7 @@
 .tbtn:active { transform: translateY(1px); }
 .tbtn.play {
     width: 60px; height: 60px;
-    font-size: 1.4rem;
+    font-size: var(--text-xl);
     background: var(--color-accent);
     border-color: var(--color-accent);
     color: #1b1b1b;
@@ -270,7 +270,7 @@
 .q-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .q-drag svg, .q-btn svg { width: 16px; height: 16px; }
 .q-sub { font-size: var(--text-sm); color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.q-btn { background: none; border: 0; color: var(--color-text-muted); cursor: pointer; padding: 4px 5px; font-size: 0.95rem; line-height: 1; flex-shrink: 0; opacity: 0; transition: opacity 0.12s, color 0.12s; }
+.q-btn { background: none; border: 0; color: var(--color-text-muted); cursor: pointer; padding: 4px 5px; font-size: var(--text-base); line-height: 1; flex-shrink: 0; opacity: 0; transition: opacity 0.12s, color 0.12s; }
 .q-row:hover .q-btn { opacity: 1; }
 .q-btn:hover { color: var(--color-text-primary); }
 .q-rm:hover { color: var(--color-danger-hover); }

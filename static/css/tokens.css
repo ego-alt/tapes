@@ -1,10 +1,34 @@
-/* Theme tokens — Tapes' chromatic identity (Gruvbox dark + orange accent).
- *
- * Structural tokens (spacing, radii, type, fonts, motion) live in
- * structural.css, shared byte-identical across the home stack. Role names here
- * follow the contract in dashboard/docs/ui-spec.md; only the *values* are
- * app-specific. Swap these and the whole app re-skins. */
+/* Tokens — every size and colour Tapes uses (Gruvbox dark, orange accent).
+ * Nothing outside this file sets a raw font size (tests/test_style_tokens.py
+ * checks). Role names follow dashboard/docs/ui-spec.md. */
 :root {
+    /* Spacing (× 4px) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+
+    /* Corners */
+    --radius-sm: 4px;       /* inputs, small chrome */
+    --radius-md: 8px;       /* cards, buttons, modals */
+    --radius-lg: 16px;      /* the phone's bottom sheet */
+    --radius-pill: 9999px;  /* pills, round buttons */
+
+    /* Type: five sizes. The cassette label's handwriting scales with the
+       cassette instead (player.css). */
+    --text-xs: 0.75rem;     /* 12: key hints, counts, badges */
+    --text-sm: 0.875rem;    /* 14: secondary text, lists */
+    --text-base: 1rem;      /* 16: body, inputs, transport icons */
+    --text-lg: 1.25rem;     /* 20: headings */
+    --text-xl: 1.5rem;      /* 24: the play button */
+    --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Motion */
+    --dur-base: 0.2s;
+    --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
     --color-bg-base: #282828;
     --color-bg-elevated: #3c3836;
     --color-bg-pane: #151515;          /* the library sidebar: near-black, like calendar's drawers */
@@ -31,3 +55,5 @@
     --track-hover: var(--color-bg-inset);
     --art-shadow: var(--color-shadow);
 }
+
+/* One breakpoint: 640px (a convention, since @media can't read a var()). */
