@@ -1,13 +1,37 @@
 # Tapes
 
-A personal music streamer for the home stack, built around a cassette deck: the tape winds from reel to reel as a song plays, and the label is handwritten with the current track.
+A personal music streamer for the home stack, made for the phone and built around a cassette: each album or tape gets its own printed retro label with the song written on it in ballpoint, the reels wind as it plays and a VU needle follows the music.
 
-![Tapes](images/tapes-2026-10-16.png)
+![The deck](images/tapes-deck.jpg)
+
+## On your phone
+
+Installed from the browser it behaves like an app: the mini player keeps what's playing in reach, the deck has just previous, play and next (its ⋯ holds two settings), and back closes whatever's open. Turn the phone on its side, or tap the tape, and the cassette fills the screen with no buttons at all; a swipe down slides the library out beside it.
+
+![Library, deck, full screen and full screen with the library](images/tapes-phone.jpg)
+
+In full screen the tape is the control:
+
+| Gesture | Does |
+|---|---|
+| Tap the left or right side | Previous or next song |
+| Tap the middle | Play or pause |
+| Double-tap a side | Back or forward 10 seconds |
+| Press and hold a side | Rewind or fast-forward while held |
+| Swipe down | The library slides out beside the tape (upright: back to the deck) |
+| Shake the phone | Shuffle |
+
+Elsewhere: swipe the mini player up to open the deck, the deck down to close it, and the tape sideways to skip.
+
+## The labels
+
+Eight designs, all in one palette of red, orange, mustard and brown on cream: the classic four bands, diagonal, rainbow, sunburst, waves, split, bauhaus and swoosh. An album (or a tape of yours) always gets the same one, and the cover's colour glows behind the tape.
+
+![The label designs](images/tapes-labels.jpg)
 
 ## Features
 
-- **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder (a queued song plays next), lock-screen controls, and your queue resumes across devices. On a phone it behaves like an app: back closes what's open, swipe the deck down to close it or the tape sideways to skip.
-- **A tape in a deck**: each album or tape gets its own retro label (red, orange, mustard and brown on cream), written in ballpoint, with the cover's colour glowing behind it; a VU needle follows the music, the reels whir on a skip or seek, and a new tape ejects the old one. The lock screen shows the cassette with the song on its label. Tap the tape, or turn the phone on its side, and the cassette fills the screen.
+- **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder (a queued song plays next), lock-screen controls that show the cassette, and your queue resumes across devices. The reels whir on a skip or seek, and a new tape ejects the old one.
 - **Keep playing**: when a tape or album runs out, related songs follow (ones you play together, the same artists, your favourites) and the tape turns over to side B. Off in the deck's ⋯ menu.
 - **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. Levelling can be turned off in the deck's ⋯ menu.
 - **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
@@ -47,6 +71,8 @@ Tests and lint: `uv run pytest` and `uv run ruff check .`
 Served at `/music/` behind the [dashboard](../dashboard)'s nginx, which signs people in and serves the audio itself (`X-Accel-Redirect`). On the Pi, set `MUSIC_HOST_DIR` to the library's location. After adding a user in the dashboard, run `uv run python scripts/sync_household_users.py` there.
 
 Commits merged to `main` that pass CI deploy to the Pi on their own (see the dashboard README). The container applies database migrations when it starts.
+
+To install it on a phone, open it at the Pi's Tailscale HTTPS address, `https://raspberrypi.tail4dd650.ts.net:8443/music/` (`tailscale serve`, with a real certificate; the self-signed one on the LAN address can't install apps), sign in, and choose Install from Chrome's menu.
 
 ## Commands
 
