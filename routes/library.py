@@ -94,12 +94,23 @@ def playlists():
     return jsonify(shelf)
 
 
-@library_blueprint.route("/api/playlists", methods=["POST"])
-@login_required
-def create_playlist():
+def _tape_name(pid=None):
+    """The name from the request, checked: present, and not another of your
+    tapes' (two tapes with one name can't be told apart in "Add to…")."""
     name = (request.json or {}).get("name", "").strip()
     if not name:
         abort(400, "Give the tape a name.")
+    taken = Playlist.query.filter(Playlist.user_id == _uid(), Playlist.deleted_at.is_(None),
+                                  db.func.lower(Playlist.name) == name.lower(), Playlist.id != pid)
+    if taken.first():
+        abort(409, f"You already have a tape called “{name}”.")
+    return name
+
+
+@library_blueprint.route("/api/playlists", methods=["POST"])
+@login_required
+def create_playlist():
+    name = _tape_name()
     p = Playlist(user_id=_uid(), name=name)
     db.session.add(p)
     db.session.commit()
@@ -110,10 +121,7 @@ def create_playlist():
 @login_required
 def rename_playlist(pid):
     p = Playlist.query.filter_by(id=pid, user_id=_uid()).first_or_404()
-    name = (request.json or {}).get("name", "").strip()
-    if not name:
-        abort(400, "Give the tape a name.")
-    p.name = name
+    p.name = _tape_name(pid)
     db.session.commit()
     return jsonify({"key": str(p.id), "name": p.name})
 
@@ -478,6 +486,8 @@ def update_track(track_id):
             track_no = int(raw) if raw not in (None, "") else None
         except (TypeError, ValueError):
             abort(400, "Track number must be a number.")
+        if track_no is not None and track_no < 1:
+            abort(400, "Track number must be 1 or more.")
 
     if title is not None:
         t.title = title

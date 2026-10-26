@@ -29,6 +29,14 @@ def test_clearing_track_number_explicitly_still_works(client, add_track):
     assert db.session.get(Track, t.id).track_no is None
 
 
+def test_track_number_below_one_is_refused(client, add_track):
+    t = add_track(track_no=4)
+    r = client.patch(f"/api/tracks/{t.id}", json={"track_no": "-3"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "Track number must be 1 or more."
+    assert db.session.get(Track, t.id).track_no == 4
+
+
 def test_remove_from_tape_keeps_track_in_library(app, client, add_track):
     t = add_track()
     pid = client.post("/api/playlists", json={"name": "Road trip"}).get_json()["key"]
@@ -53,3 +61,13 @@ def test_add_to_tape_reports_duplicates(client, add_track):
     pid = client.post("/api/playlists", json={"name": "Road trip"}).get_json()["key"]
     assert client.post(f"/api/playlists/{pid}/tracks", json={"track_id": t.id}).get_json() == {"added": True, "tape": "Road trip"}
     assert client.post(f"/api/playlists/{pid}/tracks", json={"track_id": t.id}).get_json() == {"added": False, "tape": "Road trip"}
+
+
+def test_two_tapes_cant_share_a_name(client):
+    pid = client.post("/api/playlists", json={"name": "Road trip"}).get_json()["key"]
+    other = client.post("/api/playlists", json={"name": "Summer"}).get_json()["key"]
+    assert client.post("/api/playlists", json={"name": "road trip "}).status_code == 409
+    assert client.patch(f"/api/playlists/{other}", json={"name": "Road Trip"}).status_code == 409
+    assert client.patch(f"/api/playlists/{pid}", json={"name": "Road Trip"}).status_code == 200   # its own name, recased
+    client.delete(f"/api/playlists/{pid}")
+    assert client.post("/api/playlists", json={"name": "Road trip"}).status_code == 200   # the old one is in the trash

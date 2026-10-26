@@ -97,6 +97,10 @@ _RIP_ERRORS = [
     (("unsupported url",), "That site or link isn't supported."),
     (("video unavailable", "video is unavailable", "has been removed", "no longer available", "does not exist"),
      "This video is no longer available."),
+    # The site answered, so before the connection rule ("unable to download
+    # webpage" covers both).
+    (("http error 404", "http error 410"), "That page doesn't exist. Check the link."),
+    (("http error 401", "http error 403"), "That site wouldn't let the page be read."),
     (("unable to download webpage", "name or service not known", "timed out",
       "temporary failure in name resolution", "connection"),
      "Couldn't reach that site. Check the connection and try again."),

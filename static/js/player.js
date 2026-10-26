@@ -1127,11 +1127,22 @@
   }
 
   // ---------- queue editing ----------
+  // A queued song plays next: after the current one and anything queued before
+  // it, not at the end of the album or list that's playing.
+  function insertQueued(list, from, item) {
+    let at = from + 1;
+    while (at < list.length && list[at].queued) at++;
+    list.splice(at, 0, item);
+  }
   function addToQueue(t) {
     if (qi < 0 || activeIsEpisode()) { playFromList([t], 0); toast(`Playing “${t.title}”`); return; }
     toast(`Queued “${t.title}”`);
-    queue.push(t);
-    baseQueue = queue.slice();
+    const item = { ...t, queued: true };
+    insertQueued(queue, qi, item);
+    // Shuffled, the unshuffled order keeps it too, for when shuffle goes off.
+    if (shuffleOn) insertQueued(baseQueue, baseQueue.findIndex((x) => x.id === currentTrack().id), item);
+    else baseQueue = queue.slice();
+    prefetchNext();
     savePlaystate();
     updateUpNext();
   }
@@ -1298,7 +1309,7 @@
     let updated;
     try {
       updated = await jsend(`api/tracks/${id}`, "PATCH", changes).then((r) => r.json());
-    } catch (e) { console.error(e); toast("Couldn't save changes."); return; }
+    } catch (e) { console.error(e); toast(errText(e, "Couldn't save changes.")); return; }
     // Patch every in-memory copy of this track (view, queue, source order).
     [...view, ...queue, ...baseQueue].forEach((x) => {
       if (x && x.id === id) {
@@ -1428,7 +1439,7 @@
       if ((name && name !== album) || artist) final = (await saveAlbum(album, { name, artist })).album;
       closeAlbum();
       await openAlbumTracks(final);
-      toast("Album saved");
+      if (final === album) toast("Album saved");   // a rename has said so already
     } catch (e) { console.error(e); toast(errText(e, "Couldn't save the album.")); }
   });
 
@@ -1827,8 +1838,13 @@
     view = await navGet(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
     applySearch();   // re-render, honouring any active search text
   });
-  $("backBtn").addEventListener("click", () =>
-    showView(trackParent === "albums" || trackParent === "artists" ? "browse" : "shelf"));
+  // Back to Albums or Artists fetches the list again: an edit, rename or delete
+  // in the list just left may have changed its names and counts.
+  $("backBtn").addEventListener("click", async () => {
+    if (trackParent !== "albums" && trackParent !== "artists") { showView("shelf"); return; }
+    showView("browse");
+    try { browseRows = await jget(currentBrowse === "albums" ? "api/albums" : "api/artists"); applyBrowseSearch(); } catch (_) { /* keep the old list */ }
+  });
   $("browseBack").addEventListener("click", () => showView("shelf"));
   $("browseSearch").addEventListener("input", debounce(applyBrowseSearch, 120));
   // Library-wide search from the shelf: typing jumps into All Tracks with the
@@ -1983,7 +1999,7 @@
       e.preventDefault();
       const name = $(inputId).value.trim();
       if (!name) return;
-      await onSubmit(name);
+      try { await onSubmit(name); } catch (err) { toast(errText(err, "Couldn't create that. Try again.")); return; }
       $(inputId).value = "";
     });
   }
