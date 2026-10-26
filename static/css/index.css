@@ -110,7 +110,7 @@ body {
     /* long titles wrap to a second line before they're cut */
     white-space: normal;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;   /* whole words; only a word too long for the line breaks */
 }
 .tl-dur {
     flex-shrink: 0; font-family: var(--font-mono); font-size: var(--text-sm);

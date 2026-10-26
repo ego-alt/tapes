@@ -337,6 +337,7 @@
 @media (min-width: 641px) {
     .app.immersive.nav-collapsed .sidebar { display: none; }
     .app.immersive:not(.nav-collapsed) .sidebar { width: 33.333vw; }
+    .app.immersive .tl-num, .app.immersive .tl-dur { display: none; }   /* room for the titles */
     .app.immersive:not(.nav-collapsed) .cassette { height: min(94vh, calc(64vw * 206 / 330)); }
 }
 @media (prefers-reduced-motion: reduce) { .cassette, .controls, .nav-toggle, .deck-menu-btn, .upnext { transition: none; } }
