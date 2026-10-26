@@ -332,7 +332,13 @@
 .app.immersive .controls, .app.immersive .nav-toggle, .app.immersive .deck-menu-btn, .app.immersive .upnext { opacity: 0; pointer-events: none; }
 .app.immersive .controls { position: absolute; }   /* out of the layout, so the tape centres */
 .app.immersive .cassette { height: min(94vh, calc(98vw * 206 / 330)); }
-@media (min-width: 641px) { .app.immersive .sidebar { display: none; } }
+/* Full screen with the library pulled out (swipe down, on its side): the
+   library a third of the screen, the tape the other two. */
+@media (min-width: 641px) {
+    .app.immersive.nav-collapsed .sidebar { display: none; }
+    .app.immersive:not(.nav-collapsed) .sidebar { width: 33.333vw; }
+    .app.immersive:not(.nav-collapsed) .cassette { height: min(94vh, calc(64vw * 206 / 330)); }
+}
 @media (prefers-reduced-motion: reduce) { .cassette, .controls, .nav-toggle, .deck-menu-btn, .upnext { transition: none; } }
 /* No text selection or long-press menu on the tape: a long press winds it. */
 .cassette { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -71,6 +71,7 @@
     [() => !menu.hidden, closeMenu],
     [() => !deckMenu.hidden, closeDeckMenu],
     [() => upnext.classList.contains("expanded"), () => upnext.classList.remove("expanded")],
+    [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
     [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
     [() => !$("dlPanel").hidden, () => $("dlToggle").click()],
@@ -1935,7 +1936,10 @@
       if (dy > CLOSE || (dy > 40 && fast)) closeDeck();
     } else if (touch.axis === "y" && dy > SWIPE && immersive()) {
       swiped = true;
-      DeckFX.setImmersive(false);   // swipe down: the controls come back
+      // Swipe down: on its side, the library slides out beside the tape (and
+      // back); upright, there's no room, so the deck returns.
+      if (isMobile()) DeckFX.setImmersive(false);
+      else app.classList.toggle("nav-collapsed");
     } else if (touch.axis === "x" && touch.onTape && Math.abs(dx) > SWIPE) {
       swiped = true;
       navigator.vibrate?.(12);
@@ -1950,7 +1954,7 @@
   //   tap the middle              play / pause
   //   double-tap a side           back / forward 10 seconds
   //   press and hold a side       rewind / fast-forward while held
-  //   swipe down                  the controls come back (above)
+  //   swipe down                  the library beside the tape (above)
   //   shake the phone             shuffle (below; works whenever it's playing)
   // A small icon flashes over the tape to say what happened (the words are
   // for screen readers; full screen is about the tape, not labels).
@@ -1965,7 +1969,10 @@
     navigator.vibrate?.(12);
   }
   const DOUBLE_MS = 280, HOLD_MS = 450, WIND_STEP_S = 2.5, WIND_EVERY_MS = 120;
-  const zoneAt = (x) => (x < innerWidth / 3 ? -1 : x > innerWidth * 2 / 3 ? 1 : 0);   // left, middle, right
+  const zoneAt = (x) => {   // left, middle or right third of the tape's side of the screen
+    const r = main.getBoundingClientRect(), f = (x - r.left) / r.width;
+    return f < 1 / 3 ? -1 : f > 2 / 3 ? 1 : 0;
+  };
   let lastTap = null, pendingTap = 0, hold = null, winding = false;
   main.addEventListener("pointerdown", (e) => {
     if (!immersive() || e.target.closest(".controls, .nav-toggle, .deck-menu-btn")) return;
@@ -2199,7 +2206,9 @@
   // controls (play, skip, scrubber…), menus and dialogs, so playing a song
   // doesn't also hide the list.
   document.addEventListener("click", (e) => {
-    if (isMobile() || app.classList.contains("nav-collapsed") || !e.target.isConnected) return;
+    // Full screen: the library stays out until a swipe puts it away (a tap on
+    // the tape is a gesture).
+    if (isMobile() || immersive() || app.classList.contains("nav-collapsed") || !e.target.isConnected) return;
     const t = e.target;
     if (t.closest(".sidebar, button, a, input, select, textarea, [role='slider'], [role='menu'], .menu, .modal-scrim, .toast, .upnext, #navToggle")) return;
     app.classList.add("nav-collapsed");
