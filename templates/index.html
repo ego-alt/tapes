@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='fonts/caveat/caveat.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='fonts/nothing-you-could-do/nothing-you-could-do.css') }}" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/controls.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
@@ -245,6 +245,35 @@
               </filter>
               <clipPath id="labelClip"><path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z"/></clipPath>
               <clipPath id="windowClip"><rect x="129.0" y="73.0" width="72.0" height="23.0" rx="1.5"/></clipPath>
+              <!-- the VU needle shows only through a slot over the printed scale -->
+              <!-- printed ink: coverage a little uneven, edges a little soft, as off a press -->
+              <filter id="inkPrint" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="7" result="grain"/>
+                <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.75 0 0 0 1.22" result="cover"/>
+                <feComposite in="SourceGraphic" in2="cover" operator="in" result="inked"/>
+                <feTurbulence type="fractalNoise" baseFrequency="0.3" numOctaves="1" seed="3" result="wobble"/>
+                <feDisplacementMap in="inked" in2="wobble" scale="0.6" xChannelSelector="R" yChannelSelector="G"/>
+              </filter>
+              <!-- the laminate's faint sheen across the label -->
+              <linearGradient id="laminate" x1="0" y1="0" x2="1" y2="0.6">
+                <stop offset="0.25" stop-color="#fff" stop-opacity="0"/>
+                <stop offset="0.42" stop-color="#fff" stop-opacity="0.11"/>
+                <stop offset="0.5" stop-color="#fff" stop-opacity="0.02"/>
+                <stop offset="0.62" stop-color="#fff" stop-opacity="0.07"/>
+                <stop offset="0.75" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+              <clipPath id="printClip"><rect x="15.5" y="60" width="299" height="54.5"/></clipPath>
+              <clipPath id="vuSlot"><rect x="126" y="98.4" width="78" height="6.6"/></clipPath>
+              <radialGradient id="screwHead" cx="0.4" cy="0.35" r="0.7">
+                <stop offset="0" stop-color="#6a6a6a"/>
+                <stop offset="1" stop-color="#262626"/>
+              </radialGradient>
+              <symbol id="screw" viewBox="-4 -4 8 8" overflow="visible">
+                <circle r="3.4" fill="#050505"/>
+                <circle r="2.9" fill="url(#screwHead)"/>
+                <path d="M-1.9 0 H1.9 M0 -1.9 V1.9" stroke="#0b0b0b" stroke-width="0.7"/>
+                <path d="M-1.9 -0.35 H1.9 M-0.35 -1.9 V1.9" stroke="rgba(255,255,255,0.14)" stroke-width="0.3"/>
+              </symbol>
               <clipPath id="stadiumClip"><rect x="69" y="65.5" width="192" height="53.5" rx="26.75"/></clipPath>
               <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0" stop-color="#fff" stop-opacity="0"/>
@@ -294,25 +323,40 @@
             <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="#000" opacity="0.65" transform="translate(0.3 1.1)" filter="url(#soft)"/>
             <g clip-path="url(#labelClip)">
               <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paper)" filter="url(#paperGrain)"/>
-              <rect x="15.5" y="67" width="299" height="7.5" fill="#ef4b2c"/>
-              <rect x="15.5" y="77" width="299" height="6.5" fill="#ab8f6b"/>
-              <rect x="15.5" y="86" width="299" height="7" fill="#ef4b2c"/>
-              <rect x="15.5" y="95.5" width="299" height="6.5" fill="#ab8f6b"/>
-              <rect x="15.5" y="104.5" width="299" height="7.5" fill="#ef4b2c"/>
-              <rect x="15.5" y="114.5" width="299" height="36" fill="#ab8f6b"/>
-              <!-- the same fibre over the printed ink, so stripes read as print, not paint -->
-              <rect x="15.5" y="67" width="299" height="83" fill="#fff" opacity="0.07" filter="url(#paperGrain)"/>
+              <!-- the printed design (label-print.js draws one per album or tape; classic stripes until then) -->
+              <g id="labelPrint" clip-path="url(#printClip)" filter="url(#inkPrint)" style="mix-blend-mode: multiply">
+                <rect x="15.5" y="66" width="299" height="10" fill="#e6b23a"/>
+                <rect x="15.5" y="78" width="299" height="10" fill="#e0702a"/>
+                <rect x="15.5" y="90" width="299" height="10" fill="#c43c2e"/>
+                <rect x="15.5" y="102" width="299" height="10" fill="#6d3e24"/>
+              </g>
+              <rect x="15.5" y="114.5" width="299" height="36" fill="#b08d68"/>
+              <!-- the same fibre over the printed ink, so it reads as print, not paint -->
+              <rect x="15.5" y="60" width="299" height="90" fill="#fff" opacity="0.07" filter="url(#paperGrain)"/>
               <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paperAge)"/>
               <!-- printed marks -->
               <text x="306" y="144" font-family="Inter, Arial, sans-serif" font-size="7.5" font-weight="700" fill="#f4ede0" fill-opacity="0.85" text-anchor="end" letter-spacing="0.4">C60</text>
-              <text x="24" y="144" font-family="Inter, Arial, sans-serif" font-size="4.2" font-weight="600" fill="#f4ede0" fill-opacity="0.7" letter-spacing="0.8">LOW NOISE · NORMAL POSITION</text>
+              <text x="24" y="144" font-family="Inter, Arial, sans-serif" font-size="4.2" font-weight="600" fill="#f4ede0" fill-opacity="0.7" letter-spacing="0.8">IEC I · TYPE I · NORMAL BIAS · 120µs EQ</text>
+              <!-- fine print at the top: the side, and boxes to tick -->
+              <g font-family="Inter, Arial, sans-serif" font-weight="600" fill="#2a2a2a" fill-opacity="0.62" letter-spacing="0.5">
+                <text x="31.5" y="21.6" font-size="3.3" text-anchor="middle">SIDE</text>
+                <text x="268.5" y="21.6" font-size="3.3">NR</text>
+                <text x="285.5" y="21.6" font-size="3.3">STEREO</text>
+              </g>
+              <g fill="none" stroke="#2a2a2a" stroke-opacity="0.6" stroke-width="0.35">
+                <rect x="263.6" y="18.9" width="3" height="3"/>
+                <rect x="280.6" y="18.9" width="3" height="3"/>
+              </g>
+              <path d="M281.1 20.4 l0.9 1 l1.9 -2.6" fill="none" stroke="#1b2466" stroke-width="0.45" stroke-linecap="round"/>
+              <!-- laminate sheen over everything printed and written -->
+              <rect x="15.5" y="14" width="299" height="136" fill="url(#laminate)" pointer-events="none"/>
               <!-- the bottom-right corner has lifted a little: a highlight on the curl -->
               <path d="M306 150 L314.5 141.5 V145.5 L310 150 Z" fill="#fff" opacity="0.18"/>
             </g>
             <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="0.6"/>
             <path d="M20 14.5 H310 L314 18.5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="0.5"/>
             <!-- the side letter, embossed in the corner box (album art covers it when there is some) -->
-            <text x="31.5" y="45" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="800" fill="#2a2a2a" fill-opacity="0.75" text-anchor="middle">A</text>
+            <text id="sideLetter" x="31.5" y="45" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="800" fill="#2a2a2a" fill-opacity="0.75" text-anchor="middle">A</text>
             <!-- the writing area: a corner box (album art goes here) and two lines -->
             <path d="M19.5 27.5 L23.5 23.5 H43.5 V51.5 H19.5 Z" fill="none" stroke="#2a2a2a" stroke-width="0.6"/>
             <path d="M49 35.5 H307 M49 51.5 H307" stroke="#2a2a2a" stroke-width="0.5"/>
@@ -383,6 +427,20 @@
               <text x="129.0" y="110.5">100</text><text x="165" y="110.5">50</text><text x="201.0" y="110.5">0</text>
             </g>
 
+            <!-- the needle: a hairline from a pivot below the label (deck-fx.js turns it) -->
+            <g clip-path="url(#vuSlot)" pointer-events="none">
+              <g id="vuNeedle" transform="rotate(37 165 150)">
+                <path d="M165.5 150 V96" stroke="#000" stroke-opacity="0.45" stroke-width="0.9"/>
+                <path d="M165 150 V96" stroke="#f05a32" stroke-width="0.6"/>
+              </g>
+            </g>
+
+            <!-- the five screws that hold the shell together -->
+            <use href="#screw" x="7" y="7" width="7" height="7"/>
+            <use href="#screw" x="316" y="7" width="7" height="7"/>
+            <use href="#screw" x="7" y="191.5" width="7" height="7"/>
+            <use href="#screw" x="316" y="191.5" width="7" height="7"/>
+
             <!-- bottom plate (tape head area) with its four holes -->
             <path d="M57 158 H273 L279 164 V205 H51 V164 Z" fill="url(#knurl)"/>
             <path d="M57 158 H273 L279 164 V205 H51 V164 Z" fill="url(#shellLight)"/>
@@ -401,6 +459,13 @@
               <rect x="207.5" y="187" width="9" height="7" rx="2" fill="#262626"/>
               <path d="M80 195 A5.2 5.2 0 0 0 89 195 M241 195 A5.2 5.2 0 0 0 250 195 M111.5 194 q6.5 3 13 0 M205.5 194 q6.5 3 13 0" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
             </g>
+            <!-- the head opening: the tape runs across it, a felt pad pressing from behind -->
+            <path d="M140 205 V194 Q140 192 142 192 H188 Q190 192 190 194 V205 Z" fill="#030303"/>
+            <rect x="158.5" y="195" width="13" height="5.2" rx="0.6" fill="#b9a98c"/>
+            <path d="M159 195.6 h12" stroke="rgba(255,255,255,0.25)" stroke-width="0.4"/>
+            <rect x="140" y="200.4" width="50" height="2.6" fill="#3a2b22"/>
+            <rect x="140" y="200.4" width="50" height="0.6" fill="#6b5546" opacity="0.8"/>
+            <use href="#screw" x="161.5" y="172" width="7" height="7"/>
           </svg>
 
           <div class="cassette-label" id="label">
@@ -426,6 +491,7 @@
             <button class="tbtn ep-only" id="fwd30Btn" title="Forward 30 seconds" aria-label="Forward 30 seconds"></button>
             <button class="tbtn sleep" id="sleepBtn" title="Sleep timer" aria-label="Sleep timer" aria-pressed="false"></button>
             <button class="tbtn level music-only" id="levelBtn" title="Volume levelling" aria-label="Volume levelling" aria-pressed="true"></button>
+            <button class="tbtn sound" id="soundBtn" title="Deck sounds" aria-label="Deck sounds" aria-pressed="false"></button>
           </div>
           <button class="speed-btn ep-only" id="speedBtn" title="Playback speed" aria-label="Playback speed 1×">1×</button>
         </div>
@@ -433,7 +499,9 @@
 
       <div class="upnext" id="upnext" hidden>
         <div class="upnext-panel">
-          <div class="upnext-panel-head">Up Next</div>
+          <div class="upnext-panel-head">Up Next
+            <button class="keep-btn" id="keepBtn" type="button" aria-pressed="true" title="When the queue runs out, keep going with related songs">Keep playing</button>
+          </div>
           <ul class="queue-list" id="queueList"></ul>
         </div>
         <button class="upnext-bar" id="upnextBar" aria-label="Toggle Up Next">
@@ -513,6 +581,7 @@
     window.MUSIC = {
       streamBase: "{{ url_for('stream.stream', track_id=0) }}".slice(0, -1),
       coverBase: "{{ url_for('stream.cover', track_id=0) }}".slice(0, -1),
+      cassetteBase: "{{ url_for('stream.cassette', track_id=0, key='k') }}".slice(0, -3),
       epStreamBase: "{{ url_for('podcasts.stream', eid=0) }}".slice(0, -1),
       epShowCoverBase: "{{ url_for('podcasts.show_cover', sid=0) }}".slice(0, -1),
       epEpisodeCoverBase: "{{ url_for('podcasts.episode_cover', eid=0) }}".slice(0, -1),
@@ -520,6 +589,8 @@
   </script>
   <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
   <script src="{{ url_for('static', filename='js/deck-audio.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/label-print.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/deck-fx.js') }}"></script>
   <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>

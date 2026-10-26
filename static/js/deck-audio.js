@@ -51,6 +51,7 @@
       this.gen = 0;                // bumped on every reset; stale work checks it
       this.ctx = null;
       this.gainNode = null;
+      this.analyser = null;        // taps the levelled sound for the VU needle (deck-fx.js)
       this.boundaryTimer = null;
       for (const el of [musicEl, episodeEl]) {
         for (const ev of FORWARDED) el.addEventListener(ev, (e) => this._forward(el, ev, e));
@@ -370,11 +371,25 @@
         const src = this.ctx.createMediaElementSource(this.music);
         this.gainNode = this.ctx.createGain();
         src.connect(this.gainNode).connect(this.ctx.destination);
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 1024;
+        this.gainNode.connect(this.analyser);
+        this._levelBuf = new Float32Array(this.analyser.fftSize);
         this._applyGain(this.seg, 0);
       } catch (e) {
         console.warn("Volume levelling unavailable:", e);
-        this.ctx = this.gainNode = null;
+        this.ctx = this.gainNode = this.analyser = null;
       }
+    }
+
+    /** The music's RMS level now (0..1), or null when there's nothing to read
+     *  (a podcast, or levelling off so no graph). */
+    level() {
+      if (!this.analyser || this.mode === "episode") return null;
+      this.analyser.getFloatTimeDomainData(this._levelBuf);
+      let sum = 0;
+      for (const x of this._levelBuf) sum += x * x;
+      return Math.sqrt(sum / this._levelBuf.length);
     }
 
     /** The gain for a song, in linear terms. */

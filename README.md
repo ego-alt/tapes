@@ -6,8 +6,10 @@ A personal music streamer for the home stack, built around a cassette deck: the 
 
 ## Features
 
-- **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder, a sleep timer, lock-screen controls, and your queue resumes across devices.
-- **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. `L`, or the bars button beside the sleep timer, turns levelling off.
+- **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder (a queued song plays next), a sleep timer, lock-screen controls, and your queue resumes across devices.
+- **A tape in a deck**: each album or tape gets its own retro label (red, orange, mustard and brown on cream), written in ballpoint, with the cover's colour glowing behind it; a VU needle follows the music, the reels whir on a skip or seek, a new tape ejects the old one, and optional deck sounds. The lock screen shows the cassette with the song on its label. Tap the tape for full screen; turn the phone on its side for a landscape deck.
+- **Keep playing**: when a tape or album runs out, related songs follow (ones you play together, the same artists, your favourites) and the tape turns over to side B. Off in Up Next.
+- **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. The bars button beside the sleep timer turns levelling off.
 - **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
 - **Rip** any link to MP3 with `yt-dlp` and `ffmpeg`; a playlist link becomes a new tape. Duplicates are caught by URL and by acoustic fingerprint.
 - **Tidy tags**: titles and artists are cleaned on rip and refined by Claude (Haiku) when a key is set. Rips from an album playlist (the artist's own, a "Full Album" upload, or a YouTube Music album) get the album, track number and year. Cover art comes from MusicBrainz when there's a confident match.

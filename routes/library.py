@@ -563,6 +563,16 @@ def record_play():
     return "", 204
 
 
+@library_blueprint.route("/api/keep-playing", methods=["POST"])
+@login_required
+def keep_playing():
+    """Songs to follow when the queue runs out, from the last few heard (seed)."""
+    import radio
+    data = request.json or {}
+    seed, exclude = ([i for i in data.get(key, []) if isinstance(i, int)][:500] for key in ("seed", "exclude"))
+    return jsonify(_serialize(radio.pick(_uid(), seed[-5:], exclude, limit=15)))
+
+
 def _hydrate_episode_ids(ids):
     """Hydrate episode ids → deck dicts (kind, show title, resume position), in
     order, dropping any that no longer exist. Mirrors _tracks_by_ids for music."""

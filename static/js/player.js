@@ -24,6 +24,9 @@
   const artUrl = (t) => t.kind === "episode"
     ? (t.show_id ? M.epEpisodeCoverBase + t.id : null)
     : (t.has_cover ? coverUrl(t.id) : null);
+  // The line under a song's title: the show for an episode, else artist · album.
+  const subLine = (t) => t.kind === "episode" ? (t.show || "Podcast")
+    : [t.artist || "Unknown artist", t.album].filter(Boolean).join(" · ");
   const fmt = (s) => {
     if (!s || !isFinite(s)) return "0:00";
     s = Math.floor(s);
@@ -157,6 +160,7 @@
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
+    speaker: svgIcon('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
     level: svgIcon('<path d="M6 7v10M10 7v10M14 7v10M18 7v10"/>'),   // bars at one height
   };
 
@@ -663,6 +667,7 @@
     toast("Downloading episode…");
   }
   function startEpisodePlayback(list, i) {
+    newTape(list);
     baseQueue = list.slice();
     queue = list.slice();
     qi = i;
@@ -674,7 +679,7 @@
     cassette.closest(".deck").classList.add("is-episode");
     cassette.classList.add("loaded");
     labelTitle.textContent = t.title;
-    labelArtist.textContent = (t.show || "Podcast") + " · downloading…";
+    labelArtist.textContent = subLine(t) + " · downloading…";
     labelArt.removeAttribute("src");
     markActive();
     updateUpNext();
@@ -861,8 +866,7 @@
     $("mini").hidden = !t;
     if (!t) { closeDeck(); return; }
     $("miniTitle").textContent = t.title;
-    $("miniSub").textContent = t.kind === "episode" ? (t.show || "Podcast")
-      : [t.artist, t.album].filter(Boolean).join(" · ") || "Unknown artist";
+    $("miniSub").textContent = subLine(t);
     const art = artUrl(t);
     if (art) $("miniArt").src = art; else $("miniArt").removeAttribute("src");
     const playing = !audio.paused;
@@ -878,7 +882,20 @@
     }
     return a;
   }
+  // Starting a different list puts a new tape in: the old one ejects and the
+  // new one starts on side A (Keep playing turns it over to side B).
+  const listKey = (list) => `${list.length}:${list[0]?.id}:${list[list.length - 1]?.id}`;
+  // A tape of yours prints one label design for all its songs; anything else
+  // prints each album's own (label-print.js).
+  let tapeChanging = false, side = "A", tapeSeed = null;
+  function newTape(list) {
+    tapeChanging = cassette.classList.contains("loaded") && listKey(list) !== listKey(baseQueue);
+    side = "A";
+    tapeSeed = currentTape && currentTape.kind === "user" ? `tape:${currentTape.key}` : null;
+  }
+  const labelSeed = (t) => tapeSeed || (t.kind === "episode" ? `show:${t.show}` : t.album || `${t.artist}|${t.title}`);
   function playFromList(list, i) {
+    newTape(list);
     baseQueue = list.slice();
     if (shuffleOn) {
       const chosen = baseQueue[i];
@@ -904,16 +921,8 @@
     // Resume an episode where you left off (music resume rides the playstate path).
     if (isEp) resumeEpisodeTo(t.position);
     if (autoplay) audio.play().catch(() => {});
-    cassette.classList.add("loaded");
-    labelTitle.textContent = t.title;
-    labelArtist.textContent = isEp
-      ? (t.show || "Podcast")
-      : [t.artist || "Unknown artist", t.album].filter(Boolean).join(" · ");
-    fitLabel();
-    const art = artUrl(t);
-    if (art) labelArt.src = art; else labelArt.removeAttribute("src");
-    document.title = t.title + (isEp ? (t.show ? " · " + t.show : "") : (t.artist ? " · " + t.artist : ""));
-    setMediaSession(t);
+    if (tapeChanging) { tapeChanging = false; DeckFX.changeTape(() => paintLabel(t)); } else paintLabel(t);
+    if (t.radio && side === "A") { side = "B"; DeckFX.flip(side); }
     markActive();
     // Persist the deck snapshot. For episodes, only the session (queue+cursor) —
     // the position rides on the episode and mustn't be saved as 0 before the seek.
@@ -921,6 +930,25 @@
     prefetchNext();
     updateUpNext();
     updateMini();
+    keepPlayingIfEnding();
+  }
+  // The label, the page title and the lock screen for what's in the deck.
+  function paintLabel(t) {
+    cassette.classList.add("loaded");
+    $("sideLetter").textContent = side;
+    labelTitle.textContent = t.title;
+    labelArtist.textContent = subLine(t);
+    fitLabel();
+    const art = artUrl(t);
+    if (art) labelArt.src = art; else labelArt.removeAttribute("src");
+    document.title = `${t.title} · ${subLine(t)}`;
+    setMediaSession(t);
+    const seed = labelSeed(t);
+    DeckFX.setLabel(seed, art).then((glow) => {
+      if (t.kind === "episode" || currentTrack() !== t) return;
+      DeckFX.lockArt(M.cassetteBase, t, { title: t.title, sub: subLine(t), artUrl: art, glow, seed },
+        (url) => { if (currentTrack() === t) setMediaSession(t, url); });
+    });
   }
   // ---------- reels ----------
   // The tape winds from the left pack to the right one as the song plays.
@@ -953,7 +981,10 @@
       c.setAttribute("visibility", rr > CORE ? "visible" : "hidden");
     });
     const still = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let angL = 0, angR = 0, last = 0, raf = 0;
+    // A skip or seek spins the reels fast for a moment, like fast-forward or
+    // rewind, even while paused; `playing` is whether the tape itself runs.
+    const WHIR_MS = 450, WHIR_SPEED = 14;
+    let angL = 0, angR = 0, last = 0, raf = 0, playing = false, whirDir = 0, whirEnd = 0;
     const radius = (share) => Math.sqrt(CORE * CORE + share * (FULL * FULL - CORE * CORE));
     function setPacks() {
       const p = audio.duration ? Math.min(1, Math.max(0, audio.currentTime / audio.duration)) : 0;
@@ -968,18 +999,23 @@
       const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
       last = t;
       const [rL, rR] = setPacks();
+      const whir = Math.max(0, (whirEnd - t) / WHIR_MS);   // 1 → 0 as the whir dies away
       if (!still.matches) {
-        const speed = TAPE_SPEED * (audio.playbackRate || 1) * dt;
+        const rate = (playing ? audio.playbackRate || 1 : 0) + whirDir * WHIR_SPEED * whir * whir;
+        const speed = TAPE_SPEED * rate * dt;
         angL = (angL + (speed / rL) * 180 / Math.PI) % 360;
         angR = (angR + (speed / rR) * 180 / Math.PI) % 360;
         reelL.setAttribute("transform", `rotate(${angL} ${CX.L} ${CY})`);
         reelR.setAttribute("transform", `rotate(${angR} ${CX.R} ${CY})`);
       }
-      raf = requestAnimationFrame(frame);
+      raf = playing || whir > 0 ? requestAnimationFrame(frame) : 0;
     }
+    const run = () => { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } };
     return {
-      start() { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } },
-      stop() { cancelAnimationFrame(raf); raf = 0; setPacks(); },
+      start() { playing = true; run(); },
+      stop() { playing = false; setPacks(); },
+      /** dir: 1 forward (next, seek ahead), -1 back. */
+      whir(dir) { if (still.matches || !dir) return; whirDir = Math.sign(dir); whirEnd = performance.now() + WHIR_MS; run(); },
       sync: setPacks,
     };
   })();
@@ -1034,7 +1070,9 @@
     if (qi < 0) { if (view.length) playFromList(view, 0); return; }
     audio.paused ? audio.play() : audio.pause();
   }
-  function setMediaSession(t) {
+  // `lockArt`: the cassette drawn with this label (deck-fx.js), once it's stored;
+  // until then the cover.
+  function setMediaSession(t, lockArt) {
     if (!("mediaSession" in navigator)) return;
     const isEp = t.kind === "episode";
     const art = artUrl(t);
@@ -1042,13 +1080,14 @@
       title: t.title,
       artist: isEp ? (t.show || "Podcast") : (t.artist || ""),
       album: isEp ? "" : (t.album || ""),
-      artwork: art ? [{ src: art, sizes: "500x500", type: "image/jpeg" }] : [],
+      artwork: lockArt ? [{ src: lockArt, sizes: "512x512", type: "image/jpeg" }]
+        : art ? [{ src: art, sizes: "500x500", type: "image/jpeg" }] : [],
     });
     const handle = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn); } catch (_) { /* unsupported */ } };
     handle("previoustrack", () => prev());
     handle("nexttrack", () => next(true));
     // Lock-screen scrubbing and skips (±15/30 s for episodes, ±10 s for songs).
-    handle("seekto", (d) => { if (d.seekTime != null) { audio.currentTime = d.seekTime; savePlaystate(); } });
+    handle("seekto", (d) => { if (d.seekTime != null) seekTo(d.seekTime); });
     handle("seekbackward", (d) => skipBy(-(d.seekOffset || (isEp ? 15 : 10))));
     handle("seekforward", (d) => skipBy(d.seekOffset || (isEp ? 30 : 10)));
   }
@@ -1056,6 +1095,7 @@
   // `manual` = user pressed next (vs. a track ending). Repeat-one only loops on
   // natural end, so pressing next still advances.
   function next(manual) {
+    if (manual) reels.whir(1);
     const ep = activeIsEpisode();
     // Episodes are listed newest-first, so "forward" means newer (toward index 0)
     // — finishing one plays the next-newer episode and stops at the newest.
@@ -1066,6 +1106,7 @@
     // else: end of queue — stop.
   }
   function prev() {
+    reels.whir(-1);
     if (qi >= 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }  // restart current first
     if (activeIsEpisode()) { if (qi + 1 < queue.length) go(qi + 1, true); return; }  // back = older
     if (qi > 0) go(qi - 1, true);
@@ -1087,9 +1128,53 @@
     renderSpeed();
   }
   function skipBy(sec) {
-    if (!audio.duration) return;
-    audio.currentTime = Math.max(0, Math.min(audio.duration - 0.5, audio.currentTime + sec));
+    if (audio.duration) seekTo(Math.min(audio.duration - 0.5, audio.currentTime + sec));
+  }
+  // Every seek (scrub, skip, lock screen) winds the reels the way it went.
+  function seekTo(at) {
+    const to = Math.max(0, at);
+    reels.whir(to - audio.currentTime);
+    audio.currentTime = to;
     savePlaystate();
+  }
+
+  // ---------- Keep playing ----------
+  // When the queue is about to run out, related songs follow (radio.py), so
+  // the music doesn't stop; the tape turns over to side B as they start.
+  let keepPlaying = localStorage.getItem("tapes-keep-playing") !== "off", extending = false;
+  async function keepPlayingIfEnding() {
+    if (!keepPlaying || extending || activeIsEpisode() || repeatMode !== "off" || qi < queue.length - 2) return;
+    extending = true;
+    const q = queue;
+    try {
+      const more = await jsend("api/keep-playing", "POST", {
+        seed: queue.slice(Math.max(0, qi - 4), qi + 1).map((t) => t.id), exclude: queue.map((t) => t.id),
+      }).then((r) => r.json());
+      if (queue !== q || !keepPlaying) return;   // a new tape went in meanwhile
+      const items = more.map((t) => ({ ...t, radio: true }));
+      queue.push(...items);
+      if (baseQueue !== queue) baseQueue.push(...items);
+      prefetchNext();
+      savePlaystate();
+      updateUpNext();
+    } catch (e) { console.warn("Keep playing:", e); }
+    finally { extending = false; }
+  }
+  function setKeepPlaying(on) {
+    keepPlaying = on;
+    localStorage.setItem("tapes-keep-playing", on ? "on" : "off");
+    const b = $("keepBtn");
+    b.setAttribute("aria-pressed", String(on));
+    b.classList.toggle("active", on);
+    if (on) keepPlayingIfEnding();
+    else {   // take back the songs it added that haven't played yet
+      const kept = (t, i) => i <= qi || !t.radio;
+      queue = queue.filter(kept);
+      baseQueue = baseQueue.filter((t) => !t.radio || queue.includes(t));
+      prefetchNext();
+      savePlaystate();
+      updateUpNext();
+    }
   }
 
   // ---------- shuffle / repeat ----------
@@ -1116,6 +1201,7 @@
     localStorage.setItem("tapes-repeat", repeatMode);
     updateRepeatBtn();
     prefetchNext();   // what follows depends on the repeat mode
+    keepPlayingIfEnding();
   }
   function updateRepeatBtn() {
     const b = $("repeatBtn");
@@ -1177,14 +1263,14 @@
     queue.forEach((t, i) => {
       const li = document.createElement("li");
       li.dataset.id = t.id;
-      li.className = "q-row" + (i === qi ? " active" : "");
+      li.className = "q-row" + (i === qi ? " active" : "")
+        + (t.radio && !queue[i - 1]?.radio ? " side-b" : "");   // where Keep playing takes over
       li.innerHTML = `<span class="q-drag drag-handle" title="Drag to reorder" aria-hidden="true">${ICONS.grip}</span>
         <span class="q-meta"><div class="q-title"></div><div class="q-sub"></div></span>
         <button class="q-btn q-rm" title="Remove from queue" aria-label="Remove from queue">${ICONS.x}</button>`;
       li.querySelector(".q-title").textContent = t.title;
       li.querySelector(".q-title").title = t.title;
-      li.querySelector(".q-sub").textContent = t.kind === "episode" ? (t.show || "Podcast")
-        : [t.artist, t.album].filter(Boolean).join(" · ");
+      li.querySelector(".q-sub").textContent = subLine(t);
       li.querySelector(".q-meta").addEventListener("click", () => queueJump(i));
       li.querySelector(".q-drag").addEventListener("click", (e) => e.stopPropagation());
       li.querySelector(".q-rm").addEventListener("click", (e) => { e.stopPropagation(); queueRemove(i); });
@@ -1320,13 +1406,7 @@
     closeEdit();
     applySearch();
     const cur = currentTrack();
-    if (cur && cur.id === id) {   // refresh the deck label without reloading audio
-      labelTitle.textContent = cur.title;
-      labelArtist.textContent = [cur.artist || "Unknown artist", cur.album].filter(Boolean).join(" · ");
-      fitLabel();
-      document.title = cur.title + (cur.artist ? " · " + cur.artist : "");
-      updateMini();
-    }
+    if (cur && cur.id === id) { paintLabel(cur); updateMini(); }   // the label, without reloading audio
     loadShelf();   // album/artist counts may have shifted
   }
   // Delete goes to the trash; the toast's Undo brings it back (file, tapes and
@@ -1826,9 +1906,31 @@
   }
 
   // ---------- events ----------
-  playBtn.addEventListener("click", togglePlay);
-  $("prevBtn").addEventListener("click", () => prev());
-  $("nextBtn").addEventListener("click", () => next(true));
+  // The transport keys clunk like a deck's, when deck sounds are on.
+  const key = (fn) => () => { DeckFX.sounds.clunk(); fn(); };
+  playBtn.addEventListener("click", key(togglePlay));
+  $("prevBtn").addEventListener("click", key(() => prev()));
+  $("nextBtn").addEventListener("click", key(() => next(true)));
+  $("miniPlay").addEventListener("click", key(togglePlay));
+  const soundBtn = $("soundBtn");
+  soundBtn.innerHTML = ICONS.speaker;
+  const showSounds = (on) => {
+    soundBtn.classList.toggle("active", on);
+    soundBtn.setAttribute("aria-pressed", String(on));
+    soundBtn.title = on ? "Deck sounds on" : "Deck sounds off";
+  };
+  showSounds(DeckFX.sounds.enabled());
+  soundBtn.addEventListener("click", () => { showSounds(DeckFX.sounds.toggle()); DeckFX.sounds.clunk(); });
+  $("keepBtn").addEventListener("click", (e) => { e.stopPropagation(); setKeepPlaying(!keepPlaying); });
+  setKeepPlaying(keepPlaying);
+  // Tap the tape: full screen, just the cassette; tap again to come back.
+  cassette.addEventListener("click", () => DeckFX.setImmersive(app, !app.classList.contains("immersive")));
+  // A phone turned on its side is for listening: the library steps aside.
+  const sideways = window.matchMedia("(max-height: 480px) and (orientation: landscape)");
+  const onSideways = () => { if (sideways.matches) app.classList.add("nav-collapsed"); };
+  sideways.addEventListener("change", onSideways);
+  onSideways();
+  DeckFX.meter.attach(audio);
   $("shuffleBtn").addEventListener("click", () => setShuffle(!shuffleOn));
   $("repeatBtn").addEventListener("click", cycleRepeat);
   $("sortSelect").addEventListener("change", async () => {
@@ -1991,7 +2093,6 @@
     app.classList.add("nav-collapsed");
   });
   $("miniOpen").addEventListener("click", openDeck);
-  $("miniPlay").addEventListener("click", togglePlay);
   $("search").addEventListener("input", debounce(applySearch, 120));
   // Both "New tape" forms (music + podcast) share the create boilerplate.
   function wireCreateForm(formId, inputId, onSubmit) {
@@ -2011,7 +2112,7 @@
   });
 
   audio.addEventListener("play", () => {
-    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini(); reels.start();
+    cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini(); reels.start(); DeckFX.meter.wake();
     const t = currentTrack();
     // Play counts are a music-catalog thing (no Play row for episodes).
     if (t && t.kind !== "episode" && t.id !== lastPlayed) {
@@ -2072,8 +2173,7 @@
     if (!scrubbing) return;
     scrubbing = false;
     scrub.classList.remove("dragging");
-    audio.currentTime = scrubFrac(e) * audio.duration;
-    savePlaystate();
+    seekTo(scrubFrac(e) * audio.duration);
   }
   scrub.addEventListener("pointerup", endScrub);
   scrub.addEventListener("pointercancel", () => { scrubbing = false; scrub.classList.remove("dragging"); });
@@ -2082,10 +2182,11 @@
     if (!audio.duration || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     e.preventDefault();
     e.stopPropagation();
-    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
+    seekTo(Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
+    if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(app, false); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !sleepMenu.hidden;
       upnext.classList.remove("expanded"); closeMenu(); closeSleep();
