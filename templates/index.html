@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tapes</title>
   <meta name="theme-color" content="#282828">
-  <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
+  {# With cookies: behind the dashboard's sign-in, a manifest fetched without them gets a 401 and the app can't be installed. #}
+  <link rel="manifest" href="{{ url_for('pwa.manifest') }}" crossorigin="use-credentials">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
