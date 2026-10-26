@@ -34,8 +34,9 @@ choice. Updated 2026-10-15, after the UX audit.
   - Needs-tidying shelf, album edit, artist rename with merge preview;
   - podcasts: ±15/30 s, speed, lock-screen seek, RSS streaming while it
     downloads, Hide (not delete) for followed shows;
-  - chunked long lists, loading bar, remembered sort, library search (`/`),
-    full keyboard shortcuts (`?`), keyboard-reachable rows;
+  - chunked long lists, loading bar, remembered sort, library search,
+    keyboard-reachable rows (the shortcut keys went on 2026-10-26: tapes is
+    for phones);
   - installable PWA with an offline app shell; reconnects resume mid-song;
   - Flask-Migrate (migrations run on start), `tests/` + CI, Pi auto-deploy.
 - **Gapless playback + volume levelling** (2026-10-16). Music plays on one

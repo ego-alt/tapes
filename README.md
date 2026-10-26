@@ -13,7 +13,7 @@ A personal music streamer for the home stack, built around a cassette deck: the 
 - **Tidy tags**: titles and artists are cleaned on rip and refined by Claude (Haiku) when a key is set. Rips from an album playlist (the artist's own, a "Full Album" upload, or a YouTube Music album) get the album, track number and year. Cover art comes from MusicBrainz when there's a confident match.
 - **Podcasts**: follow RSS feeds or YouTube channels; episodes stream while they download, with skips, speed and resume.
 - **Safe edits**: deletes go to a 30-day trash with Undo; artist renames show any merge first.
-- **Installable**, and works offline once loaded. `?` lists the keyboard shortcuts.
+- **Installable**, and works offline once loaded.
 
 ## Run it
 

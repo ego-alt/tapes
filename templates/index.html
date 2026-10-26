@@ -39,8 +39,7 @@
       <!-- shelf of tapes -->
       <div class="shelf" id="shelfView">
         <div class="search-wrap lib-search">
-          <input class="input" id="libSearch" type="search" placeholder="Search your library" aria-label="Search your library" aria-keyshortcuts="/" autocomplete="off">
-          <kbd class="search-key" aria-hidden="true">/</kbd>
+          <input class="input" id="libSearch" type="search" placeholder="Search your library" aria-label="Search your library" autocomplete="off">
         </div>
         <ul class="shelf-list" id="shelfList"></ul>
         <div class="first-run" id="firstRun" hidden>
@@ -496,27 +495,6 @@
         <button class="btn btn-primary" id="nameOk" type="submit">Create</button>
       </div>
     </form>
-  </div>
-
-  <!-- Keyboard shortcuts (opened with ?). -->
-  <div class="modal-scrim" id="keysModal" hidden>
-    <div class="modal-card keys-card" role="dialog" aria-modal="true" aria-labelledby="keysTitle">
-      <div class="modal-head" id="keysTitle">Keyboard shortcuts</div>
-      <dl class="keys-list">
-        <dt><kbd>Space</kbd></dt><dd>Play / pause</dd>
-        <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Back / forward 5 s (10 s in podcasts)</dd>
-        <dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous / next</dd>
-        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Volume</dd>
-        <dt><kbd>M</kbd></dt><dd>Mute</dd>
-        <dt><kbd>S</kbd></dt><dd>Shuffle</dd>
-        <dt><kbd>R</kbd></dt><dd>Repeat</dd>
-        <dt><kbd>Q</kbd></dt><dd>Up Next</dd>
-        <dt><kbd>L</kbd></dt><dd>Volume levelling on / off</dd>
-        <dt><kbd>/</kbd></dt><dd>Search</dd>
-        <dt><kbd>?</kbd></dt><dd>This list</dd>
-      </dl>
-      <div class="modal-actions"><button class="btn btn-ghost" id="keysClose" type="button">Close</button></div>
-    </div>
   </div>
 
   <!-- In-app confirmation (replaces the browser's confirm()). -->

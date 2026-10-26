@@ -2106,31 +2106,7 @@
         return;
       }
     }
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    const handled = {
-      " ": () => togglePlay(),
-      ArrowRight: () => (e.shiftKey ? next(true) : skipBy(activeIsEpisode() ? 10 : 5)),
-      ArrowLeft: () => (e.shiftKey ? prev() : skipBy(activeIsEpisode() ? -10 : -5)),
-      ArrowUp: () => nudgeVolume(0.1),
-      ArrowDown: () => nudgeVolume(-0.1),
-      m: () => toggleMute(),
-      s: () => { setShuffle(!shuffleOn); toast(shuffleOn ? "Shuffle on" : "Shuffle off"); },
-      r: () => { cycleRepeat(); toast(repeatMode === "one" ? "Repeat one" : repeatMode === "all" ? "Repeat all" : "Repeat off"); },
-      q: () => { if (!upnext.hidden) toggleUpNext(); },
-      l: () => toggleLevelling(),
-      "/": () => focusSearch(),
-      "?": () => { $("keysModal").hidden = false; $("keysClose").focus(); },
-    }[key];
-    if (!handled) return;
-    e.preventDefault();
-    handled();
   });
-  function nudgeVolume(d) {
-    audio.muted = false;
-    audio.volume = Math.round(Math.max(0, Math.min(1, audio.volume + d)) * 10) / 10;
-    try { localStorage.setItem("tapes-volume", String(audio.volume)); } catch (_) { /* private mode */ }
-    toast(`Volume ${Math.round(audio.volume * 100)}%`);
-  }
   // Volume levelling: every song (or album) at the same loudness. On by default.
   let levelling = localStorage.getItem("tapes-levelling") !== "off";
   audio.setLevelling(levelling);
@@ -2139,7 +2115,7 @@
   function showLevelling() {
     levelBtn.classList.toggle("active", levelling);
     levelBtn.setAttribute("aria-pressed", String(levelling));
-    levelBtn.title = levelling ? "Volume levelling on (L)" : "Volume levelling off (L)";
+    levelBtn.title = levelling ? "Volume levelling on" : "Volume levelling off";
   }
   showLevelling();
   levelBtn.addEventListener("click", () => toggleLevelling());
@@ -2150,25 +2126,6 @@
     showLevelling();
     toast(levelling ? "Volume levelling on" : "Volume levelling off");
   }
-  function toggleMute() {
-    audio.muted = !audio.muted;
-    toast(audio.muted ? "Muted" : "Sound on");
-  }
-  // `/`: search the list that's open, or the whole library from the shelf.
-  function focusSearch() {
-    if (isMobile()) closeDeck();
-    const visible = (id) => !$(id).hidden;
-    const field = visible("tracksView") ? "search" : visible("browseView") ? "browseSearch"
-      : visible("episodesView") ? "epSearch" : mode === "music" ? "libSearch" : null;
-    if (field) { $(field).focus(); $(field).select(); }
-  }
-  $("keysClose").addEventListener("click", () => { $("keysModal").hidden = true; });
-  $("keysModal").addEventListener("click", (e) => { if (e.target === $("keysModal")) $("keysModal").hidden = true; });
-  $("keysModal").addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "?") $("keysModal").hidden = true; });
-  try {
-    const v = parseFloat(localStorage.getItem("tapes-volume"));
-    if (v >= 0 && v <= 1) audio.volume = v;
-  } catch (_) { /* private mode */ }
   // Closing or backgrounding the page: send the playhead right away with a
   // beacon (a normal fetch would be cancelled, and savePlaystate debounces).
   function beaconPlaystate() {
