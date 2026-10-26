@@ -326,7 +326,7 @@
       const before = this.seg;
       this.dispatchEvent(new Event("ended"));
       if (this.seg !== before || streamEnded) return;     // adopted, or stopped at the very end
-      // Not continued (sleep timer, end of queue, repeat-one): stay at the end of this song.
+      // Not continued (end of queue, repeat-one): stay at the end of this song.
       this._dropNext();
       this.music.pause();
       this.music.currentTime = Math.max(before.t0, before.t1 - 0.01);

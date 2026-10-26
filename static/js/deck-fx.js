@@ -7,8 +7,6 @@
  *   no graph to read (podcasts, levelling off) it sways with the playing.
  * - Tape changes: a new tape ejects and the next slides in; Keep playing
  *   flips to side B.
- * - Sounds (off by default): the clunk of the keys and a breath of hiss as a
- *   tape goes in, made in Web Audio, no files.
  * - Lock screen: the cassette, label and all, drawn to an image once per
  *   label and stored (routes/stream.py), so the lock screen shows the tape.
  * - Full screen: tapping the cassette (or turning a phone on its side)
@@ -18,10 +16,6 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const still = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const store = {
-    get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } },
-    set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* private mode */ } },
-  };
 
   // ---------- the label, and the cover's glow behind the tape ----------
   const NO_GLOW = "transparent";
@@ -123,62 +117,6 @@
     };
   })();
 
-  // ---------- sounds (off by default) ----------
-  const sounds = (() => {
-    let ctx = null, noise = null;
-    const on = () => store.get("tapes-deck-sounds") === "on";
-    function context() {
-      if (!ctx) {
-        const C = window.AudioContext || window.webkitAudioContext;
-        if (!C) return null;
-        ctx = new C();
-        const len = ctx.sampleRate;
-        noise = ctx.createBuffer(1, len, ctx.sampleRate);
-        const d = noise.getChannelData(0);
-        let b = 0;
-        for (let i = 0; i < len; i++) { b = 0.97 * b + 0.03 * (Math.random() * 2 - 1); d[i] = (Math.random() * 2 - 1) * 0.6 + b * 2; }
-      }
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      return ctx;
-    }
-    function burst(c, { at, dur, freq, q, gain }) {
-      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-      src.buffer = noise; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q;
-      g.gain.setValueAtTime(gain, at);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-      src.connect(f).connect(g).connect(c.destination);
-      src.start(at, Math.random() * 0.5); src.stop(at + dur + 0.02);
-    }
-    return {
-      enabled: on,
-      toggle() { store.set("tapes-deck-sounds", on() ? "off" : "on"); if (on()) context(); return on(); },
-      // The mechanical key: a click, then the thump of the transport engaging.
-      clunk() {
-        if (!on()) return;
-        const c = context(); if (!c) return;
-        const t = c.currentTime;
-        burst(c, { at: t, dur: 0.025, freq: 3200, q: 1.2, gain: 0.35 });
-        const o = c.createOscillator(), g = c.createGain();
-        o.frequency.setValueAtTime(110, t + 0.012); o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-        o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.16);
-        burst(c, { at: t + 0.04, dur: 0.06, freq: 900, q: 0.8, gain: 0.12 });
-      },
-      // A tape going in: the clatter of the door, then a breath of hiss.
-      insert() {
-        if (!on()) return;
-        const c = context(); if (!c) return;
-        const t = c.currentTime;
-        burst(c, { at: t, dur: 0.05, freq: 1800, q: 0.9, gain: 0.25 });
-        burst(c, { at: t + 0.09, dur: 0.04, freq: 2600, q: 1.5, gain: 0.2 });
-        const src = c.createBufferSource(), hp = c.createBiquadFilter(), g = c.createGain();
-        src.buffer = noise; src.loop = true; hp.type = "highpass"; hp.frequency.value = 3500;
-        g.gain.setValueAtTime(0.0001, t + 0.15); g.gain.linearRampToValueAtTime(0.025, t + 0.4); g.gain.linearRampToValueAtTime(0.0001, t + 1.5);
-        src.connect(hp).connect(g).connect(c.destination); src.start(t + 0.15); src.stop(t + 1.6);
-      },
-    };
-  })();
-
   // ---------- tape changes ----------
   // One movement of the cassette: animate out, `swap` what it shows, animate
   // back in. Queued, so a quick second change waits for the first.
@@ -211,7 +149,7 @@
            timing: { duration: 240, easing: "cubic-bezier(.5,0,.75,0)" } },
          { frames: [{ transform: "translateY(-10%) scale(0.98)", opacity: 0 }, { transform: "translateY(1.5%)", opacity: 1, offset: 0.75 }, { transform: "none", opacity: 1 }],
            timing: { duration: 420, easing: "cubic-bezier(.2,.8,.3,1)" } },
-         () => { swap(); sounds.insert(); });
+         swap);
   }
   // Turn the tape over: side A to B (Keep playing) or back.
   function flip(side) {
@@ -325,5 +263,5 @@
   // Leaving the browser's full screen (the back gesture) leaves ours too.
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && immersive()) setImmersive(false); });
 
-  window.DeckFX = { setLabel, meter, sounds, changeTape, flip, lockArt, setImmersive };
+  window.DeckFX = { setLabel, meter, changeTape, flip, lockArt, setImmersive };
 })();

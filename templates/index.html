@@ -128,18 +128,22 @@
         <ul class="shelf-list" id="browseList"></ul>
       </div>
 
-      <!-- Phones: what's playing, always in reach while browsing; tap to open the deck. -->
+      <!-- Phones: what's playing, always in reach while browsing; tap (or swipe up) to open the deck. -->
       <div class="mini" id="mini" hidden>
+        <div class="mini-progress" aria-hidden="true"><div class="mini-fill" id="miniFill"></div></div>
         <button class="mini-open" id="miniOpen" type="button" aria-label="Open the player">
           <img class="mini-art" id="miniArt" alt="">
           <span class="mini-meta"><span class="mini-title" id="miniTitle"></span><span class="mini-sub" id="miniSub"></span></span>
         </button>
         <button class="mini-play" id="miniPlay" type="button" aria-label="Play"></button>
+        <button class="mini-next" id="miniNext" type="button" aria-label="Next"></button>
       </div>
     </aside>
 
     <main class="main">
       <button class="btn btn-ghost nav-toggle" id="navToggle" title="Library" aria-label="Library"></button>
+      <div class="gesture-hint" id="gestureHint" role="status" aria-live="polite"></div>
+      <button class="btn btn-ghost deck-menu-btn" id="deckMenuBtn" title="Deck settings" aria-label="Deck settings" aria-haspopup="menu"></button>
 
       <div class="deck">
         <div class="cassette" id="cassette">
@@ -490,9 +494,6 @@
             <button class="tbtn play" id="playBtn" title="Play/Pause" aria-label="Play/Pause"></button>
             <button class="tbtn" id="nextBtn" title="Next" aria-label="Next"></button>
             <button class="tbtn ep-only" id="fwd30Btn" title="Forward 30 seconds" aria-label="Forward 30 seconds"></button>
-            <button class="tbtn sleep" id="sleepBtn" title="Sleep timer" aria-label="Sleep timer" aria-pressed="false"></button>
-            <button class="tbtn level music-only" id="levelBtn" title="Volume levelling" aria-label="Volume levelling" aria-pressed="true"></button>
-            <button class="tbtn sound" id="soundBtn" title="Deck sounds" aria-label="Deck sounds" aria-pressed="false"></button>
           </div>
           <button class="speed-btn ep-only" id="speedBtn" title="Playback speed" aria-label="Playback speed 1×">1×</button>
         </div>
@@ -500,9 +501,7 @@
 
       <div class="upnext" id="upnext" hidden>
         <div class="upnext-panel">
-          <div class="upnext-panel-head">Up Next
-            <button class="keep-btn" id="keepBtn" type="button" aria-pressed="true" title="When the queue runs out, keep going with related songs">Keep playing</button>
-          </div>
+          <div class="upnext-panel-head">Up Next</div>
           <ul class="queue-list" id="queueList"></ul>
         </div>
         <button class="upnext-bar" id="upnextBar" aria-label="Toggle Up Next">
@@ -520,7 +519,7 @@
   </div>
 
   <div class="menu" id="plMenu" role="menu" hidden></div>
-  <div class="menu" id="sleepMenu" role="menu" hidden></div>
+  <div class="menu" id="deckMenu" role="menu" hidden></div>
 
   <div class="modal-scrim" id="editModal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit track">

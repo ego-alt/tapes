@@ -58,6 +58,41 @@
     setTimeout(dismiss, action ? 8000 : 3200);
   }
 
+  // ---------- the back gesture ----------
+  // Android's back (and the browser's) closes what's open, top layer first,
+  // instead of leaving the app. History keeps one entry per open layer, put
+  // back in line after every tap or key and whenever something opens.
+  // (Live once the page has set up: the layers below are defined further on.)
+  const layers = () => [   // topmost first: [is it open?, close it]
+    [() => !$("confirmModal").hidden, () => $("confirmCancel").click()],
+    [() => !$("nameModal").hidden, () => $("nameCancel").click()],
+    [() => !$("albumModal").hidden, () => $("alCancel").click()],
+    [() => !$("editModal").hidden, () => dismissEdit()],
+    [() => !menu.hidden, closeMenu],
+    [() => !deckMenu.hidden, closeDeckMenu],
+    [() => upnext.classList.contains("expanded"), () => upnext.classList.remove("expanded")],
+    [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
+    [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
+    [() => !$("dlPanel").hidden, () => $("dlToggle").click()],
+    [() => !$("tracksView").hidden, () => $("backBtn").click()],
+    [() => !$("browseView").hidden, () => $("browseBack").click()],
+    [() => !$("episodesView").hidden, () => $("epBack").click()],
+  ];
+  let historyLive = false, historyDepth = 0, ignoredPops = 0;
+  function syncHistory() {
+    if (!historyLive) return;
+    const open = layers().filter(([isOpen]) => isOpen()).length;
+    while (historyDepth < open) history.pushState({ tapesLayer: ++historyDepth }, "");
+    if (historyDepth > open) { ignoredPops++; history.go(open - historyDepth); historyDepth = open; }
+  }
+  window.addEventListener("popstate", () => {
+    if (ignoredPops) { ignoredPops--; return; }
+    historyDepth = Math.max(0, historyDepth - 1);
+    layers().find(([isOpen]) => isOpen())?.[1]();
+    setTimeout(syncHistory, 0);
+  });
+  ["click", "keydown", "touchend"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncHistory, 0), true));
+
   // In-app name field: resolves the trimmed name, or null if cancelled.
   function askName(title, { label = "Name", ok = "Create", value = "" } = {}) {
     return new Promise((resolve) => {
@@ -67,6 +102,7 @@
       $("nameInput").value = value;
       $("nameModal").hidden = false;
       $("nameInput").focus();
+      syncHistory();
       const done = (v) => {
         $("nameModal").hidden = true;
         $("nameForm").onsubmit = $("nameCancel").onclick = $("nameModal").onclick = null;
@@ -87,6 +123,7 @@
       $("confirmOk").classList.toggle("danger", danger);
       $("confirmModal").hidden = false;
       $("confirmOk").focus();
+      syncHistory();
       const done = (v) => {
         $("confirmModal").hidden = true;
         $("confirmOk").onclick = $("confirmCancel").onclick = $("confirmModal").onclick = null;
@@ -159,9 +196,6 @@
     chevronLeft: svgIcon('<path d="m15 18-6-6 6-6"/>'),
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
-    moon: svgIcon('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', true),
-    speaker: svgIcon('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>'),
-    level: svgIcon('<path d="M6 7v10M10 7v10M14 7v10M18 7v10"/>'),   // bars at one height
   };
 
   let shelf = [];         // tapes
@@ -318,6 +352,7 @@
     $("tracksView").hidden = name !== "tracks";
     $("podcastsView").hidden = name !== "podcasts";
     $("episodesView").hidden = name !== "episodes";
+    syncHistory();
   }
 
   // ---------- album / artist browse ----------
@@ -1163,9 +1198,7 @@
   function setKeepPlaying(on) {
     keepPlaying = on;
     localStorage.setItem("tapes-keep-playing", on ? "on" : "off");
-    const b = $("keepBtn");
-    b.setAttribute("aria-pressed", String(on));
-    b.classList.toggle("active", on);
+    toast(on ? "Keep playing on" : "Keep playing off");
     if (on) keepPlayingIfEnding();
     else {   // take back the songs it added that haven't played yet
       const kept = (t, i) => i <= qi || !t.radio;
@@ -1523,7 +1556,7 @@
     } catch (e) { console.error(e); toast(errText(e, "Couldn't save the album.")); }
   });
 
-  // ---------- popover menus (add-to-tape, sleep timer) ----------
+  // ---------- popover menus (add-to-tape, deck settings) ----------
   // Measure-then-clamp into the viewport; the caller picks the tentative top/left
   // and the grow-from corner. Shared by both menus.
   function placeMenu(el, top, left, origin) {
@@ -1617,80 +1650,28 @@
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
 
-  // ---------- sleep timer ----------
-  // Client-only: arm a duration (or "end of track"), fade out and pause when it
-  // fires, restore volume so the next manual play is normal. In-memory only — a
-  // timer surviving a page reload would be surprising, not helpful.
-  const sleepBtn = $("sleepBtn"), sleepMenu = $("sleepMenu");
-  let sleepTimeoutId = null, sleepTickId = null, sleepDeadline = 0, sleepEndOfTrack = false;
-
-  function renderSleepBtn() {
-    const active = sleepTimeoutId !== null || sleepEndOfTrack;
-    sleepBtn.classList.toggle("active", active);
-    sleepBtn.setAttribute("aria-pressed", String(active));
-    if (sleepTimeoutId !== null) {
-      const left = Math.max(0, Math.round((sleepDeadline - Date.now()) / 1000));
-      sleepBtn.innerHTML = `<span class="sleep-count">${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}</span>`;
-      sleepBtn.title = "Sleep timer running — tap to change";
-    } else {
-      sleepBtn.innerHTML = ICONS.moon;
-      sleepBtn.title = sleepEndOfTrack ? "Sleep: stop at end of track" : "Sleep timer";
+  // ---------- the deck's ⋯ menu: settings ----------
+  const deckBtn = $("deckMenuBtn"), deckMenu = $("deckMenu");
+  const closeDeckMenu = () => { deckMenu.hidden = true; };
+  // Under the ⋯ on a laptop; a bottom sheet on a phone (CSS).
+  function openDeckMenu() {
+    deckMenu.innerHTML = "";
+    deckMenu.appendChild(menuHead("Deck"));
+    if (!activeIsEpisode()) {   // levelling is for music only
+      deckMenu.appendChild(menuItem(`Volume levelling: ${levelling ? "on" : "off"}`, toggleLevelling, closeDeckMenu));
     }
+    deckMenu.appendChild(menuItem(`Keep playing: ${keepPlaying ? "on" : "off"}`, () => setKeepPlaying(!keepPlaying), closeDeckMenu));
+    deckMenu.hidden = false;
+    const r = deckBtn.getBoundingClientRect();
+    placeMenu(deckMenu, r.bottom + 6, r.right - deckMenu.offsetWidth, "top right");
+    syncHistory();
   }
-
-  function clearSleep() {
-    if (sleepTimeoutId !== null) clearTimeout(sleepTimeoutId);
-    if (sleepTickId !== null) clearInterval(sleepTickId);
-    sleepTimeoutId = sleepTickId = null;
-    sleepEndOfTrack = false;
-    renderSleepBtn();
-  }
-
-  function sleepFire() {
-    clearSleep();
-    const startVol = audio.volume, steps = 40, span = 8000;
-    let i = 0;
-    const fade = setInterval(() => {
-      audio.volume = Math.max(0, startVol * (1 - ++i / steps));
-      if (i >= steps) { clearInterval(fade); audio.pause(); audio.volume = startVol; }
-    }, span / steps);
-  }
-
-  function setSleep(val) {
-    clearSleep();
-    if (val === "track") {
-      sleepEndOfTrack = true;
-    } else if (val) {
-      sleepDeadline = Date.now() + val * 60000;
-      sleepTimeoutId = setTimeout(sleepFire, val * 60000);
-      sleepTickId = setInterval(renderSleepBtn, 1000);
-    }
-    renderSleepBtn();
-  }
-
-  const closeSleep = () => { sleepMenu.hidden = true; };
-  function openSleepMenu() {
-    sleepMenu.innerHTML = "";
-    [["15 min", 15], ["30 min", 30], ["45 min", 45], ["1 hour", 60], ["End of track", "track"]]
-      .forEach(([label, val]) => sleepMenu.appendChild(menuItem(label, () => setSleep(val), closeSleep)));
-    if (sleepTimeoutId !== null || sleepEndOfTrack) {
-      const sep = document.createElement("div"); sep.className = "menu-sep"; sleepMenu.appendChild(sep);
-      sleepMenu.appendChild(menuItem("Turn off", clearSleep, closeSleep));
-    }
-    sleepMenu.hidden = false;   // show first so we can measure, then place above the button
-    const r = sleepBtn.getBoundingClientRect(), mh = sleepMenu.offsetHeight;
-    let top = r.top - mh - 6, below = false;
-    if (top < 8) { top = r.bottom + 6; below = true; }   // flip below if no room above
-    placeMenu(sleepMenu, top, r.left + r.width / 2 - sleepMenu.offsetWidth / 2,
-      (below ? "top" : "bottom") + " center");           // grow toward the button
-  }
-
-  sleepBtn.addEventListener("click", (e) => {
+  deckBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    sleepMenu.hidden ? openSleepMenu() : closeSleep();
+    deckMenu.hidden ? openDeckMenu() : closeDeckMenu();
   });
   document.addEventListener("click", (e) => {
-    if (!sleepMenu.hidden && !sleepMenu.contains(e.target)) closeSleep();
+    if (!deckMenu.hidden && !deckMenu.contains(e.target)) closeDeckMenu();
   });
 
   // ---------- downloads ----------
@@ -1906,31 +1887,158 @@
   }
 
   // ---------- events ----------
-  // The transport keys clunk like a deck's, when deck sounds are on.
-  const key = (fn) => () => { DeckFX.sounds.clunk(); fn(); };
+  // The transport keys give a short buzz under the thumb, like a deck's keys.
+  const key = (fn) => () => { navigator.vibrate?.(12); fn(); };
   playBtn.addEventListener("click", key(togglePlay));
   $("prevBtn").addEventListener("click", key(() => prev()));
   $("nextBtn").addEventListener("click", key(() => next(true)));
   $("miniPlay").addEventListener("click", key(togglePlay));
-  const soundBtn = $("soundBtn");
-  soundBtn.innerHTML = ICONS.speaker;
-  const showSounds = (on) => {
-    soundBtn.classList.toggle("active", on);
-    soundBtn.setAttribute("aria-pressed", String(on));
-    soundBtn.title = on ? "Deck sounds on" : "Deck sounds off";
-  };
-  showSounds(DeckFX.sounds.enabled());
-  soundBtn.addEventListener("click", () => { showSounds(DeckFX.sounds.toggle()); DeckFX.sounds.clunk(); });
-  $("keepBtn").addEventListener("click", (e) => { e.stopPropagation(); setKeepPlaying(!keepPlaying); });
-  setKeepPlaying(keepPlaying);
-  // Tap the tape: full screen, just the cassette; tap again to come back.
-  cassette.addEventListener("click", () => DeckFX.setImmersive(!app.classList.contains("immersive")));
+  $("miniNext").addEventListener("click", key(() => next(true)));
+  // Tap the tape: full screen, just the cassette (its gestures are below).
+  const immersive = () => app.classList.contains("immersive");
+  let swiped = false;   // a swipe on the tape isn't also a tap
+  cassette.addEventListener("click", (e) => {
+    if (swiped) { swiped = false; return; }
+    if (immersive()) return;   // the full-screen gestures handle it
+    e.stopPropagation();
+    DeckFX.setImmersive(true);
+  });
+
+  // ---------- swipes ----------
+  // On the deck: down closes it (phones), and left or right on the tape skips
+  // to the next or previous song. On the mini player: up opens the deck.
+  const main = document.querySelector(".main");
+  const SWIPE = 60, CLOSE = 110;
+  let touch = null;
+  main.addEventListener("touchstart", (e) => {
+    swiped = false;   // a new gesture: whatever the last swipe was, it's over
+    if (e.touches.length !== 1 || e.target.closest(".controls, .upnext, .nav-toggle, .deck-menu-btn, .menu")) { touch = null; return; }
+    const p = e.touches[0];
+    touch = { x: p.clientX, y: p.clientY, t: performance.now(), axis: null, onTape: !!e.target.closest("#cassette") };
+  }, { passive: true });
+  main.addEventListener("touchmove", (e) => {
+    if (!touch) return;
+    const p = e.touches[0], dx = p.clientX - touch.x, dy = p.clientY - touch.y;
+    if (!touch.axis && Math.hypot(dx, dy) > 10) touch.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    if (touch.axis === "y" && dy > 0 && isMobile() && app.classList.contains("deck-open") && !immersive()) {
+      main.classList.add("dragging");
+      main.style.transform = `translateY(${dy}px)`;   // the deck follows the finger down
+    }
+  }, { passive: true });
+  main.addEventListener("touchend", (e) => {
+    if (!touch) return;
+    const p = e.changedTouches[0], dx = p.clientX - touch.x, dy = p.clientY - touch.y;
+    const fast = Math.abs(dy) / (performance.now() - touch.t) > 0.6;
+    if (main.classList.contains("dragging")) {
+      main.classList.remove("dragging");
+      main.style.transform = "";
+      if (dy > CLOSE || (dy > 40 && fast)) closeDeck();
+    } else if (touch.axis === "y" && dy > SWIPE && immersive()) {
+      swiped = true;
+      DeckFX.setImmersive(false);   // swipe down: the controls come back
+    } else if (touch.axis === "x" && touch.onTape && Math.abs(dx) > SWIPE) {
+      swiped = true;
+      navigator.vibrate?.(12);
+      if (dx < 0) next(true); else prev();
+    }
+    touch = null;
+  }, { passive: true });
+  // ---------- full-screen tape: the tape is the control ----------
+  // With just the tape on screen (a phone on its side, or after tapping the
+  // tape) there are no buttons:
+  //   tap the left / right side   previous / next song
+  //   tap the middle              play / pause
+  //   double-tap a side           back / forward 10 seconds
+  //   press and hold a side       rewind / fast-forward while held
+  //   swipe down                  the controls come back (above)
+  //   shake the phone             shuffle (below; works whenever it's playing)
+  // A small icon flashes over the tape to say what happened (the words are
+  // for screen readers; full screen is about the tape, not labels).
+  const hint = $("gestureHint");
+  let hintTimer = 0;
+  function showHint(icon, text) {
+    hint.innerHTML = icon || `<span>${text}</span>`;
+    hint.setAttribute("aria-label", text);
+    hint.classList.add("show");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => hint.classList.remove("show"), 800);
+    navigator.vibrate?.(12);
+  }
+  const DOUBLE_MS = 280, HOLD_MS = 450, WIND_STEP_S = 2.5, WIND_EVERY_MS = 120;
+  const zoneAt = (x) => (x < innerWidth / 3 ? -1 : x > innerWidth * 2 / 3 ? 1 : 0);   // left, middle, right
+  let lastTap = null, pendingTap = 0, hold = null, winding = false;
+  main.addEventListener("pointerdown", (e) => {
+    if (!immersive() || e.target.closest(".controls, .nav-toggle, .deck-menu-btn")) return;
+    const zone = zoneAt(e.clientX);
+    if (!zone) return;
+    hold = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {   // held: wind the tape
+      winding = true;
+      showHint(zone > 0 ? ICONS.next : ICONS.prev, zone > 0 ? "Fast-forward" : "Rewind");
+      hold.wind = setInterval(() => skipBy(zone * WIND_STEP_S), WIND_EVERY_MS);
+    }, HOLD_MS) };
+  });
+  main.addEventListener("pointermove", (e) => {
+    if (hold && !winding && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 12) { clearTimeout(hold.timer); hold = null; }   // a swipe
+  });
+  const endHold = () => { if (hold) { clearTimeout(hold.timer); clearInterval(hold.wind); hold = null; } };
+  main.addEventListener("pointerup", endHold);
+  main.addEventListener("pointercancel", () => { endHold(); winding = false; });
+  main.addEventListener("contextmenu", (e) => { if (immersive()) e.preventDefault(); });   // a long press winds, no menu
+  main.addEventListener("click", (e) => {
+    if (!immersive() || e.target.closest(".controls, .nav-toggle, .deck-menu-btn")) return;
+    if (winding) { winding = false; return; }
+    if (swiped) { swiped = false; return; }
+    const zone = zoneAt(e.clientX), now = performance.now();
+    if (!zone) {
+      togglePlay();
+      showHint(audio.paused ? ICONS.pause : ICONS.play, audio.paused ? "Paused" : "Playing");
+      return;
+    }
+    if (lastTap && lastTap.zone === zone && now - lastTap.t < DOUBLE_MS) {   // double tap: ±10 s
+      clearTimeout(pendingTap);
+      lastTap = null;
+      skipBy(zone * 10);
+      showHint(null, zone > 0 ? "+10" : "−10");
+      return;
+    }
+    lastTap = { zone, t: now };
+    pendingTap = setTimeout(() => {   // a single tap, once it's clearly not a double
+      lastTap = null;
+      if (zone > 0) { next(true); showHint(ICONS.next, "Next"); } else { prev(); showHint(ICONS.prev, "Previous"); }
+    }, DOUBLE_MS);
+  });
+
+  // Shake to shuffle: two hard jolts within a second while tapes is on
+  // screen and music is playing (walking with it doesn't come close).
+  const JOLT = 18;   // m/s², gravity excluded
+  let jolts = [], lastShuffle = 0;
+  window.addEventListener("devicemotion", (e) => {
+    const a = e.acceleration;
+    if (!a || a.x == null || document.hidden || qi < 0 || activeIsEpisode()) return;
+    const now = performance.now();
+    if (Math.hypot(a.x, a.y, a.z) < JOLT || now - lastShuffle < 2000) return;
+    if (jolts.length && now - jolts[jolts.length - 1] < 150) return;   // the same jolt, still settling
+    jolts = jolts.filter((t) => now - t < 1000).concat(now);
+    if (jolts.length < 2) return;
+    jolts = [];
+    lastShuffle = now;
+    setShuffle(true);
+    showHint(ICONS.shuffle, "Shuffled");
+  });
+
+  let miniY = null;
+  $("mini").addEventListener("touchstart", (e) => { miniY = e.touches[0].clientY; }, { passive: true });
+  $("mini").addEventListener("touchend", (e) => {
+    if (miniY !== null && miniY - e.changedTouches[0].clientY > 40) openDeck();
+    miniY = null;
+  }, { passive: true });
   // A phone turned on its side is for listening: the tape fills the screen
   // (a tap brings the controls back); upright again, the deck returns.
   const sideways = window.matchMedia("(max-height: 480px) and (orientation: landscape)");
   const onSideways = () => {
     if (sideways.matches) app.classList.add("nav-collapsed");
     DeckFX.setImmersive(sideways.matches);
+    syncHistory();
   };
   sideways.addEventListener("change", onSideways);
   onSideways();
@@ -2127,7 +2235,6 @@
     cassette.classList.remove("playing"); playBtn.innerHTML = ICONS.play; updateMini(); savePlaystate(); reels.stop();
   });
   audio.addEventListener("ended", () => {
-    if (sleepEndOfTrack) { clearSleep(); audio.pause(); return; }  // sleep: stop, don't advance
     const t = currentTrack();
     if (t && t.kind === "episode") markEpisodePlayed(t);
     next(false);
@@ -2157,6 +2264,7 @@
     scrubFill.style.width = frac * 100 + "%";
     $("scrubThumb").style.left = frac * 100 + "%";
     scrub.setAttribute("aria-valuenow", String(Math.round(frac * 100)));
+    $("miniFill").style.width = frac * 100 + "%";
   }
   scrub.addEventListener("pointerdown", (e) => {
     if (!audio.duration) return;
@@ -2192,8 +2300,8 @@
     if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
     if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
-      const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !sleepMenu.hidden;
-      upnext.classList.remove("expanded"); closeMenu(); closeSleep();
+      const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !deckMenu.hidden;
+      upnext.classList.remove("expanded"); closeMenu(); closeDeckMenu();
       if (!anyOpen && isMobile()) closeDeck();
     }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;
@@ -2215,20 +2323,10 @@
   // Volume levelling: every song (or album) at the same loudness. On by default.
   let levelling = localStorage.getItem("tapes-levelling") !== "off";
   audio.setLevelling(levelling);
-  const levelBtn = $("levelBtn");
-  levelBtn.innerHTML = ICONS.level;
-  function showLevelling() {
-    levelBtn.classList.toggle("active", levelling);
-    levelBtn.setAttribute("aria-pressed", String(levelling));
-    levelBtn.title = levelling ? "Volume levelling on" : "Volume levelling off";
-  }
-  showLevelling();
-  levelBtn.addEventListener("click", () => toggleLevelling());
   function toggleLevelling() {
     levelling = !levelling;
     try { localStorage.setItem("tapes-levelling", levelling ? "on" : "off"); } catch (_) { /* private mode */ }
     audio.setLevelling(levelling);
-    showLevelling();
     toast(levelling ? "Volume levelling on" : "Volume levelling off");
   }
   // Closing or backgrounding the page: send the playhead right away with a
@@ -2279,7 +2377,8 @@
   $("prevBtn").innerHTML = ICONS.prev;
   playBtn.innerHTML = ICONS.play;
   $("nextBtn").innerHTML = ICONS.next;
-  renderSleepBtn();
+  deckBtn.innerHTML = ICONS.more;
+  $("miniNext").innerHTML = ICONS.next;
   $("shuffleBtn").innerHTML = ICONS.shuffle;
   $("newTapeBtn").innerHTML = ICONS.plus;
   $("newShowBtn").innerHTML = ICONS.plus;
@@ -2304,6 +2403,7 @@
     }
     toast(errText(e.reason, "Something went wrong — please try again."));
   });
+  historyLive = true;
   (async () => {
     try {
       await loadShelf();
