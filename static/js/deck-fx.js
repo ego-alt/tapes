@@ -280,7 +280,7 @@
     } finally { URL.revokeObjectURL(url); }
   }
   const djb2 = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
-  const LOCK_VERSION = 5;
+  const LOCK_VERSION = 6;
   const ready = new Map();   // url -> true once it exists on the server
   /** The lock-screen URL for this label, once drawn and stored; draws it if needed.
    *  Calls onReady(url) when it becomes available. */

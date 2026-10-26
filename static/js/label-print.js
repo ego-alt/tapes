@@ -1,6 +1,6 @@
-/* The printed design on the cassette's paper label: the original thin
- * stripes, or one of seven bold, full-bleed geometric designs of the kind
- * 70s and 80s tapes were printed with (the window simply sits on top).
+/* The printed design on the cassette's paper label: the classic four broad
+ * bands, or one of seven bold, full-bleed geometric designs of the kind 70s
+ * and 80s tapes were printed with (the window simply sits on top).
  *
  * The design is chosen (and varied: angle, count, spacing) from a seed, the
  * album or tape name, so an album always prints the same way and every song
@@ -42,11 +42,11 @@
   const inkAt = (i) => RAINBOW[((i % 4) + 4) % 4];
   const circle = (cx, cy, rad, k) => `<circle class="ink-${k}" cx="${f(cx)}" cy="${f(cy)}" r="${f(rad)}"/>`;
   const DESIGNS = {
-    // The original: five thin stripes with cream between them, and a broad
-    // band below (the deck's first label, in the retro inks).
+    // The classic: four broad bands with a hairline of cream between them,
+    // always red, orange, mustard, brown (see CLASSIC_RUN).
     classic() {
-      return [[67, 7.5, "a"], [77, 6.5, "b"], [86, 7, "a"], [95.5, 6.5, "b"], [104.5, 7.5, "a"], [114.5, Y1 - 114.5, "b"]]
-        .map(([y, h, k]) => rect(X0, y, W, h, k)).join("");
+      const gap = 1.2, h = (H - gap * 3) / 4;
+      return RAINBOW.map((k, i) => rect(X0, Y0 + i * (h + gap), W, h, k)).join("");
     },
     // Wide diagonal stripes straight across, all four inks.
     diagonal(r) {
@@ -56,10 +56,10 @@
       }
       return out.join("");
     },
-    // Thick rainbow bands top to bottom.
-    rainbow(r) {
-      const n = pick(r, [4, 8]), gap = n === 4 ? between(r, 2, 4) : 0, h = (H - gap * (n - 1)) / n;
-      return Array.from({ length: n }, (_, i) => rect(X0, Y0 + i * (h + gap), W, h + 0.2, inkAt(i))).join("");
+    // Eight narrower rainbow bands, edge to edge.
+    rainbow() {
+      const h = H / 8;
+      return Array.from({ length: 8 }, (_, i) => rect(X0, Y0 + i * h, W, h + 0.2, inkAt(i))).join("");
     },
     // Rays from the middle of the bottom edge, filling the label.
     sunburst(r) {
@@ -115,14 +115,16 @@
   // The palette every tape is printed in.
   const RETRO = { red: "#c43c2e", orange: "#e0702a", mustard: "#e6b23a", brown: "#6d3e24", tan: "#b08d68" };
   // The inks in rainbow order (c, a, e, d): a few classic runs to choose from.
+  const CLASSIC_RUN = ["red", "orange", "mustard", "brown"];
   const RUNS = [["mustard", "orange", "red", "brown"], ["orange", "red", "brown", "mustard"],
-                ["red", "orange", "mustard", "brown"], ["mustard", "red", "orange", "brown"]];
+                CLASSIC_RUN, ["mustard", "red", "orange", "brown"]];
 
   /** The design for a seed (an album or tape name): its name, markup and inks. */
   function design(seed) {
     const r = rng(String(seed || ""));
     const name = NAMES[Math.floor(r() * NAMES.length)];
-    const [c, a, e, d] = pick(r, RUNS).map((k) => RETRO[k]);
+    const run = pick(r, RUNS);
+    const [c, a, e, d] = (name === "classic" ? CLASSIC_RUN : run).map((k) => RETRO[k]);
     return { name, markup: DESIGNS[name](r), inks: { a, c, d, e, b: RETRO.tan } };
   }
 
