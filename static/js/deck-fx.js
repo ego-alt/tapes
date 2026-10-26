@@ -11,8 +11,8 @@
  *   tape goes in, made in Web Audio, no files.
  * - Lock screen: the cassette, label and all, drawn to an image once per
  *   label and stored (routes/stream.py), so the lock screen shows the tape.
- * - Full screen: tapping the cassette leaves just the tape (and keeps the
- *   screen on while it plays, where the browser allows).
+ * - Full screen: tapping the cassette (or turning a phone on its side)
+ *   leaves just the tape, and keeps the screen on where the browser allows.
  *
  * player.js calls these; nothing here changes what plays. */
 (function () {
@@ -187,10 +187,22 @@
     const el = $("cassette");
     if (still.matches || !el || !el.animate) { swap(); return; }
     busy = busy.then(async () => {
-      await el.animate(out.frames, { ...out.timing, fill: "forwards" }).finished;
-      swap();
-      await el.animate(back.frames, { ...back.timing, fill: "forwards" }).finished;
-      el.getAnimations().forEach((x) => x.cancel());
+      // Cancelled by reference: once the second replaces the first, the
+      // browser stops listing the first, which would hold the tape hidden.
+      const moves = [];
+      let swapped = false;
+      try {
+        moves.push(el.animate(out.frames, { ...out.timing, fill: "forwards" }));
+        await moves[0].finished;
+        swap(); swapped = true;
+        moves.push(el.animate(back.frames, { ...back.timing, fill: "forwards" }));
+        await moves[1].finished;
+      } catch (e) {
+        console.warn("Tape animation:", e);
+        if (!swapped) swap();
+      } finally {
+        moves.forEach((m) => m.cancel());   // never leave the tape faded out
+      }
     });
   }
   // Out goes the old tape, in slides the new one (with its label written).
@@ -268,7 +280,7 @@
     } finally { URL.revokeObjectURL(url); }
   }
   const djb2 = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
-  const LOCK_VERSION = 3;
+  const LOCK_VERSION = 5;
   const ready = new Map();   // url -> true once it exists on the server
   /** The lock-screen URL for this label, once drawn and stored; draws it if needed.
    *  Calls onReady(url) when it becomes available. */
@@ -301,21 +313,17 @@
       } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
     } catch (_) { /* not allowed now */ }
   }
-  function setImmersive(app, on) {
-    app.classList.toggle("immersive", on);
+  function setImmersive(on) {
+    $("app").classList.toggle("immersive", on);
     holdScreen(on);
     const root = document.documentElement;
     if (on && root.requestFullscreen && !document.fullscreenElement) root.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
     if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
-  document.addEventListener("visibilitychange", () => {
-    const app = $("app");
-    if (document.visibilityState === "visible" && app && app.classList.contains("immersive")) holdScreen(true);
-  });
-  document.addEventListener("fullscreenchange", () => {
-    const app = $("app");
-    if (!document.fullscreenElement && app && app.classList.contains("immersive")) { app.classList.remove("immersive"); holdScreen(false); }
-  });
+  const immersive = () => $("app").classList.contains("immersive");
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && immersive()) holdScreen(true); });
+  // Leaving the browser's full screen (the back gesture) leaves ours too.
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && immersive()) setImmersive(false); });
 
   window.DeckFX = { setLabel, meter, sounds, changeTape, flip, lockArt, setImmersive };
 })();

@@ -262,7 +262,7 @@
                 <stop offset="0.62" stop-color="#fff" stop-opacity="0.07"/>
                 <stop offset="0.75" stop-color="#fff" stop-opacity="0"/>
               </linearGradient>
-              <clipPath id="printClip"><rect x="15.5" y="60" width="299" height="54.5"/></clipPath>
+              <clipPath id="printClip"><rect x="15.5" y="58" width="299" height="78"/></clipPath>
               <clipPath id="vuSlot"><rect x="126" y="98.4" width="78" height="6.6"/></clipPath>
               <radialGradient id="screwHead" cx="0.4" cy="0.35" r="0.7">
                 <stop offset="0" stop-color="#6a6a6a"/>
@@ -323,16 +323,18 @@
             <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="#000" opacity="0.65" transform="translate(0.3 1.1)" filter="url(#soft)"/>
             <g clip-path="url(#labelClip)">
               <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paper)" filter="url(#paperGrain)"/>
-              <!-- the printed design (label-print.js draws one per album or tape; classic stripes until then) -->
+              <!-- the printed design (label-print.js draws one per album or tape; the classic until then) -->
               <g id="labelPrint" clip-path="url(#printClip)" filter="url(#inkPrint)" style="mix-blend-mode: multiply">
-                <rect x="15.5" y="66" width="299" height="10" fill="#e6b23a"/>
-                <rect x="15.5" y="78" width="299" height="10" fill="#e0702a"/>
-                <rect x="15.5" y="90" width="299" height="10" fill="#c43c2e"/>
-                <rect x="15.5" y="102" width="299" height="10" fill="#6d3e24"/>
+                <rect x="15.5" y="67" width="299" height="7.5" fill="#c43c2e"/>
+                <rect x="15.5" y="77" width="299" height="6.5" fill="#b08d68"/>
+                <rect x="15.5" y="86" width="299" height="7" fill="#c43c2e"/>
+                <rect x="15.5" y="95.5" width="299" height="6.5" fill="#b08d68"/>
+                <rect x="15.5" y="104.5" width="299" height="7.5" fill="#c43c2e"/>
+                <rect x="15.5" y="114.5" width="299" height="21.5" fill="#b08d68"/>
               </g>
-              <rect x="15.5" y="114.5" width="299" height="36" fill="#b08d68"/>
+              <rect x="15.5" y="136" width="299" height="14.5" fill="#b08d68"/>
               <!-- the same fibre over the printed ink, so it reads as print, not paint -->
-              <rect x="15.5" y="60" width="299" height="90" fill="#fff" opacity="0.07" filter="url(#paperGrain)"/>
+              <rect x="15.5" y="58" width="299" height="92" fill="#fff" opacity="0.07" filter="url(#paperGrain)"/>
               <path d="M20 14 H310 L314.5 18.5 V145.5 L310 150 H20 L15.5 145.5 V18.5 Z" fill="url(#paperAge)"/>
               <!-- printed marks -->
               <text x="306" y="144" font-family="Inter, Arial, sans-serif" font-size="7.5" font-weight="700" fill="#f4ede0" fill-opacity="0.85" text-anchor="end" letter-spacing="0.4">C60</text>

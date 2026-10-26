@@ -1,5 +1,6 @@
-/* The printed design on the cassette's paper label: one of a dozen bold
- * geometric designs, the kind 70s and 80s tapes were printed with.
+/* The printed design on the cassette's paper label: the original thin
+ * stripes, or one of seven bold, full-bleed geometric designs of the kind
+ * 70s and 80s tapes were printed with (the window simply sits on top).
  *
  * The design is chosen (and varied: angle, count, spacing) from a seed, the
  * album or tape name, so an album always prints the same way and every song
@@ -13,7 +14,7 @@
  * first band, the second…" without naming colours. Printed as overprinting
  * ink (multiply, set on the group in the SVG), as on real labels. */
 (function () {
-  const X0 = 15.5, X1 = 314.5, Y0 = 60, Y1 = 114.5, W = X1 - X0, H = Y1 - Y0;
+  const X0 = 15.5, X1 = 314.5, Y0 = 58, Y1 = 136, W = X1 - X0, H = Y1 - Y0;
   const CX = (X0 + X1) / 2, CY = (Y0 + Y1) / 2;
   const f = (n) => +n.toFixed(2);
 
@@ -37,123 +38,81 @@
     ? `<path class="ink-${ink}" d="${d}" fill="none" stroke-width="${f(stroke)}"/>`
     : `<path class="ink-${ink}" d="${d}"/>`;
 
-  // Broad retro designs: a few big shapes in a family of inks.
   const RAINBOW = ["c", "a", "e", "d"];
-  const circle = (cx, cy, rad, ink) => `<circle class="ink-${ink}" cx="${f(cx)}" cy="${f(cy)}" r="${f(rad)}"/>`;
-  const side = (r) => (r() > 0.5 ? 1 : -1);                       // which end of the label a shape favours
-  const atSide = (s, inset) => (s > 0 ? X1 - inset : X0 + inset);
+  const inkAt = (i) => RAINBOW[((i % 4) + 4) % 4];
+  const circle = (cx, cy, rad, k) => `<circle class="ink-${k}" cx="${f(cx)}" cy="${f(cy)}" r="${f(rad)}"/>`;
   const DESIGNS = {
-    // Thick rainbow bands straight across: the 70s classic.
+    // The original: five thin stripes with cream between them, and a broad
+    // band below (the deck's first label, in the retro inks).
+    classic() {
+      return [[67, 7.5, "a"], [77, 6.5, "b"], [86, 7, "a"], [95.5, 6.5, "b"], [104.5, 7.5, "a"], [114.5, Y1 - 114.5, "b"]]
+        .map(([y, h, k]) => rect(X0, y, W, h, k)).join("");
+    },
+    // Wide diagonal stripes straight across, all four inks.
+    diagonal(r) {
+      const w = between(r, 14, 22), gap = r() > 0.5 ? 0 : between(r, 3, 6), lean = (r() > 0.5 ? 1 : -1) * H * between(r, 0.7, 1.1), out = [];
+      for (let x = X0 - Math.abs(lean) - w, i = 0; x < X1 + Math.abs(lean); x += w + gap, i++) {
+        out.push(poly([[x, Y1], [x + w, Y1], [x + w + lean, Y0], [x + lean, Y0]], inkAt(i)));
+      }
+      return out.join("");
+    },
+    // Thick rainbow bands top to bottom.
     rainbow(r) {
-      const n = pick(r, [3, 4]), gap = between(r, 1.2, 2.4), h = (H - 6 - gap * (n - 1)) / n;
-      return RAINBOW.slice(0, n).map((ink, i) => rect(X0, Y0 + 6 + i * (h + gap), W, h, ink)).join("");
+      const n = pick(r, [4, 8]), gap = n === 4 ? between(r, 2, 4) : 0, h = (H - gap * (n - 1)) / n;
+      return Array.from({ length: n }, (_, i) => rect(X0, Y0 + i * (h + gap), W, h + 0.2, inkAt(i))).join("");
     },
-    // Bands that run flat, then sweep up at one end, like a racing stripe.
-    swoosh(r) {
-      const s = side(r), n = pick(r, [3, 4]), band = H / (n + 1.2), turn = s > 0 ? X1 - between(r, 40, 70) : X0 + between(r, 40, 70);
-      return RAINBOW.slice(0, n).map((ink, i) => {
-        const y = Y0 + band * (i + 1.1), rise = 70 + i * band;
-        const end = s > 0 ? X1 + 40 : X0 - 40;
-        return path(`M${s > 0 ? X0 - 5 : X1 + 5} ${f(y)} H${f(turn)} Q${f(turn + s * 26)} ${f(y)} ${f(end)} ${f(y - rise)}`, ink, band * 0.82);
-      }).join("");
-    },
-    // A rainbow arch rising from the bottom edge beside the window.
-    arch(r) {
-      const s = side(r), cx = atSide(s, between(r, 24, 30)), w = between(r, 8.5, 10.5);
-      return RAINBOW.map((ink, i) => `<circle class="ink-${ink}" cx="${f(cx)}" cy="${Y1}" r="${f(w * (4.5 - i))}" fill="none" stroke-width="${f(w)}"/>`).join("");
-    },
-    // A sun setting at one end, its lower half cut into widening gaps, with
-    // bands across the sky.
-    sunset(r) {
-      const s = side(r), cx = atSide(s, between(r, 26, 34)), rad = between(r, 22, 26), cy = Y1 - 2;
-      const slices = [];
-      for (let y = cy - rad, k = 0; y < Y1; k++) {
-        const h = y < cy - rad * 0.4 ? rad * 0.6 : Math.max(1.2, 4.5 - k * 0.7);
-        slices.push(rect(cx - rad, y, rad * 2, h, "a"));
-        y += h + (y < cy - rad * 0.4 ? 1.2 : 1 + k * 0.5);
-      }
-      return rect(X0, Y0 + 6, W, 6, "c") + rect(X0, Y0 + 15, W, 4, "e")
-        + `<clipPath id="lp-sun"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(rad)}"/></clipPath><g clip-path="url(#lp-sun)">${slices.join("")}</g>`;
-    },
-    // The label split into a few broad slanting fields of colour.
-    fields(r) {
-      const slope = between(r, 18, 34) * side(r), widths = [between(r, 30, 60), between(r, 18, 30), between(r, 10, 18), between(r, 6, 10)];
-      let x = between(r, X0 + 20, X0 + 60);
-      return RAINBOW.map((ink, i) => {
-        const w = widths[i], pts = [[x, Y1], [x + w, Y1], [x + w + slope, Y0], [x + slope, Y0]];
-        x += w + 6 + between(r, 30, 70);
-        return poly(pts, ink);
-      }).join("") + poly([[X1 - 50, Y1], [X1 + 10, Y1], [X1 + 10 + slope, Y0], [X1 - 50 + slope, Y0]], "a");
-    },
-    // Two or three huge chevrons.
-    chevrons(r) {
-      const n = pick(r, [2, 3]), w = between(r, 9, 13), depth = between(r, 18, 26), out = [];
-      for (let i = 0; i < n; i++) {
-        const y = Y0 + 10 + i * (w + 4);
-        out.push(path(`M${X0 - 10} ${f(y)} L${CX} ${f(y + depth)} L${X1 + 10} ${f(y)}`, RAINBOW[i], w));
+    // Rays from the middle of the bottom edge, filling the label.
+    sunburst(r) {
+      const rays = pick(r, [16, 20, 24]), oy = Y1 + between(r, 0, 20), R = 420, out = [rect(X0, Y0, W, H, "c")];
+      for (let i = 0; i < rays; i++) {
+        const a0 = Math.PI + Math.PI * i / rays, a1 = Math.PI + Math.PI * (i + 1) / rays;
+        if (i % 2) out.push(poly([[CX, oy], [CX + R * Math.cos(a0), oy + R * Math.sin(a0)], [CX + R * Math.cos(a1), oy + R * Math.sin(a1)]], inkAt(1 + ((i - 1) / 2) % 3)));
       }
       return out.join("");
     },
-    // Overlapping mountain peaks along the bottom.
-    peaks(r) {
-      const out = [];
-      for (const [k, ink] of [["far", "c"], ["mid", "e"], ["near", "a"]]) {
-        const h = { far: H * 0.95, mid: H * 0.75, near: H * 0.5 }[k], w = h * between(r, 1.3, 1.9);
-        for (let x = X0 - w / 2 + between(r, 0, w / 2); x < X1; x += w * between(r, 0.8, 1.2)) {
-          out.push(poly([[x, Y1], [x + w / 2, Y1 - h], [x + w, Y1]], ink));
-        }
-      }
-      return out.join("");
-    },
-    // Memphis: a big disc at one end; a triangle and a ring overlapping at the other.
-    memphis(r) {
-      const s = side(r);
-      return circle(atSide(s, 30), Y0 + 26, 20, "c")
-        + poly([[atSide(-s, 8), Y1], [atSide(-s, 52), Y1], [atSide(-s, 30), Y0 + 8]], "a")
-        + `<circle class="ink-e" cx="${f(atSide(-s, 42))}" cy="${Y0 + 20}" r="12" fill="none" stroke-width="4"/>`
-        + rect(X0, Y1 - 6, W, 6, "d");
-    },
-    // Bauhaus tiles: big squares, each with a quarter circle.
-    bauhaus(r) {
-      const sz = H / 2, out = [];
-      for (let x = X0, i = 0; x < X1; x += sz, i++) {
-        for (let j = 0; j < 2; j++) {
-          const y = Y0 + j * sz, ink = RAINBOW[(i + j * 2) % 4], corner = Math.floor(r() * 4);
-          const [cx, cy] = [[x, y], [x + sz, y], [x + sz, y + sz], [x, y + sz]][corner];
-          out.push(rect(x, y, sz, sz, (i + j) % 2 ? "b" : "d"));
-          out.push(`<path class="ink-${ink}" d="M${f(cx)} ${f(cy)} m${corner === 1 || corner === 2 ? -sz : sz} 0 A${f(sz)} ${f(sz)} 0 0 ${corner % 2} ${f(cx)} ${f(cy + (corner < 2 ? sz : -sz))} L${f(cx)} ${f(cy)} Z"/>`);
-        }
-      }
-      return out.join("");
-    },
-    // Big checks in two rows.
-    checks(r) {
-      const sz = H / 2, out = [], offset = between(r, 0, sz);
-      for (let x = X0 - offset, i = 0; x < X1; x += sz, i++) {
-        for (let j = 0; j < 2; j++) if ((i + j) % 2) out.push(rect(x, Y0 + j * sz, sz, sz, RAINBOW[i % 4]));
-      }
-      return out.join("");
-    },
-    // Two or three thick, slow waves.
+    // Fat waves, band on band.
     waves(r) {
-      const n = pick(r, [2, 3]), len = between(r, 90, 140), amp = between(r, 6, 10), band = H / (n + 0.3);
-      return RAINBOW.slice(0, n).map((ink, i) => {
-        const y = Y0 + band * (i + 0.65);
+      const n = pick(r, [4, 5]), len = between(r, 70, 110), amp = between(r, 5, 9), band = H / (n - 0.5), out = [rect(X0, Y0, W, H, "d")];
+      for (let i = 0; i < n; i++) {
+        const y = Y0 + band * i;
         let d = `M${X0 - len} ${f(y)}`;
         for (let x = X0 - len; x < X1 + len; x += len) d += ` q${f(len / 4)} ${-amp} ${f(len / 2)} 0 t${f(len / 2)} 0`;
-        return path(d, ink, band * 0.75);
-      }).join("");
+        out.push(path(`${d} V${Y1 + 20} H${X0 - len} Z`, inkAt(i)));
+      }
+      return out.join("");
     },
-    // A block of wide vertical stripes at one end, the rest left as paper.
-    block(r) {
-      const s = side(r), w = between(r, 9, 12), out = [rect(X0, Y0 + 8, W, 5, "d")];
-      RAINBOW.forEach((ink, i) => out.push(rect(s > 0 ? X1 - (4 - i) * w : X0 + i * w, Y0, w, H, ink)));
+    // The label split into big diagonal fields of colour.
+    split(r) {
+      const lean = H * between(r, 0.5, 1) * (r() > 0.5 ? 1 : -1), cuts = [X0 + W * between(r, 0.15, 0.3), CX + W * between(r, -0.08, 0.08), X1 - W * between(r, 0.15, 0.3)];
+      const xs = [X0 - 200, ...cuts, X1 + 200];
+      return xs.slice(0, -1).map((x, i) => poly([[x, Y1], [xs[i + 1], Y1], [xs[i + 1] + lean, Y0], [x + lean, Y0]], inkAt(i))).join("");
+    },
+    // Bauhaus: big squares, each with a quarter circle in one corner.
+    bauhaus(r) {
+      const rows = 2, sz = H / rows, out = [];
+      for (let x = X0, i = 0; x < X1; x += sz, i++) {
+        for (let j = 0; j < rows; j++) {
+          const y = Y0 + j * sz, corner = Math.floor(r() * 4), [cx, cy] = [[x, y], [x + sz, y], [x + sz, y + sz], [x, y + sz]][corner];
+          out.push(rect(x, y, sz + 0.2, sz + 0.2, inkAt(i + j)));
+          out.push(`<clipPath id="lp-q${i}-${j}"><rect x="${f(x)}" y="${f(y)}" width="${f(sz)}" height="${f(sz)}"/></clipPath>`);
+          out.push(`<g clip-path="url(#lp-q${i}-${j})">${circle(cx, cy, sz, inkAt(i + j + 2))}</g>`);
+        }
+      }
+      return out.join("");
+    },
+    // A racing swoosh: fat bands that run flat, then sweep up at the end.
+    swoosh(r) {
+      const n = 4, band = H / (n + 0.5), turn = X1 - between(r, 70, 100), out = [rect(X0, Y0, W, H, "b")];
+      for (let i = 0; i < n; i++) {
+        const y = Y0 + band * (i + 0.75), rise = 120 + i * band;
+        out.push(path(`M${X0 - 5} ${f(y)} H${f(turn)} Q${f(turn + 30)} ${f(y)} ${X1 + 60} ${f(y - rise)}`, inkAt(i), band));
+      }
       return out.join("");
     },
   };
   const NAMES = Object.keys(DESIGNS);
 
-  /** The design's name and markup for a seed (an album or tape name). */
+  // The palette every tape is printed in.
   const RETRO = { red: "#c43c2e", orange: "#e0702a", mustard: "#e6b23a", brown: "#6d3e24", tan: "#b08d68" };
   // The inks in rainbow order (c, a, e, d): a few classic runs to choose from.
   const RUNS = [["mustard", "orange", "red", "brown"], ["orange", "red", "brown", "mustard"],

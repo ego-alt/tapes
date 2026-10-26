@@ -337,6 +337,7 @@
 /* ---- full screen: tap the tape and the rest steps back ---- */
 .controls, .nav-toggle, .upnext { transition: opacity 0.3s ease; }
 .app.immersive .controls, .app.immersive .nav-toggle, .app.immersive .upnext { opacity: 0; pointer-events: none; }
-.app.immersive .cassette { height: min(84vh, calc(96vw * 206 / 330)); }
+.app.immersive .controls { position: absolute; }   /* out of the layout, so the tape centres */
+.app.immersive .cassette { height: min(94vh, calc(98vw * 206 / 330)); }
 @media (min-width: 641px) { .app.immersive .sidebar { display: none; } }
 @media (prefers-reduced-motion: reduce) { .cassette, .controls, .nav-toggle, .upnext { transition: none; } }

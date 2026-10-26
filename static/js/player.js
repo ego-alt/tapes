@@ -1924,10 +1924,14 @@
   $("keepBtn").addEventListener("click", (e) => { e.stopPropagation(); setKeepPlaying(!keepPlaying); });
   setKeepPlaying(keepPlaying);
   // Tap the tape: full screen, just the cassette; tap again to come back.
-  cassette.addEventListener("click", () => DeckFX.setImmersive(app, !app.classList.contains("immersive")));
-  // A phone turned on its side is for listening: the library steps aside.
+  cassette.addEventListener("click", () => DeckFX.setImmersive(!app.classList.contains("immersive")));
+  // A phone turned on its side is for listening: the tape fills the screen
+  // (a tap brings the controls back); upright again, the deck returns.
   const sideways = window.matchMedia("(max-height: 480px) and (orientation: landscape)");
-  const onSideways = () => { if (sideways.matches) app.classList.add("nav-collapsed"); };
+  const onSideways = () => {
+    if (sideways.matches) app.classList.add("nav-collapsed");
+    DeckFX.setImmersive(sideways.matches);
+  };
   sideways.addEventListener("change", onSideways);
   onSideways();
   DeckFX.meter.attach(audio);
@@ -2186,7 +2190,7 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
-    if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(app, false); return; }
+    if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !sleepMenu.hidden;
       upnext.classList.remove("expanded"); closeMenu(); closeSleep();
