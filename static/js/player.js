@@ -74,7 +74,7 @@
     [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
     [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
-    [() => !$("dlPanel").hidden, closeDl],
+    [() => !$("dlList").hidden, () => setDlList(false)],
     [() => !!openSearchInput(), () => closeSearch(openSearchInput())],
     [() => !$("tracksView").hidden, () => $("backBtn").click()],
     [() => !$("browseView").hidden, () => $("browseBack").click()],
@@ -95,13 +95,19 @@
   });
   ["click", "keydown", "touchend"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncHistory, 0), true));
 
-  // In-app name field: resolves the trimmed name, or null if cancelled.
-  function askName(title, { label = "Name", ok = "Create", value = "" } = {}) {
+  // The app's one dialog for a short piece of text (a name, a link): resolves the
+  // trimmed text, or null if cancelled. Rip, Follow, New tape and New show all
+  // use it, so adding anything looks and works the same.
+  function askText(title, { label = "Name", ok = "Create", value = "", type = "text", placeholder = "" } = {}) {
     return new Promise((resolve) => {
       $("nameTitle").textContent = title;
       $("nameLabel").textContent = label;
       $("nameOk").textContent = ok;
-      $("nameInput").value = value;
+      const input = $("nameInput");
+      input.type = type;
+      input.placeholder = placeholder;
+      input.autocapitalize = type === "url" ? "off" : "sentences";
+      input.value = value;
       $("nameModal").hidden = false;
       $("nameInput").focus();
       syncHistory();
@@ -261,9 +267,6 @@
     $("modePods").classList.toggle("active", m === "podcasts");
     $("modeMusic").setAttribute("aria-selected", String(m === "music"));
     $("modePods").setAttribute("aria-selected", String(m === "podcasts"));
-    // The one add input re-skins to the mode; the submit handler routes on it.
-    $("dlUrl").placeholder = m === "music" ? "Paste a song or playlist link…" : "Paste an RSS or YouTube link…";
-    $("dlSubmit").textContent = m === "music" ? "Rip" : "Follow";
     closeSearch($("libSearch"));
     document.querySelector('[data-search="libSearch"]').hidden = m !== "music";   // shows have no library-wide search
     if (m === "music") showView("shelf");
@@ -489,7 +492,7 @@
       el.innerHTML = `<div class="first-run"><p class="first-run-title">No shows yet.</p>
         <p class="first-run-body">Follow one with its RSS or YouTube link.</p>
         <div class="first-run-actions"><button class="btn btn-primary" type="button">Follow a podcast</button></div></div>`;
-      el.querySelector("button").addEventListener("click", () => openAdd("podcasts"));
+      el.querySelector("button").addEventListener("click", () => addFromLink("podcasts"));
       return;
     }
     data.shows.forEach((s) => {
@@ -637,7 +640,7 @@
       menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
     menu.appendChild(menuSep());
     menu.appendChild(menuItem("New show…", async () => {
-      const name = await askName("New show", { label: "Show name", ok: "Create" });
+      const name = await askText("New show", { label: "Show name", ok: "Create" });
       if (name) assignEpisode(ep, { new_show_name: name });
     }, closeMenu));
     showMenuAt(e);
@@ -699,7 +702,6 @@
     pendingPlays[e.id] = { list, i };
     e.status = "downloading";
     applyEpisodeSearch();
-    $("dlPanel").hidden = false;
     openDlStream();
     toast("Downloading episode…");
   }
@@ -724,7 +726,7 @@
     pendingPlays[t.id] = { list: queue, i: qi };
     jsend(`api/podcast/episodes/${t.id}/play`, "POST").then((r) => r.json()).then((res) => {
       if (res.ready) { t.status = "ready"; loadCurrent(true); }
-      else { $("dlPanel").hidden = false; openDlStream(); }
+      else openDlStream();
     }).catch((e) => { console.error(e); toast("Couldn't load episode."); });
   }
   // A podcast download job finished (or errored — it just drops off the stream).
@@ -1476,14 +1478,8 @@
   }
 
   // ---------- first run ----------
-  function openAdd(m) {
-    setMode(m);
-    $("dlPanel").hidden = false;
-    openDlStream();
-    $("dlUrl").focus();
-  }
-  $("firstRip").addEventListener("click", () => openAdd("music"));
-  $("firstFollow").addEventListener("click", () => openAdd("podcasts"));
+  $("firstRip").addEventListener("click", () => addFromLink("music"));
+  $("firstFollow").addEventListener("click", () => addFromLink("podcasts"));
 
   // ---------- tidying + album edits ----------
   async function tidy(ids) {
@@ -1691,8 +1687,8 @@
   $("dlToggle").addEventListener("click", (e) => {
     e.stopPropagation();
     openBarMenu(e.currentTarget, mode === "music" ? "Add music" : "Add a podcast", mode === "music"
-      ? [["Rip a song or playlist…", () => openAdd("music")], ["New tape…", createTape]]
-      : [["Follow a podcast…", () => openAdd("podcasts")], ["New show…", createShow]]);
+      ? [["Rip a song or playlist…", () => addFromLink("music")], ["New tape…", createTape]]
+      : [["Follow a podcast…", () => addFromLink("podcasts")], ["New show…", createShow]]);
   });
   // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
   function tapeMenuItems() {
@@ -1747,43 +1743,53 @@
 
   // ---------- downloads ----------
   let dlEvt = null, dlPrev = {};
-  function closeDl() { $("dlPanel").hidden = true; closeDlStream(); }
-  $("dlClose").addEventListener("click", closeDl);
-  $("dlForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const url = $("dlUrl").value.trim();
+  // Rip a link (music) or follow a feed (podcasts): ask for it in the dialog, then
+  // the dialog closes and the downloads row shows how it's going.
+  async function addFromLink(m) {
+    if (mode !== m) setMode(m);
+    const url = m === "music"
+      ? await askText("Rip a song or playlist", { label: "Link", ok: "Rip", type: "url", placeholder: "https://…" })
+      : await askText("Follow a podcast", { label: "RSS or YouTube link", ok: "Follow", type: "url", placeholder: "https://…" });
     if (!url) return;
-    if (mode === "podcasts") { await addPodcast(url); return; }
-    const btn = $("dlSubmit");
-    btn.disabled = true;
+    if (m === "music") await startRip(url); else await addPodcast(url);
+  }
+  async function startRip(url) {
     try {
       const r = await jsend("api/downloads", "POST", { url }).then((x) => x.json());
-      $("dlUrl").value = "";
       toast(r.playlist ? `Ripping ${r.queued} songs into a new tape, “${r.playlist}”` : "Ripping…");
       // Count these as in flight, so even an instant result (already in the
       // library) gets announced.
       (r.job_ids || []).forEach((id) => { dlPrev[id] = { finished: false }; });
-      handleJobs(await jget("api/downloads"));   // show the job right away
-      openDlStream();
-    } catch (err) {
-      console.error(err); toast(errText(err, "Couldn't start that rip."));
-    } finally { btn.disabled = false; }
-  });
+      handleJobs(await jget("api/downloads"));   // the row appears at once
+    } catch (err) { console.error(err); toast(errText(err, "Couldn't start that rip.")); }
+  }
   async function addPodcast(url) {
-    const btn = $("dlSubmit");
-    btn.disabled = true;
     try {
       const r = await jsend("api/podcast/add", "POST", { url }).then((x) => x.json());
-      $("dlUrl").value = "";
       const msg = r.assigned ? `Added to “${r.assigned.title}”`
         : r.loose ? "Added to Unsorted episodes"
         : r.created === false ? `${r.added} new episode${r.added === 1 ? "" : "s"}`
         : `Following “${r.title}”`;
       toast(msg);
       openPodcasts();
-    } catch (err) {
-      console.error(err); toast(errText(err, "Couldn't add that — check the link."));
-    } finally { btn.disabled = false; }
+    } catch (err) { console.error(err); toast(errText(err, "Couldn't add that — check the link.")); }
+  }
+  // The downloads row: shown while there are jobs, its list opened by a tap.
+  function setDlList(open) {
+    $("dlList").hidden = !open;
+    $("dlSummary").setAttribute("aria-expanded", String(open));
+  }
+  $("dlSummary").addEventListener("click", () => setDlList($("dlList").hidden));
+  function summariseDl() {
+    const jobs = [...$("dlList").children];
+    $("dlPanel").hidden = !jobs.length;
+    if (!jobs.length) { setDlList(false); return; }
+    const busy = jobs.filter((li) => li.classList.contains("queued") || li.classList.contains("running")).length;
+    const failed = jobs.filter((li) => li.classList.contains("error")).length;
+    const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+    $("dlSummaryText").textContent = busy ? `Downloading ${n(busy, "item", "items")}…`
+      : failed ? `${n(failed, "download", "downloads")} failed` : `${n(jobs.length, "download", "downloads")} finished`;
+    $("dlPanel").classList.toggle("failed", !busy && failed > 0);
   }
   function openDlStream() {
     if (dlEvt) return;  // already streaming
@@ -1860,11 +1866,14 @@
         }
         li.querySelector(".dl-dismiss").addEventListener("click", async () => {
           li.remove();
+          summariseDl();
           try { await jsend(`api/downloads/${j.id}`, "DELETE"); } catch (_) { /* best effort */ }
         });
       }
       el.appendChild(li);
     });
+    summariseDl();
+    if (jobs.some((j) => j.status === "queued" || j.status === "running")) openDlStream();
   }
   async function onDownloadDone() {
     await loadShelf();
@@ -2280,14 +2289,14 @@
   $("miniOpen").addEventListener("click", openDeck);
   $("search").addEventListener("input", debounce(applySearch, 120));
   async function createTape() {
-    const name = await askName("New tape");
+    const name = await askText("New tape");
     if (!name) return;
     try { await jsend("api/playlists", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     loadShelf();
     toast(`Created the tape “${name}”`);
   }
   async function createShow() {
-    const name = await askName("New show", { label: "Show name" });
+    const name = await askText("New show", { label: "Show name" });
     if (!name) return;
     try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     showsData = null;
@@ -2479,6 +2488,7 @@
       await loadShelf();
       await restorePlaystate();
       updateUpNext();
+      jget("api/downloads").then(handleJobs).catch(() => {});   // rips still running, or finished since last time
     } catch (e) {
       console.error(e);
       toast("Couldn't load your library.");

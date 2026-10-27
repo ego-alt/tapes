@@ -323,11 +323,30 @@ body {
 .tl-add:hover { color: var(--color-text-primary); }
 
 /* ---- download panel ---- */
-.dl-panel { border-bottom: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); }
-.dl-form { display: flex; gap: var(--space-2); }
-.dl-form .input { flex: 1; min-width: 0; }
-.dl-form .btn { flex-shrink: 0; }
-.dl-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; max-height: 240px; overflow-y: auto; }
+/* Downloads: one quiet row under the bar while there are any, the list on a tap. */
+.dl-panel { border-bottom: 1px solid var(--color-border-soft); padding: 0 var(--space-2); }
+.sidebar.in-list .dl-panel { display: none; }
+.dl-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 40px;
+    padding: var(--space-2);
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+}
+.dl-summary:hover { color: var(--color-text-primary); }
+.dl-summary:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: -2px; }
+.dl-summary .ico svg { width: 16px; height: 16px; transition: transform var(--dur-base) ease; }
+.dl-summary[aria-expanded="true"] .ico svg { transform: rotate(180deg); }
+.dl-panel.failed .dl-summary { color: var(--color-danger-hover); }
+.dl-list { list-style: none; margin: 0; padding: 0 var(--space-2) var(--space-2); max-height: 240px; overflow-y: auto; }
 .dl-row { display: flex; align-items: center; gap: var(--space-2); }
 .dl-meta { flex: 1; min-width: 0; }
 .dl-sub { font-size: var(--text-sm); color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -601,6 +620,7 @@ body {
     .tl-add { min-width: 44px; min-height: 44px; opacity: 1; }
     .tape-mode { width: 44px; height: 44px; }
     .bar-btn { width: 44px; height: 44px; }
+    .dl-summary { min-height: 44px; }
     .lib-tab { min-height: 44px; }
     .shelf-row, .browse-row { min-height: 48px; }
     .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
@@ -630,4 +650,4 @@ body {
     /* Edit dialog: anchored to the top so the keyboard never covers Save. */
     .modal-scrim { align-items: flex-start; padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
 }
-
+@media (prefers-reduced-motion: reduce) { .dl-summary .ico svg { transition: none; } }

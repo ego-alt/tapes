@@ -30,13 +30,12 @@
         <button class="bar-btn" id="dlToggle" type="button" aria-label="Add" aria-haspopup="menu"><span class="ico" data-icon="plus"></span></button>
       </div>
 
+      <!-- Rips and episode downloads: one quiet row while there are any; tap for the list. -->
       <div class="dl-panel" id="dlPanel" hidden>
-        <form class="dl-form" id="dlForm">
-          <input class="input" id="dlUrl" type="url" placeholder="Paste a song or playlist link…" autocomplete="off">
-          <button class="btn btn-primary" id="dlSubmit" type="submit">Rip</button>
-          <button class="bar-btn" id="dlClose" type="button" aria-label="Close"><span class="ico" data-icon="x"></span></button>
-        </form>
-        <ul class="dl-list" id="dlList"></ul>
+        <button class="dl-summary" id="dlSummary" type="button" aria-expanded="false" aria-controls="dlList">
+          <span class="dl-summary-text" id="dlSummaryText"></span><span class="ico" data-icon="chevronDown"></span>
+        </button>
+        <ul class="dl-list" id="dlList" hidden></ul>
       </div>
 
       <!-- shelf of tapes -->
@@ -71,7 +70,7 @@
         <ul class="track-list" id="trackList"></ul>
       </div>
 
-      <!-- podcasts: shows list (the feed-add form lives in the shared dl-panel) -->
+      <!-- podcasts: shows list -->
       <div class="podcasts-view" id="podcastsView" hidden>
         <ul class="shelf-list" id="showList"></ul>
       </div>
