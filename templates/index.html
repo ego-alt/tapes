@@ -532,15 +532,17 @@
     </div>
   </div>
 
-  <!-- In-app name field (replaces the browser's prompt()). -->
-  <div class="modal-scrim" id="nameModal" hidden>
-    <form class="modal-card" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
-      <div class="modal-head" id="nameTitle"></div>
-      <label class="modal-field"><span id="nameLabel">Name</span><input class="input" id="nameInput" autocomplete="off" required></label>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="nameCancel" type="button">Cancel</button>
-        <button class="btn btn-primary" id="nameOk" type="submit">Create</button>
+  <!-- The one sheet for a short piece of text (a link, a name): Cancel and the
+       action sit in its header; on phones it rises above the keyboard. -->
+  <div class="modal-scrim ask-scrim" id="nameModal" hidden>
+    <form class="ask-sheet" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+      <div class="ask-head">
+        <button class="ask-btn" id="nameCancel" type="button">Cancel</button>
+        <div class="ask-title" id="nameTitle"></div>
+        <button class="ask-btn ask-ok" id="nameOk" type="submit" disabled>Create</button>
       </div>
+      <input class="ask-input" id="nameInput" aria-labelledby="nameTitle" aria-describedby="nameHelp" autocomplete="off" enterkeyhint="done">
+      <p class="ask-help" id="nameHelp" hidden></p>
     </form>
   </div>
 

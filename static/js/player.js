@@ -95,30 +95,40 @@
   });
   ["click", "keydown", "touchend"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncHistory, 0), true));
 
-  // The app's one dialog for a short piece of text (a name, a link): resolves the
+  // The app's one sheet for a short piece of text (a name, a link): resolves the
   // trimmed text, or null if cancelled. Rip, Follow, New tape and New show all
-  // use it, so adding anything looks and works the same.
-  function askText(title, { label = "Name", ok = "Create", value = "", type = "text", placeholder = "" } = {}) {
+  // use it, so adding anything looks and works the same. On phones it sits on
+  // top of the keyboard (the visual viewport shrinks; the layout one doesn't).
+  function askText(title, { ok = "Create", value = "", type = "text", placeholder = "Name", help = "" } = {}) {
     return new Promise((resolve) => {
+      const modal = $("nameModal"), form = $("nameForm"), input = $("nameInput"), okBtn = $("nameOk");
       $("nameTitle").textContent = title;
-      $("nameLabel").textContent = label;
-      $("nameOk").textContent = ok;
-      const input = $("nameInput");
+      okBtn.textContent = ok;
+      $("nameHelp").textContent = help;
+      $("nameHelp").hidden = !help;
       input.type = type;
       input.placeholder = placeholder;
       input.autocapitalize = type === "url" ? "off" : "sentences";
       input.value = value;
-      $("nameModal").hidden = false;
-      $("nameInput").focus();
+      okBtn.disabled = !value.trim();
+      input.oninput = () => { okBtn.disabled = !input.value.trim(); };
+      const vv = window.visualViewport;
+      const lift = () => { modal.style.setProperty("--kb", vv ? `${Math.max(0, innerHeight - vv.height - vv.offsetTop)}px` : "0px"); };
+      lift();
+      vv?.addEventListener("resize", lift);
+      modal.hidden = false;
+      input.focus();
       syncHistory();
       const done = (v) => {
-        $("nameModal").hidden = true;
-        $("nameForm").onsubmit = $("nameCancel").onclick = $("nameModal").onclick = null;
+        modal.hidden = true;
+        vv?.removeEventListener("resize", lift);
+        form.onsubmit = form.onkeydown = input.oninput = $("nameCancel").onclick = modal.onclick = null;
         resolve(v);
       };
-      $("nameForm").onsubmit = (e) => { e.preventDefault(); const v = $("nameInput").value.trim(); if (v) done(v); };
+      form.onsubmit = (e) => { e.preventDefault(); const v = input.value.trim(); if (v) done(v); };
+      form.onkeydown = (e) => { if (e.key === "Escape") { e.stopPropagation(); done(null); } };
       $("nameCancel").onclick = () => done(null);
-      $("nameModal").onclick = (e) => { if (e.target === $("nameModal")) done(null); };
+      modal.onclick = (e) => { if (e.target === modal) done(null); };
     });
   }
 
@@ -640,7 +650,7 @@
       menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
     menu.appendChild(menuSep());
     menu.appendChild(menuItem("New show…", async () => {
-      const name = await askText("New show", { label: "Show name", ok: "Create" });
+      const name = await askText("New show");
       if (name) assignEpisode(ep, { new_show_name: name });
     }, closeMenu));
     showMenuAt(e);
@@ -1748,8 +1758,8 @@
   async function addFromLink(m) {
     if (mode !== m) setMode(m);
     const url = m === "music"
-      ? await askText("Rip a song or playlist", { label: "Link", ok: "Rip", type: "url", placeholder: "https://…" })
-      : await askText("Follow a podcast", { label: "RSS or YouTube link", ok: "Follow", type: "url", placeholder: "https://…" });
+      ? await askText("Rip a song", { ok: "Rip", type: "url", placeholder: "Paste a link", help: "YouTube or YouTube Music. A playlist becomes a new tape." })
+      : await askText("Follow a podcast", { ok: "Follow", type: "url", placeholder: "Paste a link", help: "A podcast's RSS feed, or a YouTube channel or video." });
     if (!url) return;
     if (m === "music") await startRip(url); else await addPodcast(url);
   }
@@ -2296,7 +2306,7 @@
     toast(`Created the tape “${name}”`);
   }
   async function createShow() {
-    const name = await askText("New show", { label: "Show name" });
+    const name = await askText("New show");
     if (!name) return;
     try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     showsData = null;
