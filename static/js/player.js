@@ -1687,15 +1687,12 @@
     placeMenu(menu, r.bottom + 6, r.right - menu.offsetWidth, "top right");
     syncHistory();
   }
+  // + adds to the tab you're on: songs and tapes under Music, shows under Podcasts.
   $("dlToggle").addEventListener("click", (e) => {
     e.stopPropagation();
-    openBarMenu(e.currentTarget, "Add", [
-      ["Rip a song or playlist…", () => openAdd("music")],
-      ["Follow a podcast…", () => openAdd("podcasts")],
-      null,
-      ["New tape…", createTape],
-      ["New show…", createShow],
-    ]);
+    openBarMenu(e.currentTarget, mode === "music" ? "Add music" : "Add a podcast", mode === "music"
+      ? [["Rip a song or playlist…", () => openAdd("music")], ["New tape…", createTape]]
+      : [["Follow a podcast…", () => openAdd("podcasts")], ["New show…", createShow]]);
   });
   // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
   function tapeMenuItems() {
@@ -2294,7 +2291,7 @@
     if (!name) return;
     try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     showsData = null;
-    if (mode === "podcasts") openPodcasts(); else setMode("podcasts");
+    openPodcasts();
     toast(`Created the show “${name}”`);
   }
 
