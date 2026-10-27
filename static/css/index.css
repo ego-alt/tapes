@@ -427,7 +427,8 @@ body {
     border-radius: var(--radius-md);
     box-shadow: 0 12px 40px var(--color-shadow);
 }
-.modal-head { font-size: var(--text-lg); }
+.modal-head { font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary); }   /* the bar's weight: a dialog is chrome, not a page title */
+.modal-actions .btn { font-size: var(--text-sm); font-weight: 500; min-height: 36px; }
 .modal-field {
     display: flex;
     flex-direction: column;
@@ -625,6 +626,7 @@ body {
     .shelf-row, .browse-row { min-height: 48px; }
     .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
     .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
+    .modal-actions .btn { min-height: 44px; }
 
 
     /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
