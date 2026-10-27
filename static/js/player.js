@@ -74,7 +74,8 @@
     [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
     [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
-    [() => !$("dlPanel").hidden, () => $("dlToggle").click()],
+    [() => !$("dlPanel").hidden, closeDl],
+    [() => !!openSearchInput(), () => closeSearch(openSearchInput())],
     [() => !$("tracksView").hidden, () => $("backBtn").click()],
     [() => !$("browseView").hidden, () => $("browseBack").click()],
     [() => !$("episodesView").hidden, () => $("epBack").click()],
@@ -193,6 +194,7 @@
     check: svgIcon('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'),
     circleO: svgIcon('<circle cx="12" cy="12" r="9"/>'),
     x: svgIcon('<path d="M18 6 6 18M6 6l12 12"/>'),
+    search: svgIcon('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
     grip: svgIcon('<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>', true),
     chevronLeft: svgIcon('<path d="m15 18-6-6 6-6"/>'),
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
@@ -207,6 +209,8 @@
   let lastPlayed = null;  // for play-count dedupe
   let currentTape = null; // { key, name, kind }
   let currentSort = "default";
+  // How All Tracks and Singles can be ordered (the tape's ⋯ menu).
+  const SORTS = [["default", "By artist"], ["added", "Recently added"], ["played", "Recently played"], ["most", "Most played"]];
   let shuffleOn = localStorage.getItem("tapes-shuffle") === "1";
   let repeatMode = localStorage.getItem("tapes-repeat") || "off"; // off | all | one
   let trackParent = "shelf";  // where tracks-view "back" returns: shelf | albums | artists
@@ -215,6 +219,7 @@
   let navToken = 0;           // bumped per view-open; a slow load bails if superseded
   let showsData = null;       // last /api/podcast/shows payload
   let currentShow = null;     // show whose episodes are open (null = loose)
+  let showActions = { refreshable: false, deletable: false };   // what the open show's ⋯ offers
   let episodes = [];          // episodes currently shown
   const pendingPlays = {};    // episode_id -> {list, i} awaiting download-then-play
 
@@ -259,6 +264,8 @@
     // The one add input re-skins to the mode; the submit handler routes on it.
     $("dlUrl").placeholder = m === "music" ? "Paste a song or playlist link…" : "Paste an RSS or YouTube link…";
     $("dlSubmit").textContent = m === "music" ? "Rip" : "Follow";
+    closeSearch($("libSearch"));
+    document.querySelector('[data-search="libSearch"]').hidden = m !== "music";   // shows have no library-wide search
     if (m === "music") showView("shelf");
     else openPodcasts();
   }
@@ -267,7 +274,7 @@
   function savedSort(key) {
     let v = null;
     try { v = localStorage.getItem(`tapes-sort-${key}`); } catch (_) { /* private mode */ }
-    return v && [...$("sortSelect").options].some((o) => o.value === v) ? v : "default";
+    return SORTS.some(([k]) => k === v) ? v : "default";
   }
 
   async function openTape(key, name, kind) {
@@ -276,10 +283,8 @@
     currentSort = sortable ? savedSort(key) : "default";
     const data = await navGet(`api/playlists/${key}/tracks?sort=${currentSort}`);
     if (tok !== navToken) return;   // a newer view opened while we waited
-    currentTape = { key, name, kind };
+    currentTape = { key, name, kind, sortable };
     view = data;
-    $("sortSelect").value = currentSort;
-    $("sortBar").hidden = !sortable;
     const titleEl = $("tapeTitle");
     titleEl.textContent = name;
     titleEl.contentEditable = "false";
@@ -291,12 +296,8 @@
         toast(`Renamed to “${name}”`);
         return name;
       }).catch((e) => { toast(errText(e, "Couldn't rename the tape.")); throw e; })) : null;
-    $("tapeDelBtn").hidden = kind !== "user";
-    $("tidyBtn").hidden = key !== "tidy";
-    $("albumEditBtn").hidden = true;
-    $("search").value = "";
-    $("backBtn").querySelector(".back-label").textContent = "Tapes";
     trackParent = "shelf";
+    setListBar("Tapes");
     renderTracks(view);
     showView("tracks");
   }
@@ -353,6 +354,8 @@
     $("tracksView").hidden = name !== "tracks";
     $("podcastsView").hidden = name !== "podcasts";
     $("episodesView").hidden = name !== "episodes";
+    // Inside a tape, a browse list or a show, its own bar replaces the library's.
+    sidebar.classList.toggle("in-list", name === "tracks" || name === "browse" || name === "episodes");
     syncHistory();
   }
 
@@ -364,7 +367,7 @@
     currentBrowse = kind;
     browseRows = rows;
     $("browseTitle").textContent = kind === "albums" ? "Albums" : "Artists";
-    $("browseSearch").value = "";
+    closeSearch($("browseSearch"));
     renderBrowse(browseRows);
     showView("browse");
   }
@@ -431,12 +434,7 @@
     titleEl.onclick = !renamable ? null : parent === "artists"
       ? () => startTitleEdit((name, orig) => renameArtist(orig, name))
       : () => startTitleEdit((name, orig) => saveAlbum(orig, { name }).then((r) => r.album));
-    $("tidyBtn").hidden = true;
-    $("albumEditBtn").hidden = parent !== "albums";
-    $("tapeDelBtn").hidden = true;
-    $("sortBar").hidden = true;
-    $("backBtn").querySelector(".back-label").textContent = backLabel;
-    $("search").value = "";
+    setListBar(backLabel);
     renderTracks(view);
     showView("tracks");
   }
@@ -488,7 +486,10 @@
     const el = $("showList");
     el.innerHTML = "";
     if (!data.shows.length && !data.loose_count) {
-      el.innerHTML = `<div class="empty-note">Follow a show: tap <b>+ Add</b> and paste its RSS or YouTube link.</div>`;
+      el.innerHTML = `<div class="first-run"><p class="first-run-title">No shows yet.</p>
+        <p class="first-run-body">Follow one with its RSS or YouTube link.</p>
+        <div class="first-run-actions"><button class="btn btn-primary" type="button">Follow a podcast</button></div></div>`;
+      el.querySelector("button").addEventListener("click", () => openAdd("podcasts"));
       return;
     }
     data.shows.forEach((s) => {
@@ -536,9 +537,9 @@
   function enterEpisodes(title, eps, { refreshable, deletable }) {
     episodes = eps;
     $("showTitle").textContent = title;
-    $("showRefreshBtn").hidden = !refreshable;
-    $("showDelBtn").hidden = !deletable;
-    $("epSearch").value = "";
+    showActions = { refreshable, deletable };
+    $("showMoreBtn").hidden = !refreshable && !deletable;
+    closeSearch($("epSearch"));
     renderEpisodes(episodes);
     showView("episodes");
   }
@@ -762,14 +763,12 @@
   }
   async function refreshCurrentShow() {
     if (!currentShow) return;
-    const btn = $("showRefreshBtn"), orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "Checking…";
+    toast("Checking for new episodes…");
     try {
       const r = await jsend(`api/podcast/shows/${currentShow.id}/refresh`, "POST").then((x) => x.json());
       toast(r.added ? `${r.added} new episode${r.added > 1 ? "s" : ""}` : "No new episodes");
       if (r.added) await openShow(currentShow);
     } catch (e) { console.error(e); toast(errText(e, "Couldn't check for new episodes.")); }
-    finally { btn.disabled = false; btn.textContent = orig; }
   }
   async function deleteCurrentShow() {
     if (!currentShow) return;
@@ -1501,12 +1500,11 @@
     toast(`Tidied ${n(ids.length)} — ${changed ? `${changed} changed` : "nothing needed changing"}`
       + (ai ? "" : ". AI tidying isn't set up (add ANTHROPIC_API_KEY)"));
   }
-  $("tidyBtn").addEventListener("click", async () => {
-    const btn = $("tidyBtn"); btn.disabled = true; btn.textContent = "Tidying…";
+  async function tidyAll() {
+    toast("Tidying…");
     try { await tidy(view.map((t) => t.id)); }
     catch (e) { console.error(e); toast(errText(e, "Couldn't tidy those songs.")); }
-    finally { btn.disabled = false; btn.textContent = "Tidy all"; }
-  });
+  }
 
   async function saveAlbum(album, { name, artist } = {}) {
     const r = await jsend("api/albums", "PATCH", { album, name, artist }).then((x) => x.json());
@@ -1515,7 +1513,7 @@
     return r;
   }
   let albumCoverFile = null;
-  $("albumEditBtn").addEventListener("click", () => {
+  function editAlbum() {
     const album = $("tapeTitle").textContent;
     $("alName").value = album;
     $("alArtist").value = "";
@@ -1524,7 +1522,7 @@
     if (withCover) $("alCoverPreview").src = coverUrl(withCover.id); else $("alCoverPreview").removeAttribute("src");
     $("albumModal").hidden = false;
     $("alName").focus();
-  });
+  }
   $("alCover").addEventListener("change", () => {
     albumCoverFile = $("alCover").files[0] || null;
     if (albumCoverFile) $("alCoverPreview").src = URL.createObjectURL(albumCoverFile);
@@ -1675,15 +1673,85 @@
     if (!deckMenu.hidden && !deckMenu.contains(e.target)) closeDeckMenu();
   });
 
+  // ---------- the library's bars: + to add, a list's ⋯, search on demand ----------
+  // + and ⋯ open the shared menu under their button (a bottom sheet on a phone);
+  // the same button again closes it.
+  function openBarMenu(btn, title, items) {
+    if (!menu.hidden && menu.dataset.for === btn.id) { closeMenu(); return; }
+    menu.dataset.for = btn.id;
+    menu.innerHTML = "";
+    menu.appendChild(menuHead(title));
+    items.forEach((it) => menu.appendChild(it ? menuItem(it[0], it[1], closeMenu) : menuSep()));
+    menu.hidden = false;
+    const r = btn.getBoundingClientRect();
+    placeMenu(menu, r.bottom + 6, r.right - menu.offsetWidth, "top right");
+    syncHistory();
+  }
+  $("dlToggle").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openBarMenu(e.currentTarget, "Add", [
+      ["Rip a song or playlist…", () => openAdd("music")],
+      ["Follow a podcast…", () => openAdd("podcasts")],
+      null,
+      ["New tape…", createTape],
+      ["New show…", createShow],
+    ]);
+  });
+  // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
+  function tapeMenuItems() {
+    const sorts = currentTape?.sortable
+      ? SORTS.map(([k, label]) => [k === currentSort ? `${label}  ✓` : label, () => setSort(k)]) : [];
+    const acts = [];
+    if (currentTape?.key === "tidy") acts.push(["Tidy all", tidyAll]);
+    if (!currentTape && trackParent === "albums") acts.push(["Edit album…", editAlbum]);
+    if (currentTape?.kind === "user") acts.push(["Delete tape", deleteCurrentTape]);
+    return sorts.length && acts.length ? [...sorts, null, ...acts] : [...sorts, ...acts];
+  }
+  // The open list's bar: where back goes, a fresh search, and whether ⋯ has anything.
+  function setListBar(backLabel) {
+    $("backBtn").setAttribute("aria-label", `Back to ${backLabel}`);
+    closeSearch($("search"));
+    $("tapeMoreBtn").hidden = !tapeMenuItems().length;
+  }
+  $("tapeMoreBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openBarMenu(e.currentTarget, $("tapeTitle").textContent, tapeMenuItems());
+  });
+  $("showMoreBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    openBarMenu(e.currentTarget, $("showTitle").textContent, [
+      showActions.refreshable && ["Check for new episodes", refreshCurrentShow],
+      showActions.deletable && [currentShow?.refreshable ? "Unfollow" : "Delete show", deleteCurrentShow],
+    ].filter(Boolean));
+  });
+  // Search stays out of the way until its magnifier is tapped; closing it clears it.
+  const searchBtn = (input) => document.querySelector(`[data-search="${input.id}"]`);
+  function openSearch(input) {
+    input.closest(".search-wrap").hidden = false;
+    searchBtn(input)?.setAttribute("aria-expanded", "true");
+    input.focus();
+  }
+  function closeSearch(input) {
+    const wrap = input.closest(".search-wrap");
+    if (wrap.hidden) return;
+    wrap.hidden = true;
+    searchBtn(input)?.setAttribute("aria-expanded", "false");
+    if (input.value) { input.value = ""; input.dispatchEvent(new Event("input")); }
+  }
+  const openSearchInput = () =>
+    [...document.querySelectorAll(".search-wrap:not([hidden]) input")].find((i) => i.offsetParent);
+  document.querySelectorAll("[data-search]").forEach((btn) => btn.addEventListener("click", () => {
+    const input = $(btn.dataset.search);
+    if (input.closest(".search-wrap").hidden) openSearch(input); else closeSearch(input);
+  }));
+  document.querySelectorAll(".search-wrap input").forEach((input) => input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeSearch(input); }
+  }));
+
   // ---------- downloads ----------
   let dlEvt = null, dlPrev = {};
-  $("dlToggle").addEventListener("click", () => {
-    const showing = $("dlPanel").hidden;
-    $("dlPanel").hidden = !showing;
-    $("dlToggle").setAttribute("aria-expanded", String(showing));
-    if (showing) $("dlUrl").focus();
-    if (showing) openDlStream(); else closeDlStream();
-  });
+  function closeDl() { $("dlPanel").hidden = true; closeDlStream(); }
+  $("dlClose").addEventListener("click", closeDl);
   $("dlForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const url = $("dlUrl").value.trim();
@@ -2052,13 +2120,13 @@
   DeckFX.meter.attach(audio);
   $("shuffleBtn").addEventListener("click", () => setShuffle(!shuffleOn));
   $("repeatBtn").addEventListener("click", cycleRepeat);
-  $("sortSelect").addEventListener("change", async () => {
+  async function setSort(v) {
     if (!currentTape) return;
-    currentSort = $("sortSelect").value;
+    currentSort = v;
     try { localStorage.setItem(`tapes-sort-${currentTape.key}`, currentSort); } catch (_) { /* private mode */ }
     view = await navGet(`api/playlists/${currentTape.key}/tracks?sort=${currentSort}`);
     applySearch();   // re-render, honouring any active search text
-  });
+  }
   // Back to Albums or Artists fetches the list again: an edit, rename or delete
   // in the list just left may have changed its names and counts.
   $("backBtn").addEventListener("click", async () => {
@@ -2076,10 +2144,11 @@
     if (libJumping || !$("libSearch").value.trim()) return;
     libJumping = true;
     try { await openTape("all", "All Tracks", "smart"); } finally { libJumping = false; }
-    $("search").value = $("libSearch").value;
-    $("libSearch").value = "";
+    const q = $("libSearch").value;
+    closeSearch($("libSearch"));
+    openSearch($("search"));
+    $("search").value = q;
     applySearch();
-    $("search").focus();
   });
   $("modeMusic").addEventListener("click", () => setMode("music"));
   $("modePods").addEventListener("click", () => setMode("podcasts"));
@@ -2098,8 +2167,7 @@
       applyEpisodeSearch();
     }));
   $("epSearch").addEventListener("input", debounce(applyEpisodeSearch, 120));
-  $("showRefreshBtn").addEventListener("click", refreshCurrentShow);
-  $("showDelBtn").addEventListener("click", deleteCurrentShow);
+
   // A song that can't play (missing or damaged file): say so and move on, but
   // stop after three failures in a row rather than racing through the queue.
   let playErrors = 0;
@@ -2184,14 +2252,13 @@
   $("upnextBar").addEventListener("click", toggleUpNext);
   // Like songs, a deleted tape goes to the trash; the toast's Undo brings it
   // back with its track list. The songs themselves never leave the library.
-  $("tapeDelBtn").addEventListener("click", async () => {
+  async function deleteCurrentTape() {
     if (!currentTape) return;
     const tape = currentTape;
     try { await jsend(`api/playlists/${tape.key}`, "DELETE"); }
     catch (e) { console.error(e); toast(errText(e, "Couldn't delete the tape.")); return; }
     currentTape = null;
-    $("tracksView").hidden = true;
-    $("shelfView").hidden = false;
+    showView("shelf");
     loadShelf();
     toast(`Deleted the tape “${tape.name}”`, { action: "Undo", onAction: async () => {
       try { await jsend(`api/playlists/${tape.key}/restore`, "POST"); }
@@ -2199,7 +2266,7 @@
       await loadShelf();
       toast(`Restored “${tape.name}”`);
     } });
-  });
+  }
   $("navToggle").addEventListener("click", () =>
     isMobile() ? closeDeck() : app.classList.toggle("nav-collapsed"));
   // Desktop: a click outside the library collapses it, except on the deck's
@@ -2215,22 +2282,21 @@
   });
   $("miniOpen").addEventListener("click", openDeck);
   $("search").addEventListener("input", debounce(applySearch, 120));
-  // Both "New tape" forms (music + podcast) share the create boilerplate.
-  function wireCreateForm(formId, inputId, onSubmit) {
-    $(formId).addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = $(inputId).value.trim();
-      if (!name) return;
-      try { await onSubmit(name); } catch (err) { toast(errText(err, "Couldn't create that. Try again.")); return; }
-      $(inputId).value = "";
-    });
+  async function createTape() {
+    const name = await askName("New tape");
+    if (!name) return;
+    try { await jsend("api/playlists", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
+    loadShelf();
+    toast(`Created the tape “${name}”`);
   }
-  wireCreateForm("newTapeForm", "newTapeName", async (name) => {
-    await jsend("api/playlists", "POST", { name }); loadShelf(); toast(`Created the tape “${name}”`);
-  });
-  wireCreateForm("newShowForm", "newShowName", async (name) => {
-    await jsend("api/podcast/shows", "POST", { name }); showsData = null; openPodcasts(); toast(`Created the show “${name}”`);
-  });
+  async function createShow() {
+    const name = await askName("New show", { label: "Show name" });
+    if (!name) return;
+    try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
+    showsData = null;
+    if (mode === "podcasts") openPodcasts(); else setMode("podcasts");
+    toast(`Created the show “${name}”`);
+  }
 
   audio.addEventListener("play", () => {
     cassette.classList.add("playing"); playBtn.innerHTML = ICONS.pause; updateMini(); reels.start(); DeckFX.meter.wake();
@@ -2389,8 +2455,6 @@
   deckBtn.innerHTML = ICONS.more;
   $("miniNext").innerHTML = ICONS.next;
   $("shuffleBtn").innerHTML = ICONS.shuffle;
-  $("newTapeBtn").innerHTML = ICONS.plus;
-  $("newShowBtn").innerHTML = ICONS.plus;
   $("upnextIco").innerHTML = ICONS.list;
   $("upnextCaret").innerHTML = ICONS.chevronUp;
   $("shuffleBtn").classList.toggle("active", shuffleOn);

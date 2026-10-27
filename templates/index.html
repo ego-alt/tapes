@@ -19,27 +19,29 @@
 <body>
   <div class="app" id="app">
     <aside class="sidebar">
-      <div class="sidebar-head">
-        <h1><span class="accent">▰▰</span> TAPES</h1>
-        <button class="btn btn-ghost add-btn" id="dlToggle" title="Rip a song or follow a podcast" aria-expanded="false"><span class="ico" data-icon="plus"></span>Add</button>
-      </div>
-
-      <div class="mode-toggle" role="tablist">
-        <button class="mode-btn active" id="modeMusic" role="tab" aria-selected="true"><span class="ico" data-icon="note"></span>Music</button>
-        <button class="mode-btn" id="modePods" role="tab" aria-selected="false"><span class="ico" data-icon="podcast"></span>Podcasts</button>
+      <!-- The library's one bar: Music or Podcasts, search, and + to add anything. -->
+      <div class="lib-bar">
+        <h1 class="lib-logo"><span aria-hidden="true">▰▰</span><span class="sr-only">Tapes</span></h1>
+        <div class="lib-tabs" role="tablist" aria-label="Library">
+          <button class="lib-tab active" id="modeMusic" role="tab" aria-selected="true">Music</button>
+          <button class="lib-tab" id="modePods" role="tab" aria-selected="false">Podcasts</button>
+        </div>
+        <button class="bar-btn" type="button" data-search="libSearch" aria-label="Search your library" aria-expanded="false"><span class="ico" data-icon="search"></span></button>
+        <button class="bar-btn" id="dlToggle" type="button" aria-label="Add" aria-haspopup="menu"><span class="ico" data-icon="plus"></span></button>
       </div>
 
       <div class="dl-panel" id="dlPanel" hidden>
         <form class="dl-form" id="dlForm">
           <input class="input" id="dlUrl" type="url" placeholder="Paste a song or playlist link…" autocomplete="off">
           <button class="btn btn-primary" id="dlSubmit" type="submit">Rip</button>
+          <button class="bar-btn" id="dlClose" type="button" aria-label="Close"><span class="ico" data-icon="x"></span></button>
         </form>
         <ul class="dl-list" id="dlList"></ul>
       </div>
 
       <!-- shelf of tapes -->
       <div class="shelf" id="shelfView">
-        <div class="search-wrap lib-search">
+        <div class="search-wrap lib-search" hidden>
           <input class="input" id="libSearch" type="search" placeholder="Search your library" aria-label="Search your library" autocomplete="off">
         </div>
         <ul class="shelf-list" id="shelfList"></ul>
@@ -51,37 +53,20 @@
             <button class="btn btn-secondary" id="firstFollow" type="button">Follow a podcast</button>
           </div>
         </div>
-        <form class="new-tape" id="newTapeForm">
-          <input class="input" id="newTapeName" placeholder="New tape…" autocomplete="off">
-          <button class="btn btn-secondary" id="newTapeBtn" type="submit" title="Create tape" aria-label="Create tape"></button>
-        </form>
       </div>
 
       <!-- tracks within a tape -->
       <div class="tracks-view" id="tracksView" hidden>
-        <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="backBtn"><span class="ico" data-icon="chevronLeft"></span><span class="back-label">Tapes</span></button>
-          <button class="btn btn-ghost tape-del" id="tapeDelBtn" hidden>Delete tape</button>
-          <button class="btn btn-ghost tape-act" id="tidyBtn" hidden>Tidy all</button>
-          <button class="btn btn-ghost tape-act" id="albumEditBtn" hidden>Edit album</button>
-        </div>
-        <div class="search-wrap">
-          <input class="input" id="search" type="search" placeholder="Search this list…" autocomplete="off">
-        </div>
-        <div class="tape-title-row">
+        <div class="list-bar">
+          <button class="bar-btn back-btn" id="backBtn" type="button" aria-label="Back to Tapes"><span class="ico" data-icon="chevronLeft"></span></button>
           <div class="tape-title" id="tapeTitle"></div>
-          <div class="tape-modes">
-            <button class="tape-mode" id="shuffleBtn" title="Shuffle" aria-pressed="false" aria-label="Shuffle"></button>
-            <button class="tape-mode" id="repeatBtn" title="Repeat" aria-pressed="false" aria-label="Repeat"></button>
-          </div>
+          <button class="tape-mode" id="shuffleBtn" title="Shuffle" aria-pressed="false" aria-label="Shuffle"></button>
+          <button class="tape-mode" id="repeatBtn" title="Repeat" aria-pressed="false" aria-label="Repeat"></button>
+          <button class="bar-btn" type="button" data-search="search" aria-label="Search this list" aria-expanded="false"><span class="ico" data-icon="search"></span></button>
+          <button class="bar-btn" id="tapeMoreBtn" type="button" aria-label="Sort and more" aria-haspopup="menu" hidden><span class="ico" data-icon="more"></span></button>
         </div>
-        <div class="sort-bar" id="sortBar" hidden>
-          <select class="input sort-select" id="sortSelect" title="Sort tracks">
-            <option value="default">By artist</option>
-            <option value="added">Recently added</option>
-            <option value="played">Recently played</option>
-            <option value="most">Most played</option>
-          </select>
+        <div class="search-wrap" hidden>
+          <input class="input" id="search" type="search" placeholder="Search this list…" autocomplete="off">
         </div>
         <ul class="track-list" id="trackList"></ul>
       </div>
@@ -89,24 +74,18 @@
       <!-- podcasts: shows list (the feed-add form lives in the shared dl-panel) -->
       <div class="podcasts-view" id="podcastsView" hidden>
         <ul class="shelf-list" id="showList"></ul>
-        <form class="new-tape" id="newShowForm">
-          <input class="input" id="newShowName" placeholder="New show…" autocomplete="off">
-          <button class="btn btn-secondary" id="newShowBtn" type="submit" title="Create show" aria-label="Create show"></button>
-        </form>
       </div>
 
       <!-- episodes within a show -->
       <div class="episodes-view" id="episodesView" hidden>
-        <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="epBack"><span class="ico" data-icon="chevronLeft"></span>Podcasts</button>
-          <button class="btn btn-ghost tape-del" id="showDelBtn" hidden>Unfollow</button>
-        </div>
-        <div class="search-wrap">
-          <input class="input" id="epSearch" type="search" placeholder="Search episodes…" autocomplete="off">
-        </div>
-        <div class="tape-title-row">
+        <div class="list-bar">
+          <button class="bar-btn back-btn" id="epBack" type="button" aria-label="Back to Podcasts"><span class="ico" data-icon="chevronLeft"></span></button>
           <div class="tape-title" id="showTitle"></div>
-          <button class="btn btn-ghost ep-refresh" id="showRefreshBtn" hidden>Refresh</button>
+          <button class="bar-btn" type="button" data-search="epSearch" aria-label="Search episodes" aria-expanded="false"><span class="ico" data-icon="search"></span></button>
+          <button class="bar-btn" id="showMoreBtn" type="button" aria-label="More" aria-haspopup="menu" hidden><span class="ico" data-icon="more"></span></button>
+        </div>
+        <div class="search-wrap" hidden>
+          <input class="input" id="epSearch" type="search" placeholder="Search episodes…" autocomplete="off">
         </div>
         <div class="ep-filter">
           <button class="ep-filter-btn active" data-f="all">All</button>
@@ -118,13 +97,14 @@
 
       <!-- album / artist browse list -->
       <div class="browse-view" id="browseView" hidden>
-        <div class="tape-nav">
-          <button class="btn btn-ghost back-btn" id="browseBack"><span class="ico" data-icon="chevronLeft"></span>Tapes</button>
+        <div class="list-bar">
+          <button class="bar-btn back-btn" id="browseBack" type="button" aria-label="Back to Tapes"><span class="ico" data-icon="chevronLeft"></span></button>
+          <div class="tape-title" id="browseTitle"></div>
+          <button class="bar-btn" type="button" data-search="browseSearch" aria-label="Search" aria-expanded="false"><span class="ico" data-icon="search"></span></button>
         </div>
-        <div class="search-wrap">
+        <div class="search-wrap" hidden>
           <input class="input" id="browseSearch" type="search" placeholder="Search…" autocomplete="off">
         </div>
-        <div class="tape-title-row"><div class="tape-title" id="browseTitle"></div></div>
         <ul class="shelf-list" id="browseList"></ul>
       </div>
 

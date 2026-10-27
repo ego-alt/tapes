@@ -36,23 +36,70 @@ body {
     border-right-color: transparent;
 }
 
-.sidebar-head {
+/* ---- the bars: the library's (logo, Music | Podcasts, search, +) and each
+   list's (back, title, its toggles, search, ⋯), one row each ---- */
+.lib-bar, .list-bar {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-4);
-    padding-bottom: var(--space-2);
+    gap: var(--space-1);
+    flex-shrink: 0;
+    min-height: 52px;
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+    border-bottom: 1px solid var(--color-border-soft);
 }
-.sidebar-head h1 {
-    margin: 0;
-    font-size: var(--text-lg);
-    letter-spacing: 0.04em;
-    color: var(--color-text-secondary);
+.list-bar { padding-left: var(--space-1); }
+.sidebar.in-list .lib-bar { display: none; }
+.lib-logo { margin: 0 var(--space-2) 0 0; font-size: var(--text-base); line-height: 1; color: var(--color-accent); }
+.lib-tabs { display: flex; flex: 1; min-width: 0; gap: var(--space-1); }
+.lib-tab {
+    position: relative;
+    padding: var(--space-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.lib-tab:hover { color: var(--color-text-secondary); }
+.lib-tab.active { color: var(--color-text-primary); }
+.lib-tab.active::after {   /* the open one is underlined in the accent */
+    content: "";
+    position: absolute;
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: 1px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-accent);
+}
+.bar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+.bar-btn:hover, .bar-btn[aria-expanded="true"] { color: var(--color-text-primary); background: var(--track-hover); }
+.bar-btn .ico svg { width: 20px; height: 20px; }
+.lib-tab:focus-visible, .bar-btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
     white-space: nowrap;
 }
-.sidebar-head .accent { color: var(--color-accent); }
 
-.search-wrap { padding: 0 var(--space-4) var(--space-3); }
+.search-wrap { padding: var(--space-2) var(--space-4); }
 .search-wrap .input { width: 100%; }
 
 .track-list {
@@ -118,7 +165,6 @@ body {
 }
 .ico { display: inline-flex; vertical-align: -0.15em; }
 .ico svg { width: 1em; height: 1em; }
-.add-btn, .back-btn, .mode-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4em; }
 .shelf-ico, .browse-cover--blank, .tl-drag { display: inline-flex; align-items: center; justify-content: center; }
 .shelf-ico svg { width: 16px; height: 16px; }
 .browse-cover--blank svg { width: 20px; height: 20px; }
@@ -188,7 +234,6 @@ body {
 .list-more { height: 1px; list-style: none; }
 
 /* ---- shelf ---- */
-.sidebar-head { justify-content: space-between; }
 .shelf, .tracks-view, .browse-view, .podcasts-view, .episodes-view {
     display: flex; flex-direction: column; min-height: 0; flex: 1;
 }
@@ -226,28 +271,7 @@ body {
 .shelf-ico { width: 18px; text-align: center; color: var(--color-accent); }
 .shelf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shelf-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
-.new-tape {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    border-top: 1px solid var(--color-border);
-}
-.new-tape .input { flex: 1; }
-/* input + button: same explicit height, button square (so it isn't slim) */
-.new-tape .input, .new-tape .btn { height: 2.4rem; }
-.new-tape .btn {
-    flex-shrink: 0;
-    width: 2.4rem;
-    padding: 0;
-}
-.new-tape .btn .icn { width: 16px; height: 16px; }
-
 /* ---- tracks view ---- */
-.tape-nav { display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-2) 0; }
-.tape-del { font-size: var(--text-sm); color: var(--color-text-muted); }
-.tape-del:hover { color: var(--color-danger-hover); }
-.tape-title-row { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4) var(--space-2); }
 .tape-title {
     flex: 1; min-width: 0;
     font-size: var(--text-lg); color: var(--color-text-secondary);
@@ -271,7 +295,6 @@ body {
 .tape-title[contenteditable="true"] { outline: none; border-bottom: 1px solid var(--color-accent); opacity: 1; overflow: visible; text-overflow: clip; }
 
 /* shuffle / repeat — icon toggles beside the list title */
-.tape-modes { display: flex; gap: var(--space-1); flex-shrink: 0; }
 .tape-mode {
     display: inline-flex; align-items: center; justify-content: center;
     background: none; border: 0; cursor: pointer;
@@ -345,8 +368,6 @@ body {
 @media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
 
 /* ---- sort selector (All Tracks / Singles) ---- */
-.sort-bar { padding: 0 var(--space-4) var(--space-2); }
-.sort-bar .sort-select { width: 100%; cursor: pointer; }
 
 /* The deck's ⋯ (settings), opposite the library toggle. */
 .deck-menu-btn { left: auto; right: var(--space-4); display: inline-flex; align-items: center; justify-content: center; }
@@ -402,32 +423,6 @@ body {
     margin-top: var(--space-2);
 }
 
-/* ---- Music / Podcasts mode toggle ---- */
-.mode-toggle {
-    display: flex;
-    gap: 3px;
-    margin: 0 var(--space-4) var(--space-2);
-    padding: 3px;
-    background: var(--color-bg-inset);
-    border-radius: var(--radius-md);
-}
-.mode-btn {
-    flex: 1;
-    padding: var(--space-2);
-    border: none;
-    background: none;
-    color: var(--color-text-muted);
-    border-radius: calc(var(--radius-md) - 2px);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: var(--text-sm);
-}
-.mode-btn.active {
-    background: var(--color-bg-elevated);
-    color: var(--color-text-primary);
-    box-shadow: 0 1px 2px var(--color-shadow);
-}
-
 /* ---- podcasts: episodes reuse the .track-list row (container, .tl-meta/title/sub,
    and the .tl-add button base); only these extras are episode-specific ---- */
 .track-list li.played .tl-title { color: var(--color-text-muted); }   /* finished */
@@ -444,8 +439,7 @@ body {
 .ep-played { opacity: 1; }
 .track-list li.played .ep-played { color: var(--color-accent); }
 
-.ep-filter { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
-.ep-refresh { margin-left: auto; }   /* push Refresh to the right of All | Unplayed */
+.ep-filter { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4) var(--space-3); }
 .ep-filter-btn {
     background: none;
     border: 1px solid var(--color-border);
@@ -466,7 +460,6 @@ body {
 .first-run-body { margin: 0 0 var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 .first-run-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .track-list li.unavailable .tl-title { color: var(--color-text-muted); text-decoration: line-through; }
-.tape-act { font-size: var(--text-sm); color: var(--color-accent); }
 .tl-sub .unknown { font-style: italic; }
 .tl-issues { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-top: 2px; }
 .tl-issue { font-size: var(--text-xs); color: var(--color-accent); border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 0 6px; }
@@ -607,16 +600,12 @@ body {
     /* 44px touch targets */
     .tl-add { min-width: 44px; min-height: 44px; opacity: 1; }
     .tape-mode { width: 44px; height: 44px; }
-    .back-btn, .tape-del, .ep-refresh { min-height: 44px; }
-    .mode-btn { min-height: 44px; }
+    .bar-btn { width: 44px; height: 44px; }
+    .lib-tab { min-height: 44px; }
     .shelf-row, .browse-row { min-height: 48px; }
     .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
-    #dlToggle { min-width: 44px; min-height: 44px; }
     .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
 
-    /* New tape / show: at the top of the shelf, so the keyboard can't cover it. */
-    .shelf .new-tape, .podcasts-view .new-tape { order: -1; border-top: 0; border-bottom: 1px solid var(--color-border); }
-    .lib-search { padding-top: var(--space-3); }
 
     /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
        inline top/left, so the sheet placement needs !important. */

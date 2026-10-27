@@ -1,7 +1,7 @@
 def test_index_renders(client):
     r = client.get("/")
     assert r.status_code == 200
-    assert b"TAPES" in r.data
+    assert b"<span class=\"sr-only\">Tapes</span>" in r.data and b"lib-bar" in r.data
 
 
 def test_shelf_lists_builtins(client, add_track):
