@@ -533,17 +533,18 @@
   </div>
 
   <!-- The one sheet for a short piece of text (a link, a name): Cancel and the
-       action sit in its header; on phones it rises above the keyboard. -->
+       action sit in its header; on phones it rises above the keyboard. Not a
+       <form>, so Chrome doesn't offer passwords and addresses above the keyboard. -->
   <div class="modal-scrim ask-scrim" id="nameModal" hidden>
-    <form class="ask-sheet" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+    <div class="ask-sheet" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
       <div class="ask-head">
         <button class="ask-btn" id="nameCancel" type="button">Cancel</button>
         <div class="ask-title" id="nameTitle"></div>
-        <button class="ask-btn ask-ok" id="nameOk" type="submit" disabled>Create</button>
+        <button class="ask-btn ask-ok" id="nameOk" type="button" disabled>Create</button>
       </div>
       <input class="ask-input" id="nameInput" aria-labelledby="nameTitle" aria-describedby="nameHelp" autocomplete="off" enterkeyhint="done">
       <p class="ask-help" id="nameHelp" hidden></p>
-    </form>
+    </div>
   </div>
 
   <!-- In-app confirmation (replaces the browser's confirm()). -->

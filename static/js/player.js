@@ -122,11 +122,15 @@
       const done = (v) => {
         modal.hidden = true;
         vv?.removeEventListener("resize", lift);
-        form.onsubmit = form.onkeydown = input.oninput = $("nameCancel").onclick = modal.onclick = null;
+        form.onkeydown = input.oninput = okBtn.onclick = $("nameCancel").onclick = modal.onclick = null;
         resolve(v);
       };
-      form.onsubmit = (e) => { e.preventDefault(); const v = input.value.trim(); if (v) done(v); };
-      form.onkeydown = (e) => { if (e.key === "Escape") { e.stopPropagation(); done(null); } };
+      const submit = () => { const v = input.value.trim(); if (v) done(v); };
+      okBtn.onclick = submit;
+      form.onkeydown = (e) => {
+        if (e.key === "Escape") { e.stopPropagation(); done(null); }
+        if (e.key === "Enter" && e.target === input) { e.preventDefault(); submit(); }
+      };
       $("nameCancel").onclick = () => done(null);
       modal.onclick = (e) => { if (e.target === modal) done(null); };
     });
