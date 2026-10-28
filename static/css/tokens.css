@@ -53,8 +53,6 @@
     /* Recessed fields (the slot under the library bar, list searches): a dark
        well, shaded along the top inside edge, lit along the bottom. */
     --color-recess: #101010;
-    --color-inlay: rgba(235, 219, 178, 0.13);   /* the inlay lines of bars and lists */
-    --inlay: 6px;                               /* how far the inner rectangle sits in */
     --color-recess-shade: rgba(0, 0, 0, 0.55);
     --color-recess-rim-top: rgba(0, 0, 0, 0.95);
     --color-recess-rim-bottom: rgba(255, 255, 255, 0.10);

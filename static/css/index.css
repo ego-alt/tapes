@@ -49,23 +49,6 @@ body {
     border-bottom: 1px solid var(--color-recess-rim-top);
     box-shadow: 0 1px 0 var(--color-recess-rim-bottom);
 }
-/* The lists are drawn as inlays, in plain lines: an outer rectangle, a smaller
-   one inside it, and their corners joined, like looking into a shallow tray. The
-   bars above stay plain; the seam is the edge they share. */
-.lib-bar, .list-bar, .inlay { position: relative; }
-.inlay { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.inlay::before, .inlay::after { content: ""; position: absolute; pointer-events: none; }
-.inlay::before {
-    border: 1px solid var(--color-inlay);
-    /* the corner joins: top-left and bottom-right run one way, the others the other */
-    --tl: linear-gradient(to top right, transparent calc(50% - 0.7px), var(--color-inlay) 50%, transparent calc(50% + 0.7px));
-    --tr: linear-gradient(to bottom right, transparent calc(50% - 0.7px), var(--color-inlay) 50%, transparent calc(50% + 0.7px));
-    background: var(--tl) top left, var(--tr) top right, var(--tr) bottom left, var(--tl) bottom right;
-    background-size: var(--inlay) var(--inlay);
-    background-repeat: no-repeat;
-}
-.inlay::before { inset: 0; border-top: 0; }
-.inlay::after { inset: var(--inlay); border: 1px solid var(--color-inlay); }
 /* With the slot or a search open, the seam has parted: the lit lip is the well's lower edge. */
 .lib-bar:has(+ .slot:not([hidden])), .list-bar:has(+ .search-wrap:not([hidden])) { box-shadow: none; }
 .list-bar { padding-left: var(--space-1); }
