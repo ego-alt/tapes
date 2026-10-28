@@ -45,9 +45,101 @@ body {
     flex-shrink: 0;
     min-height: 52px;
     padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-    border-bottom: 1px solid var(--color-border-soft);
+    /* a seam, like the join in the cassette's shell: a dark groove over a lit lip */
+    border-bottom: 1px solid var(--color-recess-rim-top);
+    box-shadow: 0 1px 0 var(--color-recess-rim-bottom);
 }
+/* The lists are drawn as inlays, in plain lines: an outer rectangle, a smaller
+   one inside it, and their corners joined, like looking into a shallow tray. The
+   bars above stay plain; the seam is the edge they share. */
+.lib-bar, .list-bar, .inlay { position: relative; }
+.inlay { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.inlay::before, .inlay::after { content: ""; position: absolute; pointer-events: none; }
+.inlay::before {
+    border: 1px solid var(--color-inlay);
+    /* the corner joins: top-left and bottom-right run one way, the others the other */
+    --tl: linear-gradient(to top right, transparent calc(50% - 0.7px), var(--color-inlay) 50%, transparent calc(50% + 0.7px));
+    --tr: linear-gradient(to bottom right, transparent calc(50% - 0.7px), var(--color-inlay) 50%, transparent calc(50% + 0.7px));
+    background: var(--tl) top left, var(--tr) top right, var(--tr) bottom left, var(--tl) bottom right;
+    background-size: var(--inlay) var(--inlay);
+    background-repeat: no-repeat;
+}
+.inlay::before { inset: 0; border-top: 0; }
+.inlay::after { inset: var(--inlay); border: 1px solid var(--color-inlay); }
+/* With the slot or a search open, the seam has parted: the lit lip is the well's lower edge. */
+.lib-bar:has(+ .slot:not([hidden])), .list-bar:has(+ .search-wrap:not([hidden])) { box-shadow: none; }
 .list-bar { padding-left: var(--space-1); }
+/* The slot under the library bar and each list's search open out of the bar's
+   seam: full width, the element is the rim (dark at the top, lit at the bottom)
+   and ::before the well. */
+.slot-well, .search-wrap {
+    position: relative;
+    background: linear-gradient(var(--color-recess-rim-top), var(--color-recess-rim-bottom));
+}
+.slot-well::before, .search-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 1px;
+    background: linear-gradient(var(--color-recess-shade), transparent 6px), var(--color-recess);
+    pointer-events: none;
+}
+.slot-well > *, .search-wrap > * { position: relative; z-index: 1; }
+
+/* The slot opens under the library bar for search or +. + first offers its two
+   choices; the picked one widens over the other and becomes the field. */
+/* Hidden in the page until opened (so it stays shut even under an old stylesheet);
+   it slides open from nothing and slides shut before it's hidden. */
+.slot {
+    display: grid; grid-template-rows: 1fr; flex-shrink: 0;
+    transition: grid-template-rows 0.2s var(--ease-slot), display 0.2s allow-discrete;
+}
+.slot[hidden] { grid-template-rows: 0fr; }
+@starting-style { .slot { grid-template-rows: 0fr; } }
+.sidebar.in-list .slot { display: none; }
+.slot-well { display: grid; min-height: 0; overflow: hidden; }
+.slot-choices, .slot-field {
+    grid-area: 1 / 1; display: flex; align-items: center; min-height: 40px;
+    opacity: 0; visibility: hidden; transform: translateY(-4px);
+    transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s 0.14s;
+}
+/* Visible at once when shown (so the field can take focus), hidden after the fade. */
+.slot[data-mode="choose"] .slot-choices,
+.slot:not([data-mode="choose"]) .slot-field { opacity: 1; visibility: visible; transform: none; transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s; }
+.slot-choice {
+    flex: 1 1 0; min-width: 0; height: 100%; padding: 0 var(--space-3);
+    border: 0; background: none; cursor: pointer; overflow: hidden; white-space: nowrap;
+    font: inherit; color: var(--color-text-secondary);
+    transition: flex-grow 0.2s var(--ease-slot), opacity 0.14s ease, color 0.2s ease, padding 0.2s var(--ease-slot);
+}
+.slot-choice + .slot-choice { box-shadow: inset 1px 0 0 var(--color-recess-rim-top), inset 2px 0 0 var(--color-recess-rim-bottom); }   /* an engraved divider */
+.slot-choice:hover { color: var(--color-text-primary); }
+.slot-choice:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: -4px; }
+.slot-choices.folding .slot-choice:not(.picked) { flex-grow: 0.0001; padding: 0; opacity: 0; }
+.slot-choices.folding .slot-choice.picked { color: var(--color-text-muted); }
+.slot-field { gap: var(--space-2); padding: 0 var(--space-2) 0 var(--space-4); }
+.slot-ico { color: var(--color-text-muted); }
+.slot-ico svg { width: 16px; height: 16px; }
+.slot-input {
+    flex: 1; min-width: 0; height: 36px; padding: 0;
+    border: 0; background: none; outline: none;
+    font: inherit; color: var(--color-text-primary); caret-color: var(--color-accent);
+}
+.slot-input::placeholder { color: var(--color-text-muted); }
+.slot-input::-webkit-search-cancel-button { display: none; }
+.slot-act {
+    display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+    border: 0; background: none; cursor: pointer; color: var(--color-text-muted);
+}
+.slot-act svg { width: 14px; height: 14px; }
+.slot-act:hover { color: var(--color-text-primary); }
+.slot-act.go { color: var(--color-accent); }
+.slot-act:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: -2px; }
+/* The field in use: a fine accent line along the bottom of the well. */
+.slot-well:focus-within::after, .search-wrap:focus-within::after {
+    content: ""; position: absolute; left: var(--space-3); right: var(--space-3); bottom: 1px; height: 1px;
+    background: var(--color-accent); opacity: 0.6; z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) { .slot, .slot-choice, .slot-choices, .slot-field { transition: none; } }
 .sidebar.in-list .lib-bar { display: none; }
 .lib-logo { margin: 0 var(--space-2) 0 0; font-size: var(--text-base); line-height: 1; color: var(--color-accent); }
 .lib-tabs { display: flex; flex: 1; min-width: 0; gap: var(--space-1); }
@@ -99,13 +191,14 @@ body {
     white-space: nowrap;
 }
 
-.search-wrap { padding: var(--space-2) var(--space-4); }
-.search-wrap .input { width: 100%; }
+/* Each list's search: the same recess as the slot, its field bare inside it. */
+.search-wrap { flex-shrink: 0; padding: 0 var(--space-4); }
+.search-wrap .input { width: 100%; height: 40px; padding: 0; border: 0; background: none; caret-color: var(--color-accent); }
 
 .track-list {
     flex: 1;
     overflow-y: auto;
-    padding: 0 var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-2) var(--space-3);   /* the same gap under every bar */
     list-style: none;
     margin: 0;
 }
@@ -261,7 +354,7 @@ body {
     font-size: var(--text-sm); color: var(--color-text-muted);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.shelf-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 0 var(--space-2); }
+.shelf-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: var(--space-3) var(--space-2) 0; }
 .shelf-row {
     display: flex; align-items: center; gap: var(--space-3);
     padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer;
@@ -274,7 +367,7 @@ body {
 /* ---- tracks view ---- */
 .tape-title {
     flex: 1; min-width: 0;
-    font-size: var(--text-lg); color: var(--color-text-secondary);
+    font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary);   /* the same as the library bar's open tab */
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tape-title.editable { cursor: text; }
@@ -445,8 +538,11 @@ body {
 
 /* ---- the ask sheet: one short field (a link, a name), Cancel and the action
    in its header. A centred card here; on phones a sheet above the keyboard. ---- */
+/* On desktop the sheet stays in the sidebar it was opened from: the scrim
+   covers only the sidebar (--side-w, measured in JS) and leaves the deck alone. */
+.ask-scrim { inset: 0 auto 0 0; width: var(--side-w, 320px); align-items: flex-start; padding: 60px var(--space-3) var(--space-3); }   /* below the bar */
 .ask-sheet {
-    width: 100%; max-width: 420px;
+    width: 100%;
     padding: var(--space-2) var(--space-4) var(--space-4);
     background: var(--color-bg-elevated);
     border-radius: var(--radius-lg);
@@ -656,6 +752,9 @@ body {
     .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
     .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
     .modal-actions .btn { min-height: 44px; }
+    .slot-choices, .slot-field { min-height: 44px; }
+    .slot-act { width: 44px; height: 44px; }
+    .search-wrap .input { height: 44px; }
 
 
     /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
@@ -682,7 +781,7 @@ body {
     .modal-scrim { align-items: flex-start; padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
     /* The ask sheet rises from the bottom like the + menu it came from, and
        sits on the keyboard (--kb, set from the visual viewport in JS). */
-    .ask-scrim { align-items: flex-end; padding: 0; }
+    .ask-scrim { inset: 0; width: auto; align-items: flex-end; padding: 0; }
     .ask-sheet {
         max-width: none; margin-bottom: var(--kb, 0px);
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -691,3 +790,30 @@ body {
     }
 }
 @media (prefers-reduced-motion: reduce) { .dl-summary .ico svg { transition: none; } }
+
+/* In the library a menu opens as a slot under its row or bar: recessed like the
+   slot, sliding open, its items in a column. (After the phone rules, which make
+   menus bottom sheets, so it wins over them.) */
+.menu.inline {
+    position: relative; top: auto !important; left: auto !important; right: auto; bottom: auto; z-index: auto;
+    width: auto; min-width: 0; max-width: none; max-height: none; overflow: hidden;
+    margin: var(--space-1) 0; padding: 0;
+    border: 0; border-radius: var(--radius-sm); box-shadow: none; animation: none;
+    background: linear-gradient(var(--color-recess-rim-top), var(--color-recess-rim-bottom));
+    interpolate-size: allow-keywords; height: auto;
+    transition: height 0.2s var(--ease-slot);
+}
+@starting-style { .menu.inline { height: 0; } }
+.menu.inline::before {
+    content: ""; position: absolute; inset: 0 0 1px; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(var(--color-recess-shade), transparent 6px), var(--color-recess);
+}
+.menu.inline > * { position: relative; }
+.menu.inline .menu-head { display: none !important; }
+.menu.inline .menu-item { display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-4); border-radius: 0; font-size: var(--text-base); }
+.menu.inline .menu-sep { margin: var(--space-1) var(--space-4); background: var(--color-recess-rim-top); box-shadow: 0 1px 0 var(--color-recess-rim-bottom); }
+.list-bar + .menu.inline, .lib-bar + .menu.inline { margin: 0; border-radius: 0; }
+.list-bar:has(+ .menu.inline:not([hidden])) { box-shadow: none; }
+@media (max-width: 640px) { .menu.inline .menu-item { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .menu.inline { transition: none; } }
+

@@ -75,6 +75,7 @@
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
     [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
     [() => !$("dlList").hidden, () => setDlList(false)],
+    [() => slotOpen(), closeSlot],
     [() => !!openSearchInput(), () => closeSearch(openSearchInput())],
     [() => !$("tracksView").hidden, () => $("backBtn").click()],
     [() => !$("browseView").hidden, () => $("browseBack").click()],
@@ -116,6 +117,7 @@
       const lift = () => { modal.style.setProperty("--kb", vv ? `${Math.max(0, innerHeight - vv.height - vv.offsetTop)}px` : "0px"); };
       lift();
       vv?.addEventListener("resize", lift);
+      modal.style.setProperty("--side-w", `${document.querySelector(".sidebar").getBoundingClientRect().width}px`);
       modal.hidden = false;
       input.focus();
       syncHistory();
@@ -219,6 +221,8 @@
     chevronLeft: svgIcon('<path d="m15 18-6-6 6-6"/>'),
     chevronDown: svgIcon('<path d="m6 9 6 6 6-6"/>'),
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+    link: svgIcon('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
+    arrowRight: svgIcon('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   };
 
   let shelf = [];         // tapes
@@ -281,8 +285,8 @@
     $("modePods").classList.toggle("active", m === "podcasts");
     $("modeMusic").setAttribute("aria-selected", String(m === "music"));
     $("modePods").setAttribute("aria-selected", String(m === "podcasts"));
-    closeSearch($("libSearch"));
-    document.querySelector('[data-search="libSearch"]').hidden = m !== "music";   // shows have no library-wide search
+    closeSlot();
+    $("libSearchBtn").hidden = m !== "music";   // shows have no library-wide search
     if (m === "music") showView("shelf");
     else openPodcasts();
   }
@@ -373,6 +377,7 @@
     $("episodesView").hidden = name !== "episodes";
     // Inside a tape, a browse list or a show, its own bar replaces the library's.
     sidebar.classList.toggle("in-list", name === "tracks" || name === "browse" || name === "episodes");
+    if (sidebar.classList.contains("in-list") && !libJumping) closeSlot();   // (a library search closes it itself, after moving its text across)
     syncHistory();
   }
 
@@ -1607,8 +1612,23 @@
     s.className = "menu-sep";
     return s;
   }
-  // Reveal the popover then place it at the click (placement measures it visible).
-  function showMenuAt(e) { menu.hidden = false; placeAtClick(e); }
+  // In the library a menu opens as a slot under the row or bar it came from, like
+  // + and search; anywhere else (Up Next) it's a popover at the click.
+  function showMenuAt(e) {
+    if (menu.contains(e.target) && menu.classList.contains("inline")) { menu.hidden = false; return; }   // a sub-picker, in place
+    const anchor = e.target.closest?.(".sidebar li, .sidebar .list-bar, .sidebar .lib-bar");
+    if (anchor) { openMenuUnder(anchor); return; }
+    if (menu.classList.contains("inline") || !menu.isConnected) { menu.classList.remove("inline"); document.body.appendChild(menu); }
+    menu.hidden = false;
+    placeAtClick(e);
+  }
+  function openMenuUnder(anchor) {
+    if (menu.previousElementSibling !== anchor) anchor.after(menu);
+    menu.classList.add("inline");
+    menu.removeAttribute("style");   // a popover's placement
+    menu.hidden = false;
+    requestAnimationFrame(() => menu.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  }
 
   // ---------- add-to-tape menu ----------
   const menu = $("plMenu");
@@ -1684,26 +1704,104 @@
   });
 
   // ---------- the library's bars: + to add, a list's ⋯, search on demand ----------
-  // + and ⋯ open the shared menu under their button (a bottom sheet on a phone);
-  // the same button again closes it.
+  // A list's ⋯ opens the shared menu as a slot under its bar; the same button
+  // again closes it.
   function openBarMenu(btn, title, items) {
     if (!menu.hidden && menu.dataset.for === btn.id) { closeMenu(); return; }
     menu.dataset.for = btn.id;
     menu.innerHTML = "";
     menu.appendChild(menuHead(title));
     items.forEach((it) => menu.appendChild(it ? menuItem(it[0], it[1], closeMenu) : menuSep()));
-    menu.hidden = false;
-    const r = btn.getBoundingClientRect();
-    placeMenu(menu, r.bottom + 6, r.right - menu.offsetWidth, "top right");
+    openMenuUnder(btn.closest(".list-bar, .lib-bar"));
     syncHistory();
   }
+  // ---------- the slot under the library bar ----------
+  // Search and + share one recessed slot. Search opens it as a field; + opens it
+  // with the two things you can add on this tab, and the one picked folds into
+  // the field ("Paste link", "Add tape"). Enter or → adds it, × or Escape closes.
+  const slot = $("libSlot"), slotInput = $("libSearch");
+  const SLOT_FIELDS = {
+    search: { hint: "Search your library", icon: "search", type: "search", key: "search" },
+    rip: { hint: "Paste link", icon: "link", type: "url", key: "go" },
+    follow: { hint: "Paste link", icon: "link", type: "url", key: "go" },
+    tape: { hint: "Add tape", icon: "tape", type: "text", key: "done" },
+    show: { hint: "Add show", icon: "podcast", type: "text", key: "done" },
+  };
   // + adds to the tab you're on: songs and tapes under Music, shows under Podcasts.
-  $("dlToggle").addEventListener("click", (e) => {
-    e.stopPropagation();
-    openBarMenu(e.currentTarget, mode === "music" ? "Add music" : "Add a podcast", mode === "music"
-      ? [["Rip a song or playlist…", () => addFromLink("music")], ["New tape…", createTape]]
-      : [["Follow a podcast…", () => addFromLink("podcasts")], ["New show…", createShow]]);
+  const SLOT_CHOICES = { music: [["rip", "Rip a song"], ["tape", "Add a tape"]], podcasts: [["follow", "Follow a podcast"], ["show", "Add a show"]] };
+  const slotOpen = () => !!slot.dataset.mode;
+  function setSlot(m) {
+    slot.dataset.mode = m;
+    slot.hidden = !m;
+    $("libSearchBtn").setAttribute("aria-expanded", String(m === "search"));
+    $("dlToggle").setAttribute("aria-expanded", String(!!m && m !== "search"));
+    const f = SLOT_FIELDS[m];
+    slotInput.tabIndex = $("slotAct").tabIndex = f ? 0 : -1;
+    if (f) {
+      slotInput.type = f.type;
+      slotInput.placeholder = f.hint;
+      slotInput.enterKeyHint = f.key;
+      slotInput.autocapitalize = f.type === "text" ? "sentences" : "off";
+      slotInput.setAttribute("aria-label", f.hint);
+      $("slotIco").innerHTML = ICONS[f.icon];
+      syncSlotAct();
+    }
+    syncHistory();
+  }
+  function syncSlotAct() {   // × closes; once there's something to add, → adds it
+    const go = slot.dataset.mode !== "search" && !!slotInput.value.trim();
+    $("slotAct").innerHTML = ICONS[go ? "arrowRight" : "x"];
+    $("slotAct").setAttribute("aria-label", go ? "Add" : "Close");
+    $("slotAct").classList.toggle("go", go);
+  }
+  function openSlot(m) {
+    slotInput.value = "";
+    setSlot(m);
+    slotInput.focus({ preventScroll: true });
+  }
+  function closeSlot() {
+    if (!slotOpen()) return;
+    slotInput.value = "";   // quietly: the library search reacts only to typing
+    slotInput.blur();
+    setSlot("");
+  }
+  function chooseSlot() {
+    const box = $("slotChoices");
+    box.classList.remove("folding");
+    box.innerHTML = "";
+    SLOT_CHOICES[mode].forEach(([m, label]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "slot-choice";
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        // The other choice narrows away as the field fades in over them: no wait.
+        b.classList.add("picked");
+        box.classList.add("folding");
+        openSlot(m);
+      });
+      box.appendChild(b);
+    });
+    setSlot("choose");
+  }
+  async function submitSlot() {
+    const m = slot.dataset.mode, v = slotInput.value.trim();
+    if (!v || m === "search") return;
+    closeSlot();
+    if (m === "rip") await startRip(v);
+    else if (m === "follow") await addPodcast(v);
+    else if (m === "tape") await createTape(v);
+    else if (m === "show") await createShow(v);
+  }
+  $("dlToggle").addEventListener("click", () => (slotOpen() && slot.dataset.mode !== "search" ? closeSlot() : chooseSlot()));
+  $("libSearchBtn").addEventListener("click", () => (slot.dataset.mode === "search" ? closeSlot() : openSlot("search")));
+  slotInput.addEventListener("input", syncSlotAct);
+  slotInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSlot(); }
+    if (e.key === "Enter" && slot.dataset.mode !== "search") { e.preventDefault(); submitSlot(); }
   });
+  $("slotChoices").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); closeSlot(); } });
+  $("slotAct").addEventListener("click", () => ($("slotAct").classList.contains("go") ? submitSlot() : closeSlot()));
   // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
   function tapeMenuItems() {
     const sorts = currentTape?.sortable
@@ -1757,15 +1855,11 @@
 
   // ---------- downloads ----------
   let dlEvt = null, dlPrev = {};
-  // Rip a link (music) or follow a feed (podcasts): ask for it in the dialog, then
-  // the dialog closes and the downloads row shows how it's going.
-  async function addFromLink(m) {
+  // Rip a link (music) or follow a feed (podcasts): the slot asks for it, then
+  // closes, and the downloads row shows how it's going.
+  function addFromLink(m) {
     if (mode !== m) setMode(m);
-    const url = m === "music"
-      ? await askText("Rip a song", { ok: "Rip", type: "url", placeholder: "Paste a link", help: "YouTube or YouTube Music. A playlist becomes a new tape." })
-      : await askText("Follow a podcast", { ok: "Follow", type: "url", placeholder: "Paste a link", help: "A podcast's RSS feed, or a YouTube channel or video." });
-    if (!url) return;
-    if (m === "music") await startRip(url); else await addPodcast(url);
+    openSlot(m === "music" ? "rip" : "follow");
   }
   async function startRip(url) {
     try {
@@ -2161,11 +2255,11 @@
   // Keys typed while All Tracks loads stay in this field, then move across.
   let libJumping = false;
   $("libSearch").addEventListener("input", async () => {
-    if (libJumping || !$("libSearch").value.trim()) return;
+    if (libJumping || slot.dataset.mode !== "search" || !$("libSearch").value.trim()) return;
     libJumping = true;
     try { await openTape("all", "All Tracks", "smart"); } finally { libJumping = false; }
     const q = $("libSearch").value;
-    closeSearch($("libSearch"));
+    closeSlot();
     openSearch($("search"));
     $("search").value = q;
     applySearch();
@@ -2302,16 +2396,12 @@
   });
   $("miniOpen").addEventListener("click", openDeck);
   $("search").addEventListener("input", debounce(applySearch, 120));
-  async function createTape() {
-    const name = await askText("New tape");
-    if (!name) return;
+  async function createTape(name) {
     try { await jsend("api/playlists", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     loadShelf();
     toast(`Created the tape “${name}”`);
   }
-  async function createShow() {
-    const name = await askText("New show");
-    if (!name) return;
+  async function createShow(name) {
     try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
     showsData = null;
     openPodcasts();

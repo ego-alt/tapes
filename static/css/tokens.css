@@ -29,6 +29,7 @@
     /* Motion */
     --dur-base: 0.2s;
     --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-slot: cubic-bezier(0.2, 0.8, 0.2, 1);   /* the slot: quick start, soft landing */
 
     --color-bg-base: #282828;
     --color-bg-elevated: #3c3836;
@@ -48,6 +49,15 @@
     --color-highlight-soft: rgba(235, 219, 178, 0.05);
     --color-shadow-soft: rgba(0, 0, 0, 0.2);
     --color-shadow: rgba(0, 0, 0, 0.35);
+
+    /* Recessed fields (the slot under the library bar, list searches): a dark
+       well, shaded along the top inside edge, lit along the bottom. */
+    --color-recess: #101010;
+    --color-inlay: rgba(235, 219, 178, 0.13);   /* the inlay lines of bars and lists */
+    --inlay: 6px;                               /* how far the inner rectangle sits in */
+    --color-recess-shade: rgba(0, 0, 0, 0.55);
+    --color-recess-rim-top: rgba(0, 0, 0, 0.95);
+    --color-recess-rim-bottom: rgba(255, 255, 255, 0.10);
 
     /* component tokens — derived from the palette above */
     --scrubber-track: var(--color-border);

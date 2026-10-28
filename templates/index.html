@@ -26,8 +26,21 @@
           <button class="lib-tab active" id="modeMusic" role="tab" aria-selected="true">Music</button>
           <button class="lib-tab" id="modePods" role="tab" aria-selected="false">Podcasts</button>
         </div>
-        <button class="bar-btn" type="button" data-search="libSearch" aria-label="Search your library" aria-expanded="false"><span class="ico" data-icon="search"></span></button>
-        <button class="bar-btn" id="dlToggle" type="button" aria-label="Add" aria-haspopup="menu"><span class="ico" data-icon="plus"></span></button>
+        <button class="bar-btn" id="libSearchBtn" type="button" aria-label="Search your library" aria-expanded="false" aria-controls="libSlot"><span class="ico" data-icon="search"></span></button>
+        <button class="bar-btn" id="dlToggle" type="button" aria-label="Add" aria-expanded="false" aria-controls="libSlot"><span class="ico" data-icon="plus"></span></button>
+      </div>
+
+      <!-- The slot under the bar: search, or + with its two choices, the picked one
+           folding into the field. One field for both. Hidden until opened. -->
+      <div class="slot" id="libSlot" data-mode="" hidden>
+        <div class="slot-well">
+          <div class="slot-choices" id="slotChoices"></div>
+          <div class="slot-field">
+            <span class="ico slot-ico" id="slotIco" data-icon="search"></span>
+            <input class="slot-input" id="libSearch" type="search" aria-label="Search your library" autocomplete="off" enterkeyhint="search" tabindex="-1">
+            <button class="slot-act" id="slotAct" type="button" aria-label="Close" tabindex="-1"><span class="ico" data-icon="x"></span></button>
+          </div>
+        </div>
       </div>
 
       <!-- Rips and episode downloads: one quiet row while there are any; tap for the list. -->
@@ -39,10 +52,7 @@
       </div>
 
       <!-- shelf of tapes -->
-      <div class="shelf" id="shelfView">
-        <div class="search-wrap lib-search" hidden>
-          <input class="input" id="libSearch" type="search" placeholder="Search your library" aria-label="Search your library" autocomplete="off">
-        </div>
+      <div class="shelf inlay" id="shelfView">
         <ul class="shelf-list" id="shelfList"></ul>
         <div class="first-run" id="firstRun" hidden>
           <p class="first-run-title">Your shelf is empty.</p>
@@ -67,12 +77,12 @@
         <div class="search-wrap" hidden>
           <input class="input" id="search" type="search" placeholder="Search this list…" autocomplete="off">
         </div>
-        <ul class="track-list" id="trackList"></ul>
+        <div class="inlay"><ul class="track-list" id="trackList"></ul></div>
       </div>
 
       <!-- podcasts: shows list -->
       <div class="podcasts-view" id="podcastsView" hidden>
-        <ul class="shelf-list" id="showList"></ul>
+        <div class="inlay"><ul class="shelf-list" id="showList"></ul></div>
       </div>
 
       <!-- episodes within a show -->
@@ -91,7 +101,7 @@
           <button class="ep-filter-btn" data-f="unplayed">Unplayed</button>
           <button class="ep-filter-btn" data-f="downloaded">Downloaded</button>
         </div>
-        <ul class="track-list" id="episodeList"></ul>
+        <div class="inlay"><ul class="track-list" id="episodeList"></ul></div>
       </div>
 
       <!-- album / artist browse list -->
@@ -104,7 +114,7 @@
         <div class="search-wrap" hidden>
           <input class="input" id="browseSearch" type="search" placeholder="Search…" autocomplete="off">
         </div>
-        <ul class="shelf-list" id="browseList"></ul>
+        <div class="inlay"><ul class="shelf-list" id="browseList"></ul></div>
       </div>
 
       <!-- Phones: what's playing, always in reach while browsing; tap (or swipe up) to open the deck. -->
