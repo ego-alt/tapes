@@ -36,6 +36,9 @@ def create_app(config=None):
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+    # Its own remember-me cookie name: a cookie of the default name left by another
+    # Flask app on the same host would otherwise be read first and refuse the request.
+    app.config["REMEMBER_COOKIE_NAME"] = "tapes_remember"
 
     music_dir = os.environ.get("MUSIC_DIR") or str(pathlib.Path(app.root_path) / "music")
     app.config["MUSIC_DIR"] = music_dir
