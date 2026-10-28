@@ -47,8 +47,7 @@ choice. Updated 2026-10-15, after the UX audit.
   server (on rip, plus a background pass) and written as ReplayGain tags.
   Tracks over 15 minutes, and far seeks in a song that hit the browser's
   memory limit, play the plain way. Podcasts keep a plain element (their
-  streams can be cross-origin). `L` or the bars button beside the sleep
-  timer toggles levelling.
+  streams can be cross-origin). Always on.
 
 ## Open loops
 

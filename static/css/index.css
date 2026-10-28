@@ -284,7 +284,7 @@ body {
     justify-content: center;
     min-width: 0;
 }
-.nav-toggle, .deck-menu-btn {
+.nav-toggle {
     position: absolute;
     top: var(--space-4);
     left: var(--space-4);
@@ -294,7 +294,7 @@ body {
 }
 /* Icons take their size from their container; without this the toggle drew
    at 0×0 on desktop, so a closed library couldn't be opened again. */
-.nav-toggle .icn, .deck-menu-btn .icn { width: 20px; height: 20px; }
+.nav-toggle .icn { width: 20px; height: 20px; }
 
 /* The mini-player only exists on phones. */
 .mini { display: none; }
@@ -481,8 +481,6 @@ body {
 
 /* ---- sort selector (All Tracks / Singles) ---- */
 
-/* The deck's ⋯ (settings), opposite the library toggle. */
-.deck-menu-btn { left: auto; right: var(--space-4); display: inline-flex; align-items: center; justify-content: center; }
 
 /* transient toast (fetch/error feedback) */
 .toast {
@@ -663,7 +661,7 @@ body {
     @media (prefers-reduced-motion: reduce) { .main { transition: none; } }
 
     /* The deck's close button (top left) and its ⋯ (top right): solid 44px squares. */
-    .nav-toggle, .deck-menu-btn {
+    .nav-toggle {
         top: max(var(--space-3), env(safe-area-inset-top));
         left: max(var(--space-3), env(safe-area-inset-left));
         width: 44px;
@@ -673,7 +671,6 @@ body {
         border: 1px solid var(--color-border-soft);
         color: var(--color-text-primary);
     }
-    .deck-menu-btn { left: auto; right: max(var(--space-3), env(safe-area-inset-right)); }
 
     .mini:not([hidden]) {
         position: relative;

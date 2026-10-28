@@ -4,7 +4,7 @@
  *   and behind the tape a soft glow of the cover's most vivid common colour.
  * - VU needle: a meter needle seen through a slot over the printed scale,
  *   driven by the music's level (the levelling graph in deck-audio.js); with
- *   no graph to read (podcasts, levelling off) it sways with the playing.
+ *   no graph to read (podcasts) it sways with the playing.
  * - Tape changes: a new tape ejects and the next slides in; Keep playing
  *   flips to side B.
  * - Lock screen: the cassette, label and all, drawn to an image once per

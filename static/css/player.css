@@ -328,8 +328,8 @@
 }
 
 /* ---- full screen: tap the tape and the rest steps back ---- */
-.controls, .nav-toggle, .deck-menu-btn, .upnext { transition: opacity 0.3s ease; }
-.app.immersive .controls, .app.immersive .nav-toggle, .app.immersive .deck-menu-btn, .app.immersive .upnext { opacity: 0; pointer-events: none; }
+.controls, .nav-toggle, .upnext { transition: opacity 0.3s ease; }
+.app.immersive .controls, .app.immersive .nav-toggle, .app.immersive .upnext { opacity: 0; pointer-events: none; }
 .app.immersive .controls { position: absolute; }   /* out of the layout, so the tape centres */
 .app.immersive .cassette { height: min(94vh, calc(98vw * 206 / 330)); }
 /* Full screen with the library pulled out (swipe down, on its side): the
@@ -340,7 +340,7 @@
     .app.immersive .tl-num, .app.immersive .tl-dur { display: none; }   /* room for the titles */
     .app.immersive:not(.nav-collapsed) .cassette { height: min(94vh, calc(64vw * 206 / 330)); }
 }
-@media (prefers-reduced-motion: reduce) { .cassette, .controls, .nav-toggle, .deck-menu-btn, .upnext { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .cassette, .controls, .nav-toggle, .upnext { transition: none; } }
 /* No text selection or long-press menu on the tape: a long press winds it. */
 .cassette { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 

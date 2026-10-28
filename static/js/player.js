@@ -69,7 +69,6 @@
     [() => !$("albumModal").hidden, () => $("alCancel").click()],
     [() => !$("editModal").hidden, () => dismissEdit()],
     [() => !menu.hidden, closeMenu],
-    [() => !deckMenu.hidden, closeDeckMenu],
     [() => upnext.classList.contains("expanded"), () => upnext.classList.remove("expanded")],
     [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
@@ -1197,16 +1196,16 @@
   // ---------- Keep playing ----------
   // When the queue is about to run out, related songs follow (radio.py), so
   // the music doesn't stop; the tape turns over to side B as they start.
-  let keepPlaying = localStorage.getItem("tapes-keep-playing") !== "off", extending = false;
+  let extending = false;
   async function keepPlayingIfEnding() {
-    if (!keepPlaying || extending || activeIsEpisode() || repeatMode !== "off" || qi < queue.length - 2) return;
+    if (extending || activeIsEpisode() || repeatMode !== "off" || qi < queue.length - 2) return;
     extending = true;
     const q = queue;
     try {
       const more = await jsend("api/keep-playing", "POST", {
         seed: queue.slice(Math.max(0, qi - 4), qi + 1).map((t) => t.id), exclude: queue.map((t) => t.id),
       }).then((r) => r.json());
-      if (queue !== q || !keepPlaying) return;   // a new tape went in meanwhile
+      if (queue !== q) return;   // a new tape went in meanwhile
       const items = more.map((t) => ({ ...t, radio: true }));
       queue.push(...items);
       if (baseQueue !== queue) baseQueue.push(...items);
@@ -1216,21 +1215,6 @@
     } catch (e) { console.warn("Keep playing:", e); }
     finally { extending = false; }
   }
-  function setKeepPlaying(on) {
-    keepPlaying = on;
-    localStorage.setItem("tapes-keep-playing", on ? "on" : "off");
-    toast(on ? "Keep playing on" : "Keep playing off");
-    if (on) keepPlayingIfEnding();
-    else {   // take back the songs it added that haven't played yet
-      const kept = (t, i) => i <= qi || !t.radio;
-      queue = queue.filter(kept);
-      baseQueue = baseQueue.filter((t) => !t.radio || queue.includes(t));
-      prefetchNext();
-      savePlaystate();
-      updateUpNext();
-    }
-  }
-
   // ---------- shuffle / repeat ----------
   function setShuffle(on) {
     shuffleOn = on;
@@ -1679,30 +1663,6 @@
   const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
   document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
 
-  // ---------- the deck's ⋯ menu: settings ----------
-  const deckBtn = $("deckMenuBtn"), deckMenu = $("deckMenu");
-  const closeDeckMenu = () => { deckMenu.hidden = true; };
-  // Under the ⋯ on a laptop; a bottom sheet on a phone (CSS).
-  function openDeckMenu() {
-    deckMenu.innerHTML = "";
-    deckMenu.appendChild(menuHead("Deck"));
-    if (!activeIsEpisode()) {   // levelling is for music only
-      deckMenu.appendChild(menuItem(`Volume levelling: ${levelling ? "on" : "off"}`, toggleLevelling, closeDeckMenu));
-    }
-    deckMenu.appendChild(menuItem(`Keep playing: ${keepPlaying ? "on" : "off"}`, () => setKeepPlaying(!keepPlaying), closeDeckMenu));
-    deckMenu.hidden = false;
-    const r = deckBtn.getBoundingClientRect();
-    placeMenu(deckMenu, r.bottom + 6, r.right - deckMenu.offsetWidth, "top right");
-    syncHistory();
-  }
-  deckBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    deckMenu.hidden ? openDeckMenu() : closeDeckMenu();
-  });
-  document.addEventListener("click", (e) => {
-    if (!deckMenu.hidden && !deckMenu.contains(e.target)) closeDeckMenu();
-  });
-
   // ---------- the library's bars: + to add, a list's ⋯, search on demand ----------
   // A list's ⋯ opens the shared menu as a slot under its bar; the same button
   // again closes it.
@@ -2095,7 +2055,7 @@
   let touch = null;
   main.addEventListener("touchstart", (e) => {
     swiped = false;   // a new gesture: whatever the last swipe was, it's over
-    if (e.touches.length !== 1 || e.target.closest(".controls, .upnext, .nav-toggle, .deck-menu-btn, .menu")) { touch = null; return; }
+    if (e.touches.length !== 1 || e.target.closest(".controls, .upnext, .nav-toggle, .menu")) { touch = null; return; }
     const p = e.touches[0];
     touch = { x: p.clientX, y: p.clientY, t: performance.now(), axis: null, onTape: !!e.target.closest("#cassette") };
   }, { passive: true });
@@ -2157,7 +2117,7 @@
   };
   let lastTap = null, pendingTap = 0, hold = null, winding = false;
   main.addEventListener("pointerdown", (e) => {
-    if (!immersive() || e.target.closest(".controls, .nav-toggle, .deck-menu-btn")) return;
+    if (!immersive() || e.target.closest(".controls, .nav-toggle")) return;
     const zone = zoneAt(e.clientX);
     if (!zone) return;
     hold = { x: e.clientX, y: e.clientY, timer: setTimeout(() => {   // held: wind the tape
@@ -2174,7 +2134,7 @@
   main.addEventListener("pointercancel", () => { endHold(); winding = false; });
   main.addEventListener("contextmenu", (e) => { if (immersive()) e.preventDefault(); });   // a long press winds, no menu
   main.addEventListener("click", (e) => {
-    if (!immersive() || e.target.closest(".controls, .nav-toggle, .deck-menu-btn")) return;
+    if (!immersive() || e.target.closest(".controls, .nav-toggle")) return;
     if (winding) { winding = false; return; }
     if (swiped) { swiped = false; return; }
     const zone = zoneAt(e.clientX), now = performance.now();
@@ -2485,8 +2445,8 @@
     if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
     if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
-      const anyOpen = upnext.classList.contains("expanded") || !menu.hidden || !deckMenu.hidden;
-      upnext.classList.remove("expanded"); closeMenu(); closeDeckMenu();
+      const anyOpen = upnext.classList.contains("expanded") || !menu.hidden;
+      upnext.classList.remove("expanded"); closeMenu();
       if (!anyOpen && isMobile()) closeDeck();
     }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;
@@ -2505,15 +2465,6 @@
       }
     }
   });
-  // Volume levelling: every song (or album) at the same loudness. On by default.
-  let levelling = localStorage.getItem("tapes-levelling") !== "off";
-  audio.setLevelling(levelling);
-  function toggleLevelling() {
-    levelling = !levelling;
-    try { localStorage.setItem("tapes-levelling", levelling ? "on" : "off"); } catch (_) { /* private mode */ }
-    audio.setLevelling(levelling);
-    toast(levelling ? "Volume levelling on" : "Volume levelling off");
-  }
   // Closing or backgrounding the page: send the playhead right away with a
   // beacon (a normal fetch would be cancelled, and savePlaystate debounces).
   function beaconPlaystate() {
@@ -2562,7 +2513,6 @@
   $("prevBtn").innerHTML = ICONS.prev;
   playBtn.innerHTML = ICONS.play;
   $("nextBtn").innerHTML = ICONS.next;
-  deckBtn.innerHTML = ICONS.more;
   $("miniNext").innerHTML = ICONS.next;
   $("shuffleBtn").innerHTML = ICONS.shuffle;
   $("upnextIco").innerHTML = ICONS.list;

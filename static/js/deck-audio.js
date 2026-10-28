@@ -47,7 +47,6 @@
       this.mode = "idle";          // "mse" | "plain" | "episode" | "idle"
       this.seg = null;             // the song playing: { track, url, t0, t1, ... }
       this.next = null;            // the song appended after it (mse only)
-      this.levelling = true;
       this.gen = 0;                // bumped on every reset; stale work checks it
       this.ctx = null;
       this.gainNode = null;
@@ -126,14 +125,6 @@
       this._appendWhenReady(this.next, this.gen);
     }
 
-    /** Volume levelling on/off (on by default). */
-    setLevelling(on) {
-      this.levelling = !!on;
-      // The audio graph starts on a play press (browsers require a gesture);
-      // switching on mid-song builds it now.
-      if (on && !this.music.paused) this._ensureGraph();
-      this._applyGain(this.seg, 0);
-    }
 
     // ---------- internals ----------
     _forward(el, ev, e) {
@@ -364,7 +355,7 @@
 
     // ---------- levelling ----------
     _ensureGraph() {
-      if (this.ctx || !this.levelling) return;
+      if (this.ctx) return;
       try {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         this.ctx = new Ctx();
@@ -383,7 +374,7 @@
     }
 
     /** The music's RMS level now (0..1), or null when there's nothing to read
-     *  (a podcast, or levelling off so no graph). */
+     *  (a podcast, or no graph). */
     level() {
       if (!this.analyser || this.mode === "episode") return null;
       this.analyser.getFloatTimeDomainData(this._levelBuf);
@@ -394,7 +385,7 @@
 
     /** The gain for a song, in linear terms. */
     gainFor(seg) {
-      if (!this.levelling || !seg || !seg.track || seg.track.kind === "episode") return 1;
+      if (!seg || !seg.track || seg.track.kind === "episode") return 1;
       const t = seg.track, album = seg.opts && seg.opts.album && t.album_lufs != null;
       const lufs = album ? t.album_lufs : t.lufs;
       if (lufs == null) return 1;
