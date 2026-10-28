@@ -9,7 +9,7 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/music/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'tapes-shell-v15';
+const SHELL_CACHE = 'tapes-shell-v16';
 const ROOT = new URL(self.registration.scope).pathname;   // always ends in "/"
 
 // Never touched: audio, the live rip stream, auth, health and the worker.

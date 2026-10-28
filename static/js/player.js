@@ -2506,6 +2506,7 @@
 
   // ---------- init ----------
   document.querySelectorAll(".ico[data-icon]").forEach((el) => { el.innerHTML = ICONS[el.dataset.icon] || ""; });
+  if (mode === "music") setSlot("search");   // the shelf opens with its search showing (not focused: no keyboard)
   $("back15Btn").innerHTML = ICONS.back15;
   $("fwd30Btn").innerHTML = ICONS.fwd30;
   renderSpeed();
