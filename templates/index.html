@@ -18,7 +18,7 @@
 </head>
 <body>
   <div class="app" id="app">
-    <aside class="sidebar">
+    <aside class="sidebar" data-depth="0">
       <!-- The library's one bar: Music or Podcasts, search, and + to add anything. -->
       <div class="lib-bar">
         <h1 class="lib-logo"><span aria-hidden="true">▰▰</span><span class="sr-only">Tapes</span></h1>
@@ -30,15 +30,14 @@
         <button class="bar-btn" id="dlToggle" type="button" aria-label="Add" aria-expanded="false" aria-controls="libSlot"><span class="ico" data-icon="plus"></span></button>
       </div>
 
-      <!-- The slot under the bar: search, or + with its two choices, the picked one
-           folding into the field. One field for both. Hidden until opened. -->
+      <!-- The slot under the bar: search, or +'s two choices folding into one field. -->
       <div class="slot" id="libSlot" data-mode="" hidden>
         <div class="slot-well">
           <div class="slot-choices" id="slotChoices"></div>
           <div class="slot-field">
             <span class="ico slot-ico" id="slotIco" data-icon="search"></span>
             <input class="slot-input" id="libSearch" type="search" aria-label="Search your library" autocomplete="off" enterkeyhint="search" tabindex="-1">
-            <button class="slot-act" id="slotAct" type="button" aria-label="Close" tabindex="-1"><span class="ico" data-icon="x"></span></button>
+            <button class="slot-act" id="slotAct" type="button" aria-label="Add" hidden><span class="ico" data-icon="arrowRight"></span></button>
           </div>
         </div>
       </div>
@@ -508,23 +507,20 @@
 
   <div class="menu" id="plMenu" role="menu" hidden></div>
 
-  <div class="modal-scrim" id="editModal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit track">
-      <div class="modal-head">Edit track</div>
+  <!-- Forms that open in a menu's slot, kept here while closed. -->
+  <div id="formHome" hidden>
+    <div class="form-card" id="editCard" role="group" aria-label="Edit track">
       <label class="modal-field">Title<input class="input" id="edTitle" autocomplete="off"></label>
       <label class="modal-field">Artist<input class="input" id="edArtist" autocomplete="off"></label>
       <label class="modal-field">Album<input class="input" id="edAlbum" autocomplete="off"></label>
       <label class="modal-field">Track #<input class="input" id="edTrackNo" type="number" min="1" autocomplete="off"></label>
       <div class="modal-actions">
+        <button class="btn btn-ghost edit-tidy" id="edTidy" type="button">Tidy up</button>
         <button class="btn btn-ghost" id="edCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="edSave" type="button">Save</button>
       </div>
     </div>
-  </div>
-
-  <div class="modal-scrim" id="albumModal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit album">
-      <div class="modal-head">Edit album</div>
+    <div class="form-card" id="albumCard" role="group" aria-label="Edit album">
       <label class="modal-field">Album<input class="input" id="alName" autocomplete="off"></label>
       <label class="modal-field">Artist for every song<input class="input" id="alArtist" placeholder="Leave blank to keep each song's artist" autocomplete="off"></label>
       <div class="modal-field">Cover
@@ -537,21 +533,6 @@
         <button class="btn btn-ghost" id="alCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="alSave" type="button">Save</button>
       </div>
-    </div>
-  </div>
-
-  <!-- The one sheet for a short piece of text (a link, a name): Cancel and the
-       action sit in its header; on phones it rises above the keyboard. Not a
-       <form>, so Chrome doesn't offer passwords and addresses above the keyboard. -->
-  <div class="modal-scrim ask-scrim" id="nameModal" hidden>
-    <div class="ask-sheet" id="nameForm" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
-      <div class="ask-head">
-        <button class="ask-btn" id="nameCancel" type="button">Cancel</button>
-        <div class="ask-title" id="nameTitle"></div>
-        <button class="ask-btn ask-ok" id="nameOk" type="button" disabled>Create</button>
-      </div>
-      <input class="ask-input" id="nameInput" aria-labelledby="nameTitle" aria-describedby="nameHelp" autocomplete="off" enterkeyhint="done">
-      <p class="ask-help" id="nameHelp" hidden></p>
     </div>
   </div>
 

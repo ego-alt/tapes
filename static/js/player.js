@@ -65,9 +65,8 @@
   // (Live once the page has set up: the layers below are defined further on.)
   const layers = () => [   // topmost first: [is it open?, close it]
     [() => !$("confirmModal").hidden, () => $("confirmCancel").click()],
-    [() => !$("nameModal").hidden, () => $("nameCancel").click()],
-    [() => !$("albumModal").hidden, () => $("alCancel").click()],
-    [() => !$("editModal").hidden, () => dismissEdit()],
+    [() => albumEditing, () => dismissAlbum()],
+    [() => !!editing, () => dismissEdit()],
     [() => !menu.hidden, closeMenu],
     [() => upnext.classList.contains("expanded"), () => upnext.classList.remove("expanded")],
     [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
@@ -94,48 +93,6 @@
     setTimeout(syncHistory, 0);
   });
   ["click", "keydown", "touchend"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncHistory, 0), true));
-
-  // The app's one sheet for a short piece of text (a name, a link): resolves the
-  // trimmed text, or null if cancelled. Rip, Follow, New tape and New show all
-  // use it, so adding anything looks and works the same. On phones it sits on
-  // top of the keyboard (the visual viewport shrinks; the layout one doesn't).
-  function askText(title, { ok = "Create", value = "", type = "text", placeholder = "Name", help = "" } = {}) {
-    return new Promise((resolve) => {
-      const modal = $("nameModal"), form = $("nameForm"), input = $("nameInput"), okBtn = $("nameOk");
-      $("nameTitle").textContent = title;
-      okBtn.textContent = ok;
-      $("nameHelp").textContent = help;
-      $("nameHelp").hidden = !help;
-      input.type = type;
-      input.placeholder = placeholder;
-      input.autocapitalize = type === "url" ? "off" : "sentences";
-      input.value = value;
-      okBtn.disabled = !value.trim();
-      input.oninput = () => { okBtn.disabled = !input.value.trim(); };
-      const vv = window.visualViewport;
-      const lift = () => { modal.style.setProperty("--kb", vv ? `${Math.max(0, innerHeight - vv.height - vv.offsetTop)}px` : "0px"); };
-      lift();
-      vv?.addEventListener("resize", lift);
-      modal.style.setProperty("--side-w", `${document.querySelector(".sidebar").getBoundingClientRect().width}px`);
-      modal.hidden = false;
-      input.focus();
-      syncHistory();
-      const done = (v) => {
-        modal.hidden = true;
-        vv?.removeEventListener("resize", lift);
-        form.onkeydown = input.oninput = okBtn.onclick = $("nameCancel").onclick = modal.onclick = null;
-        resolve(v);
-      };
-      const submit = () => { const v = input.value.trim(); if (v) done(v); };
-      okBtn.onclick = submit;
-      form.onkeydown = (e) => {
-        if (e.key === "Escape") { e.stopPropagation(); done(null); }
-        if (e.key === "Enter" && e.target === input) { e.preventDefault(); submit(); }
-      };
-      $("nameCancel").onclick = () => done(null);
-      modal.onclick = (e) => { if (e.target === modal) done(null); };
-    });
-  }
 
   // In-app confirm: resolves true/false. `danger` styles the OK button red.
   function askConfirm(text, { detail = "", ok = "OK", danger = false } = {}) {
@@ -368,7 +325,217 @@
   }
 
   // ---------- view switching ----------
+  // Going into a list, a dark slot opens under the tapped row with the list in it;
+  // row and slot rise until the row clicks into the bar. Back runs in reverse.
+  // Drawn with copies on a stage over the sidebar.
+  const LIST_TITLE = { tracks: "tapeTitle", browse: "browseTitle", episodes: "showTitle" };
+  const LIST_VIEW = { tracks: "tracksView", browse: "browseView", episodes: "episodesView" };
+  const LIST_ID = { shelf: "shelfList", podcasts: "showList", tracks: "trackList", browse: "browseList", episodes: "episodeList" };
+  let currentView = "shelf", currentShown = "shelf", pending = null;
+  const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const motionOff = () => libJumping || reducedMotion() || !Element.prototype.animate;
+  const rowLabel = (row) => row?.querySelector(".shelf-name, .browse-name");
+  const rowKey = (li) => li.dataset.id || li.dataset.job || "";   // a song, episode or download
+  const ease = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const surface = (which) => getComputedStyle(sidebar).getPropertyValue(which).trim();
+  const shutting = (extra) => ({ duration: parseFloat(ease("--dur-shut")), easing: ease("--ease-shut"), fill: "forwards", ...extra });   // every drawer closes alike
+  // A tall slot gets more time than a small one (with the square root of its
+  // height), so it never races: small ones keep the base time.
+  const forHeight = (h, base, most) => Math.round(Math.min(most, Math.max(base, base * 0.55 + 9.5 * Math.sqrt(h))));
+  // The shared spring (tokens.css); the detent curve where linear() isn't supported.
+  const SPRING = CSS.supports("animation-timing-function", "linear(0, 1)") ? ease("--ease-spring") : null;
+  const tick = () => { try { navigator.vibrate?.(10); } catch (_) { /* not on this device */ } };
+  // Where an element sits within the sidebar.
+  function inSidebar(el) {
+    const s = sidebar.getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { top: r.top - s.top, bottom: r.bottom - s.top, left: r.left - s.left, height: r.height };
+  }
+  const stripIds = (el) => { el.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); el.removeAttribute("id"); return el; };
+  const sidebarCopy = () => { const c = stripIds(sidebar.cloneNode(true)); c.classList.add("nav-copy"); return c; };
+  function listCopy(list) {
+    const c = stripIds(list.cloneNode(true));
+    c.style.cssText = `left:${list.offsetLeft}px;width:${list.offsetWidth}px;height:${list.offsetHeight}px`;
+    return c;
+  }
+  // Scroll positions, read before a swap and given to the copies.
+  const scrollsOf = (root) => [...root.querySelectorAll("ul")].map((u) => u.scrollTop);
+  const setScrolls = (root, v) => root.querySelectorAll("ul").forEach((u, i) => { u.scrollTop = v[i] || 0; });
+  // The stage: the sidebar above and below a row, with a well between.
+  function stage(copy, row) {
+    const s = sidebar.getBoundingClientRect(), r = inSidebar(row), scrolls = scrollsOf(sidebar);
+    const el = document.createElement("div");
+    el.className = "nav-stage";
+    el.style.cssText = `top:${s.top}px;left:${s.left}px;width:${s.width}px;height:${s.height}px`;
+    const belt = document.createElement("div"), well = document.createElement("div"), above = copy, below = copy.cloneNode(true);
+    belt.className = "nav-belt";
+    well.className = "nav-well";
+    well.style.top = `${r.bottom}px`;
+    well.style.right = edge();   // leave the sidebar's border showing
+    above.style.clipPath = `inset(0 0 calc(100% - ${r.bottom}px) 0)`;
+    below.style.clipPath = `inset(${r.bottom}px 0 0 0)`;
+    belt.append(above, below, well);
+    el.appendChild(belt);
+    document.body.appendChild(el);
+    setScrolls(above, scrolls);
+    setScrolls(below, scrolls);
+    // The label travels on top of everything as its own piece; the copy's is hidden.
+    const copyRow = above.querySelector("[data-nav-row]"), real = rowLabel(row), lr = inSidebar(real), cs = getComputedStyle(real);
+    const label = document.createElement("div");
+    label.className = "nav-label";
+    label.textContent = real.textContent;
+    label.style.cssText = `top:${lr.top}px;left:${lr.left}px;height:${lr.height}px;line-height:${lr.height}px;color:${cs.color};font-size:${cs.fontSize};font-weight:${cs.fontWeight}`;
+    belt.appendChild(label);
+    if (copyRow) rowLabel(copyRow).style.visibility = "hidden";
+    return { el, belt, well, above, below, r, label, rowBits: copyRow ? [...copyRow.children] : [] };
+  }
+  const centre = (r) => r.top + r.height / 2;
+  const edge = () => getComputedStyle(sidebar).borderRightWidth;
+  // A copy of a list's bar, its title hidden (the moving label stands in for it).
+  function barCopy(view, top) {
+    const c = stripIds($(LIST_VIEW[view]).querySelector(".list-bar").cloneNode(true));
+    c.classList.add("nav-bar-copy");
+    c.style.top = `${top}px`;
+    c.style.right = edge();
+    c.querySelector(".tape-title").style.visibility = "hidden";
+    return c;
+  }
+  // Back from a list with a drawer open (a menu, a form, its search) shuts that
+  // first, then leaves: inner slot, then outer.
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".back-btn");
+    const view = btn?.closest(".tracks-view, .browse-view, .episodes-view");
+    if (!view) return;
+    const search = view.querySelector(".search-wrap:not([hidden]) input");
+    const menuOpen = !menu.hidden && view.contains(menu);
+    if (!menuOpen && !search) return;
+    e.stopPropagation();
+    if (editing && Object.keys(editChanges()).length) { await dismissEdit(); if (editing) return; }
+    else if (albumEditing) { await dismissAlbum(); if (albumEditing) return; }
+    else if (menuOpen) closeMenu();
+    // A menu in the list rides along while it shuts (slideBack carries it); one
+    // under the bar, or a search, finishes shutting first.
+    const inList = menuOpen && [...view.querySelectorAll("ul")].some((u) => u.contains(menu));
+    if (search) closeSearch(search);
+    setTimeout(() => btn.click(), motionOff() ? 0 : inList && !search ? 90 : 190);
+  }, true);
+  // A tap opens the slot at once; the list follows when loaded.
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest(".sidebar .shelf-row, .sidebar .browse-row");
+    if (!row || motionOff() || e.target.closest("button")) return;
+    if (pending) { pending.st.el.remove(); pending = null; }
+    const slotH = slot.hidden ? 0 : slot.offsetHeight;   // an open search shuts as the row rises
+    row.dataset.navRow = "";
+    const st = stage(sidebarCopy(), row);
+    delete row.dataset.navRow;
+    st.well.style.background = surface("--surface-inner");
+    const h = sidebar.clientHeight - st.r.bottom;
+    const open = { duration: forHeight(h, 170, 260), easing: ease("--ease-slot"), fill: "forwards" };
+    st.well.animate([{ height: "0px" }, { height: `${h}px` }], open);
+    st.below.animate([{ transform: "none" }, { transform: `translateY(${h}px)` }], open);
+    // An open search shuts as the row rises: everything below it moves up with it.
+    if (slotH) {
+      const shut = shutting(), b = st.r.bottom;
+      [st.above, st.below].forEach((c) => c.querySelector(".slot")?.animate([{ height: `${slotH}px` }, { height: "0px" }], shut));
+      st.above.animate([{ clipPath: `inset(0 0 calc(100% - ${b}px) 0)` }, { clipPath: `inset(0 0 calc(100% - ${b - slotH}px) 0)` }], shut);
+      st.below.animate([{ clipPath: `inset(${b}px 0 0 0)` }, { clipPath: `inset(${b - slotH}px 0 0 0)` }], shut);
+      [st.well, st.label].forEach((el) => el.animate([{ translate: "0 0" }, { translate: `0 ${-slotH}px` }], shut));
+    }
+    const label = inSidebar(rowLabel(row));
+    pending = { st, label, slotH, h };
+    // Nothing came of it: close the slot again.
+    pending.timer = setTimeout(() => {
+      if (!pending || pending.st !== st) return;
+      pending = null;
+      const shut = shutting({ duration: forHeight(h, 200, 380) });
+      st.well.animate([{ height: `${h}px` }, { height: "0px" }], shut);
+      st.below.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], shut).finished.then(() => st.el.remove());
+    }, 2500);
+  }, true);
+
   function showView(name) {
+    const from = currentView;
+    currentView = name;
+    const forward = !!LIST_TITLE[name] && (!LIST_TITLE[from] || (from === "browse" && name === "tracks"));
+    const back = !forward && !!LIST_TITLE[from];
+    const p = pending;
+    pending = null;
+    if (p) clearTimeout(p.timer);
+    if (forward && p && !motionOff()) { riseInto(name, p); return; }
+    if (p) p.st.el.remove();
+    if (back && from !== name && !motionOff()) slideBack(from, name);
+    else applyView(name);
+  }
+  // Going in: the list fades into the slot, and row and slot rise, the label landing
+  // exactly on the title and the bar's controls gathering round it; the copies end
+  // pixel-identical to the real view, so the handover is invisible.
+  function riseInto(name, { st, label, slotH, h }) {
+    const fromBg = surface("--surface");
+    applyView(name);
+    const toBg = surface("--surface"), list = $(LIST_ID[name]), title = inSidebar($(LIST_TITLE[name]));
+    const dy = Math.round(centre(label) - slotH - centre(title)), dx = Math.round(title.left - label.left), L = inSidebar(list);
+    const rise = { duration: 420, delay: 60, easing: SPRING || ease("--ease-detent"), fill: "forwards" };
+    const inner = listCopy(list);
+    st.well.appendChild(inner);
+    inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: "ease-out" });
+    st.el.style.background = toBg;   // no gaps showing the view underneath
+    st.well.animate([{ top: `${st.r.bottom}px`, height: `${h}px` }, { top: `${L.top + dy + slotH}px`, height: `${sidebar.clientHeight - L.top}px` }],
+      { ...rise, easing: "ease-out", duration: 200 });
+    const bar = barCopy(name, inSidebar($(LIST_VIEW[name]).querySelector(".list-bar")).top + dy);
+    bar.style.background = fromBg;   // the row's colour: only the list goes darker
+    st.belt.insertBefore(bar, st.label);
+    bar.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: 200, fill: "both", easing: "ease-out" });
+    st.label.animate([{ transform: "none" }, { transform: `translateX(${dx}px)` }], rise);
+    st.label.animate([{ fontWeight: 400 }, { fontWeight: 600 }], { ...rise, easing: "ease-out", duration: 300 });
+    st.rowBits.forEach((c) => c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, delay: 60, fill: "forwards" }));
+    setTimeout(tick, 290);
+    st.belt.animate([{ transform: "none" }, { transform: `translateY(${-dy}px)` }], rise).finished.then(() => st.el.remove(), () => st.el.remove());
+  }
+  // Going back: the bar drops to its row carrying the list, then the slot closes.
+  function slideBack(from, name) {
+    const oldList = $(LIST_ID[from]), title = inSidebar($(LIST_TITLE[from])), L = inSidebar(oldList);
+    const text = $(LIST_TITLE[from]).textContent.trim(), barTop = inSidebar($(LIST_VIEW[from]).querySelector(".list-bar")).top;
+    // A drawer still shutting in the list goes along in the copy, finishing as it travels.
+    const halfShut = !menu.hidden || !oldList.contains(menu) ? 0 : menu.getBoundingClientRect().height;
+    const leaving = listCopy(oldList), scroll = oldList.scrollTop, fromBg = surface("--surface"), bar = barCopy(from, 0);
+    const copyMenu = halfShut && leaving.querySelector(".menu");
+    if (copyMenu) {
+      copyMenu.removeAttribute("hidden");
+      copyMenu.animate([{ height: `${halfShut}px` }, { height: "0px" }], shutting({ duration: 120 }));
+    }
+    applyView(name);
+    const row = [...$(LIST_ID[name]).querySelectorAll(".shelf-row, .browse-row")].find((x) => rowLabel(x)?.textContent.trim() === text);
+    if (!row) return;   // nothing to land on: just the swap
+    row.dataset.navRow = "";
+    const st = stage(sidebarCopy(), row);
+    delete row.dataset.navRow;
+    const label = inSidebar(rowLabel(row)), dy = Math.round(centre(label) - centre(title)), dx = Math.round(title.left - label.left), h = sidebar.clientHeight - L.top;
+    Object.assign(st.well.style, { top: `${L.top + dy}px`, height: `${h}px`, background: fromBg });
+    st.el.style.background = surface("--surface");
+    st.well.appendChild(leaving);
+    leaving.scrollTop = scroll;
+    bar.style.top = `${barTop + dy}px`;
+    bar.style.background = surface("--surface");
+    st.belt.insertBefore(bar, st.label);
+    const drop = { duration: 420, easing: SPRING || ease("--ease-detent"), fill: "both" };
+    const shut = shutting({ delay: 160, duration: forHeight(h, 200, 380), fill: "both" });
+    bar.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: "both", easing: "ease-in" });
+    st.belt.animate([{ transform: `translateY(${-dy}px)` }, { transform: "none" }], drop);
+    st.well.animate([{ height: `${h}px` }, { height: "0px" }], shut);
+    // The list is drawn up and fades early, so a tall slot reads as a dark band closing.
+    leaving.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(-16px)", opacity: 0 }], { ...shut, duration: shut.duration * 0.6 });
+    st.label.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], drop);
+    st.label.animate([{ fontWeight: 600 }, { fontWeight: 400 }], { duration: 300, easing: "ease-out", fill: "both" });
+    st.rowBits.forEach((c) => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, delay: 120, fill: "both" }));
+    setTimeout(tick, 240);
+    st.below.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], shut).finished.then(() => st.el.remove(), () => st.el.remove());
+  }
+  // Each list remembers its scroll position for coming back.
+  const scrollMem = {};
+  const scrollKey = (v) => `${v}|${LIST_TITLE[v] ? $(LIST_TITLE[v]).textContent : ""}`;
+  function applyView(name) {
+    const was = currentShown, oldList = was && $(LIST_ID[was]);
+    if (oldList && oldList.offsetParent) scrollMem[scrollKey(was)] = oldList.scrollTop;
+    currentShown = name;
     $("shelfView").hidden = name !== "shelf";
     $("browseView").hidden = name !== "browse";
     $("tracksView").hidden = name !== "tracks";
@@ -376,7 +543,12 @@
     $("episodesView").hidden = name !== "episodes";
     // Inside a tape, a browse list or a show, its own bar replaces the library's.
     sidebar.classList.toggle("in-list", name === "tracks" || name === "browse" || name === "episodes");
+    // Depth: each level in is a step darker.
+    sidebar.dataset.depth = name === "browse" || name === "episodes" ? 1
+      : name === "tracks" ? (trackParent === "albums" || trackParent === "artists" ? 2 : 1) : 0;
     if (sidebar.classList.contains("in-list") && !libJumping) closeSlot();   // (a library search closes it itself, after moving its text across)
+    const back = scrollMem[scrollKey(name)];
+    if (back != null) $(LIST_ID[name]).scrollTop = back;
     syncHistory();
   }
 
@@ -508,9 +680,7 @@
     el.innerHTML = "";
     if (!data.shows.length && !data.loose_count) {
       el.innerHTML = `<div class="first-run"><p class="first-run-title">No shows yet.</p>
-        <p class="first-run-body">Follow one with its RSS or YouTube link.</p>
-        <div class="first-run-actions"><button class="btn btn-primary" type="button">Follow a podcast</button></div></div>`;
-      el.querySelector("button").addEventListener("click", () => addFromLink("podcasts"));
+        <p class="first-run-body">Follow one with its RSS or YouTube link.</p></div>`;
       return;
     }
     data.shows.forEach((s) => {
@@ -569,7 +739,8 @@
     const d = new Date(iso);
     return isNaN(d) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   }
-  function renderEpisodes(list) {
+  function renderEpisodes(list) { renderEpisodeRows(list); keepMenu($("episodeList")); }
+  function renderEpisodeRows(list) {
     const el = $("episodeList");
     el.innerHTML = "";
     if (!list.length) {
@@ -626,20 +797,11 @@
       b.classList.toggle("active", b.dataset.f === epFilter));
   }
   // ---- per-episode menu (assign to show / remove download / delete) ----
-  function placeAtClick(e) {
-    const pad = 8, mh = menu.offsetHeight;
-    const flipUp = e.clientY + mh > window.innerHeight - pad;
-    const flipLeft = e.clientX + menu.offsetWidth > window.innerWidth - pad;
-    placeMenu(menu, flipUp ? e.clientY - mh : e.clientY, e.clientX,
-      `${flipUp ? "bottom" : "top"} ${flipLeft ? "right" : "left"}`);
-  }
   function openEpisodeMenu(e, ep) {
-    menu.dataset.for = "ep" + ep.id;
-    menu.innerHTML = "";
-    menu.appendChild(menuHead(ep.title));
-    // Unsorted episodes can be moved into a show (in-place picker — see submenuItem).
+    if (!beginMenu("ep" + ep.id)) return;
+    // Unsorted episodes can be moved into a show (an in-place picker).
     if (ep.show_id == null)
-      menu.appendChild(submenuItem("Move to show…", () => openAssignMenu(e, ep)));
+      menu.appendChild(menuItem("Move to show…", () => openAssignMenu(e, ep)));
     if (ep.status === "ready")
       menu.appendChild(menuItem("Remove download", () => removeDownload(ep), closeMenu));
     // A followed show's feed would bring a deleted episode back on the next
@@ -653,14 +815,10 @@
   async function openAssignMenu(e, ep) {
     if (!showsData) { try { showsData = await jget("api/podcast/shows"); } catch (_) { /* ignore */ } }
     menu.innerHTML = "";
-    menu.appendChild(menuHead(`Move “${ep.title}” to…`));
     (showsData?.shows || []).forEach((s) =>
       menu.appendChild(menuItem(s.title, () => assignEpisode(ep, { show_id: s.id }), closeMenu)));
     menu.appendChild(menuSep());
-    menu.appendChild(menuItem("New show…", async () => {
-      const name = await askText("New show");
-      if (name) assignEpisode(ep, { new_show_name: name });
-    }, closeMenu));
+    menu.appendChild(menuItem("New show…", () => askInMenu("Add show", (name) => assignEpisode(ep, { new_show_name: name }))));
     showMenuAt(e);
   }
   async function assignEpisode(ep, body) {
@@ -840,7 +998,8 @@
     };
   }
 
-  function renderTracks(list) {
+  function renderTracks(list) { renderTrackRows(list); keepMenu($("trackList")); }
+  function renderTrackRows(list) {
     const el = $("trackList");
     el.innerHTML = "";
     if (!list.length) {
@@ -855,6 +1014,12 @@
     // Drag-reorder only makes sense (and persists) for a user tape, and only
     // when the list isn't filtered by a search.
     const reorderable = !!(currentTape && currentTape.kind === "user") && !$("search").value.trim();
+    // The second line shows only what the header doesn't: nothing in an album
+    // (bar a compilation's other artists), the album in an artist, else the artist.
+    const inAlbum = !currentTape && trackParent === "albums", inArtist = !currentTape && trackParent === "artists";
+    const counts = {};
+    if (inAlbum) view.forEach((t) => { if (t.artist) counts[t.artist] = (counts[t.artist] || 0) + 1; });
+    const albumArtist = Object.keys(counts).sort((x, y) => counts[y] - counts[x])[0];
     const makeRow = (t, i) => {
       const li = document.createElement("li");
       li.tabIndex = 0;   // reachable by Tab; Enter opens or plays it
@@ -868,12 +1033,14 @@
       li.querySelector(".tl-title").textContent = t.title;
       li.querySelector(".tl-title").title = t.title;   // full text on hover
       const sub = li.querySelector(".tl-sub");
-      if (t.artist) sub.textContent = [t.artist, t.album].filter(Boolean).join(" · ");
-      else {
+      if (inArtist) sub.textContent = t.album || "";
+      else if (t.artist) sub.textContent = inAlbum && t.artist === albumArtist ? "" : t.artist;
+      else if (!inAlbum || albumArtist) {
         const u = document.createElement("span");
         u.className = "unknown"; u.textContent = "Unknown artist";
-        sub.append(u, t.album ? ` · ${t.album}` : "");
+        sub.append(u);
       }
+      if (!sub.textContent) sub.remove();
       if (t.issues && t.issues.length) {
         const chips = document.createElement("div");
         chips.className = "tl-issues";
@@ -1035,7 +1202,6 @@
       c.setAttribute("r", Math.max(0, rr));
       c.setAttribute("visibility", rr > CORE ? "visible" : "hidden");
     });
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
     // A skip or seek spins the reels fast for a moment, like fast-forward or
     // rewind, even while paused; `playing` is whether the tape itself runs.
     const WHIR_MS = 450, WHIR_SPEED = 14;
@@ -1055,7 +1221,7 @@
       last = t;
       const [rL, rR] = setPacks();
       const whir = Math.max(0, (whirEnd - t) / WHIR_MS);   // 1 → 0 as the whir dies away
-      if (!still.matches) {
+      if (!reducedMotion()) {
         const rate = (playing ? audio.playbackRate || 1 : 0) + whirDir * WHIR_SPEED * whir * whir;
         const speed = TAPE_SPEED * rate * dt;
         angL = (angL + (speed / rL) * 180 / Math.PI) % 360;
@@ -1070,7 +1236,7 @@
       start() { playing = true; run(); },
       stop() { playing = false; setPacks(); },
       /** dir: 1 forward (next, seek ahead), -1 back. */
-      whir(dir) { if (still.matches || !dir) return; whirDir = Math.sign(dir); whirEnd = performance.now() + WHIR_MS; run(); },
+      whir(dir) { if (reducedMotion() || !dir) return; whirDir = Math.sign(dir); whirEnd = performance.now() + WHIR_MS; run(); },
       sync: setPacks,
     };
   })();
@@ -1393,16 +1559,31 @@
 
   // ---------- track edit / delete ----------
   let editing = null;
-  function openEdit(t) {
+  // The form opens in place of the song's menu, or under its download row.
+  function openEdit(t, row) {
+    if (row && !beginMenu("edit" + t.id)) { editing = null; return; }
+    if (!row) clearMenu();
+    fillEdit(t);
+    menu.appendChild($("editCard"));
+    if (row) openMenuUnder(row);
+    setTimeout(() => $("edTitle").focus({ preventScroll: true }), row ? 230 : 0);
+  }
+  function fillEdit(t) {
     editing = t;
     $("edTitle").value = t.title || "";
     $("edArtist").value = t.artist || "";
     $("edAlbum").value = t.album || "";
     $("edTrackNo").value = t.track_no == null ? "" : t.track_no;
-    $("editModal").hidden = false;
-    $("edTitle").focus();
   }
-  function closeEdit() { $("editModal").hidden = true; editing = null; }
+  function closeEdit() { editing = null; closeMenu(); }
+  // Tidy up fills the form with the cleaned details.
+  $("edTidy").addEventListener("click", async () => {
+    if (!editing) return;
+    const id = editing.id;
+    try { await tidy([id]); } catch (e) { console.error(e); toast(errText(e, "Couldn't tidy that song.")); return; }
+    const t = view.find((x) => x.id === id);
+    if (t && editing) fillEdit(t);
+  });
   // Tapping outside or Escape with unsaved changes asks first; Cancel doesn't.
   async function dismissEdit() {
     if (editing && Object.keys(editChanges()).length
@@ -1511,30 +1692,33 @@
     if (name && name !== album) toast(`Renamed album to “${r.album}”`);
     return r;
   }
-  let albumCoverFile = null;
+  let albumCoverFile = null, albumEditing = false;
+  // Opens in place of the album bar's ⋯ menu.
   function editAlbum() {
+    clearMenu();
+    albumEditing = true;
     const album = $("tapeTitle").textContent;
     $("alName").value = album;
     $("alArtist").value = "";
     albumCoverFile = null;
     const withCover = view.find((t) => t.has_cover);
     if (withCover) $("alCoverPreview").src = coverUrl(withCover.id); else $("alCoverPreview").removeAttribute("src");
-    $("albumModal").hidden = false;
-    $("alName").focus();
+    menu.appendChild($("albumCard"));
+    $("alName").focus({ preventScroll: true });
   }
   $("alCover").addEventListener("change", () => {
     albumCoverFile = $("alCover").files[0] || null;
     if (albumCoverFile) $("alCoverPreview").src = URL.createObjectURL(albumCoverFile);
   });
-  const closeAlbum = () => { $("albumModal").hidden = true; $("alCover").value = ""; };
+  const closeAlbum = () => { albumEditing = false; $("alCover").value = ""; closeMenu(); };
   $("alCancel").addEventListener("click", closeAlbum);
-  $("albumModal").addEventListener("click", async (e) => {
-    if (e.target !== $("albumModal")) return;
+  // Escape or back with unsaved changes asks first; Cancel doesn't.
+  async function dismissAlbum() {
     const dirty = $("alName").value.trim() !== $("tapeTitle").textContent.trim()
       || $("alArtist").value.trim() || albumCoverFile;
     if (dirty && !(await askConfirm("Discard your changes?", { ok: "Discard", danger: true }))) return;
     closeAlbum();
-  });
+  }
   $("alSave").addEventListener("click", async () => {
     const album = $("tapeTitle").textContent;
     const name = $("alName").value.trim();
@@ -1554,80 +1738,108 @@
     } catch (e) { console.error(e); toast(errText(e, "Couldn't save the album.")); }
   });
 
-  // ---------- popover menus (add-to-tape, deck settings) ----------
-  // Measure-then-clamp into the viewport; the caller picks the tentative top/left
-  // and the grow-from corner. Shared by both menus.
-  function placeMenu(el, top, left, origin) {
-    const pad = 8, mw = el.offsetWidth;
-    el.style.top = Math.max(pad, top) + "px";
-    el.style.left = Math.min(Math.max(pad, left), window.innerWidth - mw - pad) + "px";
-    el.style.transformOrigin = origin;
-  }
+  // Without `close`, the menu stays open (it becomes a sub-picker or a form); the
+  // click mustn't then reach the close-on-outside handler.
   function menuItem(label, fn, close) {
     const item = document.createElement("div");
     item.className = "menu-item";
     item.setAttribute("role", "menuitem");
     item.tabIndex = -1;
     item.textContent = label;
-    item.addEventListener("click", () => { fn(); close(); });
+    item.addEventListener("click", (ev) => { if (!close) ev.stopPropagation(); fn(); close?.(); });
     return item;
-  }
-  // A menu item that swaps the menu in place for a sub-picker. Its click must NOT
-  // bubble to the close-on-outside handler (the rebuild detaches this element,
-  // which would otherwise read as an outside click and close the menu).
-  function submenuItem(label, opener) {
-    const item = document.createElement("div");
-    item.className = "menu-item";
-    item.setAttribute("role", "menuitem");
-    item.tabIndex = -1;
-    item.textContent = label;
-    item.addEventListener("click", (ev) => { ev.stopPropagation(); opener(); });
-    return item;
-  }
-  // Shown as the bottom sheet's title on phones (which song this menu is for).
-  function menuHead(text) {
-    const h = document.createElement("div");
-    h.className = "menu-head";
-    h.textContent = text;
-    return h;
   }
   function menuSep() {
     const s = document.createElement("div");
     s.className = "menu-sep";
     return s;
   }
-  // In the library a menu opens as a slot under the row or bar it came from, like
-  // + and search; anywhere else (Up Next) it's a popover at the click.
+  // ---------- menus ----------
+  // A menu opens as a slot under its row or bar, aligned to the row's title. An
+  // open one slides shut first.
+  let menuWait = 0;
+  const formHome = $("formHome");
+  // Forms go back home before the menu is reused.
+  function clearMenu() {
+    menu.querySelectorAll(".form-card").forEach((f) => formHome.appendChild(f));
+    menu.innerHTML = "";
+  }
+  // Starts a menu; false (closing it) if it's already open.
+  function beginMenu(key) {
+    menuWait = 0;
+    if (!menu.hidden && menu.dataset.for === String(key)) { closeMenu(); return false; }
+    if (!menu.hidden && menu.isConnected) {
+      const shutting = stripIds(menu.cloneNode(true));
+      shutting.classList.add("steady");   // no opening animation
+      menu.replaceWith(shutting);
+      requestAnimationFrame(() => { shutting.hidden = true; });
+      setTimeout(() => shutting.remove(), 260);
+      menuWait = reducedMotion() ? 0 : 200;
+    }
+    menu.hidden = true;
+    menu.dataset.for = key;
+    clearMenu();
+    // One drawer at a time; a list search with text stays (it's the list's results).
+    closeSlot();
+    document.querySelectorAll(".search-wrap:not([hidden]) input").forEach((i) => { if (!i.value) closeSearch(i); });
+    return true;
+  }
   function showMenuAt(e) {
-    if (menu.contains(e.target) && menu.classList.contains("inline")) { menu.hidden = false; return; }   // a sub-picker, in place
-    const anchor = e.target.closest?.(".sidebar li, .sidebar .list-bar, .sidebar .lib-bar");
-    if (anchor) { openMenuUnder(anchor); return; }
-    if (menu.classList.contains("inline") || !menu.isConnected) { menu.classList.remove("inline"); document.body.appendChild(menu); }
-    menu.hidden = false;
-    placeAtClick(e);
+    if (menu.contains(e.target)) { menu.hidden = false; return; }   // a sub-picker, in place
+    openMenuUnder(e.target.closest(".sidebar li, .sidebar .list-bar"));
   }
   function openMenuUnder(anchor) {
-    if (menu.previousElementSibling !== anchor) anchor.after(menu);
-    menu.classList.add("inline");
-    menu.removeAttribute("style");   // a popover's placement
-    menu.hidden = false;
-    requestAnimationFrame(() => menu.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    if (!anchor) return;
+    const open = () => {
+      anchor.after(menu);
+      menu.dataset.row = rowKey(anchor);
+      const title = anchor.querySelector(".tl-meta, .shelf-name, .browse-meta, .dl-meta, .tape-title");
+      const edge = anchor.parentElement.getBoundingClientRect().left;   // the menu runs edge to edge
+      menu.style.setProperty("--menu-indent", title ? `${Math.round(title.getBoundingClientRect().left - edge)}px` : "");
+      menu.hidden = false;
+      requestAnimationFrame(() => menu.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    };
+    const wait = menuWait;
+    menuWait = 0;
+    if (wait) setTimeout(open, wait); else open();
+  }
+  // A redrawn list keeps its open menu under the same row.
+  function keepMenu(list) {
+    if (menu.hidden || menu.isConnected || !menu.dataset.row) return;
+    const row = [...list.children].find((li) => rowKey(li) === menu.dataset.row);
+    if (!row) { closeMenu(); return; }
+    menu.classList.add("steady");
+    row.after(menu);
+    requestAnimationFrame(() => menu.classList.remove("steady"));
+  }
+  // A menu that needs a name (New show…) becomes a field.
+  // A field's → shows once there's something to add (its trigger closes it, so no ×).
+  const syncAct = (act, go) => { act.hidden = !go; };
+  function askInMenu(hint, done) {
+    menu.innerHTML = `<div class="slot-field"><span class="ico slot-ico">${ICONS.podcast}</span><input class="slot-input" type="text" autocapitalize="sentences" enterkeyhint="done" autocomplete="off"><button class="slot-act" type="button" aria-label="Add" hidden>${ICONS.arrowRight}</button></div>`;
+    const input = menu.querySelector("input"), act = menu.querySelector(".slot-act");
+    input.placeholder = hint;
+    input.setAttribute("aria-label", hint);
+    const submit = () => { const v = input.value.trim(); if (v) { closeMenu(); done(v); } };
+    input.addEventListener("input", () => syncAct(act, !!input.value.trim()));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); submit(); }
+      if (ev.key === "Escape") { ev.stopPropagation(); closeMenu(); }
+    });
+    act.addEventListener("click", (ev) => { ev.stopPropagation(); submit(); });
+    input.focus({ preventScroll: true });
   }
 
   // ---------- add-to-tape menu ----------
   const menu = $("plMenu");
   function openMenu(e, t) {
-    menu.dataset.for = t.id;
-    menu.innerHTML = "";
-    menu.appendChild(menuHead(t.title));
+    if (!beginMenu(t.id)) return;
     // On a tape, taking a song off the tape comes first; deleting it from the
     // whole library is the rare, separate action below the divider.
     if (currentTape && currentTape.kind === "user") {
       menu.appendChild(menuItem("Remove from tape", () => removeFromTape(t), closeMenu));
     }
-    menu.appendChild(menuItem("Edit details…", () => openEdit(t), closeMenu));
-    menu.appendChild(menuItem("Tidy up", () => tidy([t.id]).catch((e) => toast(errText(e, "Couldn't tidy that song."))), closeMenu));
-    menu.appendChild(menuSep());
+    menu.appendChild(menuItem("Edit…", () => openEdit(t)));
     menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
     showMenuAt(e);
   }
@@ -1643,9 +1855,7 @@
   // "Add to…" picker (the + button): the queue, or any tape. Distinct dataset key
   // so it doesn't clash with the ⋯ more-menu's open/close toggle on the same row.
   function openAddMenu(e, t) {
-    menu.dataset.for = "add" + t.id;
-    menu.innerHTML = "";
-    menu.appendChild(menuHead(`Add “${t.title}” to…`));
+    if (!beginMenu("add" + t.id)) return;
     menu.appendChild(menuItem("Queue", () => addToQueue(t), closeMenu));
     const tapes = shelf.filter((s) => s.kind === "user");
     if (tapes.length) {
@@ -1660,25 +1870,28 @@
     }
     showMenuAt(e);
   }
-  const closeMenu = () => { menu.hidden = true; delete menu.dataset.for; };
-  document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+  const closeMenu = () => {
+    menu.hidden = true;
+    delete menu.dataset.for;
+    editing = null; albumEditing = false;
+    setTimeout(() => { if (menu.hidden) clearMenu(); }, 260);   // after it slides shut
+  };
+  // A tap elsewhere closes a menu, but not a form.
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !menu.contains(e.target) && !menu.querySelector(".form-card")) closeMenu();
+  });
 
-  // ---------- the library's bars: + to add, a list's ⋯, search on demand ----------
-  // A list's ⋯ opens the shared menu as a slot under its bar; the same button
-  // again closes it.
-  function openBarMenu(btn, title, items) {
-    if (!menu.hidden && menu.dataset.for === btn.id) { closeMenu(); return; }
-    menu.dataset.for = btn.id;
-    menu.innerHTML = "";
-    menu.appendChild(menuHead(title));
-    items.forEach((it) => menu.appendChild(it ? menuItem(it[0], it[1], closeMenu) : menuSep()));
-    openMenuUnder(btn.closest(".list-bar, .lib-bar"));
+  // ---------- the bars: + to add, a list's ⋯, search ----------
+  function openBarMenu(btn, items) {
+    if (!beginMenu(btn.id)) return;
+    // Items marked to stay open (Edit album…) turn the menu into a form.
+    items.forEach((it) => menu.appendChild(!it ? menuSep() : menuItem(it[0], it[1], it[2] ? null : closeMenu)));
+    openMenuUnder(btn.closest(".list-bar"));
     syncHistory();
   }
   // ---------- the slot under the library bar ----------
-  // Search and + share one recessed slot. Search opens it as a field; + opens it
-  // with the two things you can add on this tab, and the one picked folds into
-  // the field ("Paste link", "Add tape"). Enter or → adds it, × or Escape closes.
+  // Search and + share one slot: search is a field; + offers two choices, and the
+  // picked one folds into the field.
   const slot = $("libSlot"), slotInput = $("libSearch");
   const SLOT_FIELDS = {
     search: { hint: "Search your library", icon: "search", type: "search", key: "search" },
@@ -1696,7 +1909,7 @@
     $("libSearchBtn").setAttribute("aria-expanded", String(m === "search"));
     $("dlToggle").setAttribute("aria-expanded", String(!!m && m !== "search"));
     const f = SLOT_FIELDS[m];
-    slotInput.tabIndex = $("slotAct").tabIndex = f ? 0 : -1;
+    slotInput.tabIndex = f ? 0 : -1;
     if (f) {
       slotInput.type = f.type;
       slotInput.placeholder = f.hint;
@@ -1708,13 +1921,9 @@
     }
     syncHistory();
   }
-  function syncSlotAct() {   // × closes; once there's something to add, → adds it
-    const go = slot.dataset.mode !== "search" && !!slotInput.value.trim();
-    $("slotAct").innerHTML = ICONS[go ? "arrowRight" : "x"];
-    $("slotAct").setAttribute("aria-label", go ? "Add" : "Close");
-    $("slotAct").classList.toggle("go", go);
-  }
+  const syncSlotAct = () => syncAct($("slotAct"), slot.dataset.mode !== "search" && !!slotInput.value.trim());
   function openSlot(m) {
+    closeMenu();
     slotInput.value = "";
     setSlot(m);
     slotInput.focus({ preventScroll: true });
@@ -1742,6 +1951,7 @@
       });
       box.appendChild(b);
     });
+    closeMenu();
     setSlot("choose");
   }
   async function submitSlot() {
@@ -1761,14 +1971,14 @@
     if (e.key === "Enter" && slot.dataset.mode !== "search") { e.preventDefault(); submitSlot(); }
   });
   $("slotChoices").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); closeSlot(); } });
-  $("slotAct").addEventListener("click", () => ($("slotAct").classList.contains("go") ? submitSlot() : closeSlot()));
+  $("slotAct").addEventListener("click", submitSlot);
   // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
   function tapeMenuItems() {
     const sorts = currentTape?.sortable
       ? SORTS.map(([k, label]) => [k === currentSort ? `${label}  ✓` : label, () => setSort(k)]) : [];
     const acts = [];
     if (currentTape?.key === "tidy") acts.push(["Tidy all", tidyAll]);
-    if (!currentTape && trackParent === "albums") acts.push(["Edit album…", editAlbum]);
+    if (!currentTape && trackParent === "albums") acts.push(["Edit album…", editAlbum, true]);
     if (currentTape?.kind === "user") acts.push(["Delete tape", deleteCurrentTape]);
     return sorts.length && acts.length ? [...sorts, null, ...acts] : [...sorts, ...acts];
   }
@@ -1780,11 +1990,11 @@
   }
   $("tapeMoreBtn").addEventListener("click", (e) => {
     e.stopPropagation();
-    openBarMenu(e.currentTarget, $("tapeTitle").textContent, tapeMenuItems());
+    openBarMenu(e.currentTarget, tapeMenuItems());
   });
   $("showMoreBtn").addEventListener("click", (e) => {
     e.stopPropagation();
-    openBarMenu(e.currentTarget, $("showTitle").textContent, [
+    openBarMenu(e.currentTarget, [
       showActions.refreshable && ["Check for new episodes", refreshCurrentShow],
       showActions.deletable && [currentShow?.refreshable ? "Unfollow" : "Delete show", deleteCurrentShow],
     ].filter(Boolean));
@@ -1792,6 +2002,7 @@
   // Search stays out of the way until its magnifier is tapped; closing it clears it.
   const searchBtn = (input) => document.querySelector(`[data-search="${input.id}"]`);
   function openSearch(input) {
+    closeMenu();
     input.closest(".search-wrap").hidden = false;
     searchBtn(input)?.setAttribute("aria-expanded", "true");
     input.focus();
@@ -1900,6 +2111,7 @@
     jobs.forEach((j) => {
       const li = document.createElement("li");
       li.className = "dl-job " + j.status;
+      li.dataset.job = j.id;
       if (j.status === "queued" || j.status === "running") {
         li.innerHTML = `<div class="dl-msg"></div>
           <div class="dl-bar"><div class="dl-bar-fill" style="width:${j.progress}%"></div></div>`;
@@ -1928,7 +2140,7 @@
           if (j.outcome === "added") {
             const edit = document.createElement("button");
             edit.className = "btn btn-ghost dl-act"; edit.textContent = "Edit";
-            edit.addEventListener("click", () => openEdit(j.track));
+            edit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(j.track, li); });
             actions.appendChild(edit);
           }
         }
@@ -1940,6 +2152,7 @@
       }
       el.appendChild(li);
     });
+    keepMenu(el);
     summariseDl();
     if (jobs.some((j) => j.status === "queued" || j.status === "running")) openDlStream();
   }
@@ -2228,8 +2441,7 @@
   $("modePods").addEventListener("click", () => setMode("podcasts"));
   $("edCancel").addEventListener("click", closeEdit);
   $("edSave").addEventListener("click", saveEdit);
-  $("editModal").addEventListener("click", (e) => { if (e.target === $("editModal")) dismissEdit(); });
-  $("editModal").addEventListener("keydown", (e) => {
+  $("editCard").addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
   });
   $("epBack").addEventListener("click", () => showView("podcasts"));
@@ -2442,7 +2654,8 @@
     seekTo(Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("editModal").hidden && $("confirmModal").hidden) { dismissEdit(); return; }
+    if (e.key === "Escape" && editing && $("confirmModal").hidden) { dismissEdit(); return; }
+    if (e.key === "Escape" && albumEditing && $("confirmModal").hidden) { dismissAlbum(); return; }
     if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden;

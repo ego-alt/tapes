@@ -33,7 +33,7 @@ Eight designs, all in one palette of red, orange, mustard and brown on cream: th
 
 - **The deck**: scrubber, shuffle and repeat, an Up Next queue you can reorder (a queued song plays next), lock-screen controls that show the cassette, and your queue resumes across devices. The reels whir on a skip or seek, and a new tape ejects the old one.
 - **Keep playing**: when a tape or album runs out, related songs follow (ones you play together, the same artists, your favourites) and the tape turns over to side B.
-- **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling. Levelling can be turned off in the deck's ⋯ menu.
+- **Gapless and levelled**: songs join without a gap (each MP3's encoder delay and padding are trimmed, on one continuous stream), and every song plays at the same loudness: EBU R128, with album gain when an album plays in order and a clip-safe ceiling.
 - **Your library**: All Tracks (sortable), Singles, Albums, Artists, your own tapes, and search across everything.
 - **Rip** any link to MP3 with `yt-dlp` and `ffmpeg`; a playlist link becomes a new tape. Duplicates are caught by URL and by acoustic fingerprint.
 - **Tidy tags**: titles and artists are cleaned on rip and refined by Claude (Haiku) when a key is set. Rips from an album playlist (the artist's own, a "Full Album" upload, or a YouTube Music album) get the album, track number and year. Cover art comes from MusicBrainz when there's a confident match.

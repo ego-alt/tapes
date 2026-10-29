@@ -29,13 +29,17 @@
     /* Motion */
     --dur-base: 0.2s;
     --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-slot: cubic-bezier(0.2, 0.8, 0.2, 1);   /* the slot: quick start, soft landing */
+    --ease-slot: cubic-bezier(0.2, 0.8, 0.2, 1);    /* quick start, soft landing */
+    --ease-detent: cubic-bezier(0.3, 1.2, 0.5, 1);  /* a slight overshoot, then settles */
+    --ease-shut: cubic-bezier(0.4, 0, 0.2, 1);      /* a drawer closing */
+    --ease-spring: linear(0, 0.036, 0.121, 0.233, 0.353, 0.47, 0.578, 0.673, 0.754, 0.821, 0.874, 0.915, 0.947, 0.97, 0.986, 0.997, 1.004, 1.009, 1.011, 1.011, 1.011, 1.01, 1.009, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1.001, 1.001, 1);   /* opening: clicks into place with a slight settle */
+    --dur-open: 320ms;                              /* a drawer opening (the spring's settle included) */
+    --dur-shut: 200ms;                              /* how long a drawer takes to close */
 
     --color-bg-base: #282828;
     --color-bg-elevated: #3c3836;
-    --color-bg-pane: #151515;          /* the library sidebar: near-black, like calendar's drawers */
+    --color-bg-pane: #191919;          /* the library sidebar: near-black, like calendar's drawers */
     --color-bg-inset: rgba(40, 40, 40, 0.5);
-    --color-bg-inset-soft: rgba(40, 40, 40, 0.3);
     --color-bg-overlay: rgba(40, 40, 40, 0.85);
     --color-border: #504945;
     --color-border-soft: rgba(80, 73, 69, 0.5);
@@ -47,15 +51,17 @@
     --color-danger: #cc241d;
     --color-danger-hover: #fb4934;
     --color-highlight-soft: rgba(235, 219, 178, 0.05);
-    --color-shadow-soft: rgba(0, 0, 0, 0.2);
     --color-shadow: rgba(0, 0, 0, 0.35);
 
-    /* Recessed fields (the slot under the library bar, list searches): a dark
-       well, shaded along the top inside edge, lit along the bottom. */
-    --color-recess: #101010;
-    --color-recess-shade: rgba(0, 0, 0, 0.55);
+    /* Recessed wells: shaded along the top, lit along the bottom. */
+    /* Depth: each level in, and each slot within a level, is a step darker. */
+    --color-depth-1: #121212;
+    --color-depth-2: #0b0b0b;
+    --color-depth-3: #050505;
+    --color-recess-shade: rgba(0, 0, 0, 0.9);
     --color-recess-rim-top: rgba(0, 0, 0, 0.95);
     --color-recess-rim-bottom: rgba(255, 255, 255, 0.10);
+    --color-well-lip: rgba(255, 255, 255, 0.2);      /* the lit lip at a slot's foot (brighter than a bar's seam) */
 
     /* component tokens — derived from the palette above */
     --scrubber-track: var(--color-border);

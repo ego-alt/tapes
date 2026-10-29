@@ -24,14 +24,21 @@ body {
 .sidebar {
     width: 320px;
     flex-shrink: 0;
-    background: var(--color-bg-pane);
+    --surface: var(--color-bg-pane);         /* this level */
+    --surface-inner: var(--color-depth-1);   /* a slot or menu within it */
+    background: var(--surface);
     border-right: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
-    transition: width 0.25s ease, transform 0.25s ease;
+    transition: width 0.18s var(--ease-slot), border-color 0.18s var(--ease-slot);
     overflow: hidden;
 }
+/* Sliding in and out, the library keeps its width and slides under the edge,
+   rather than squeezing (which reflows every row, every frame). */
+.sidebar > * { min-width: 320px; transition: transform 0.18s var(--ease-slot); }
+.app.nav-collapsed .sidebar > * { transform: translateX(-100%); transition-timing-function: var(--ease-shut); }
 .app.nav-collapsed .sidebar {
+    transition-timing-function: var(--ease-shut);
     width: 0;
     border-right-color: transparent;
 }
@@ -45,41 +52,38 @@ body {
     flex-shrink: 0;
     min-height: 52px;
     padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-    /* a seam, like the join in the cassette's shell: a dark groove over a lit lip */
+    /* a seam: a dark groove over a lit lip */
     border-bottom: 1px solid var(--color-recess-rim-top);
     box-shadow: 0 1px 0 var(--color-recess-rim-bottom);
 }
-/* With the slot or a search open, the seam has parted: the lit lip is the well's lower edge. */
+/* With a drawer open, the seam has parted. */
 .lib-bar:has(+ .slot:not([hidden])), .list-bar:has(+ .search-wrap:not([hidden])) { box-shadow: none; }
 .list-bar { padding-left: var(--space-1); }
-/* The slot under the library bar and each list's search open out of the bar's
-   seam: full width, the element is the rim (dark at the top, lit at the bottom)
-   and ::before the well. */
+/* Recessed wells: the element is the rim, ::before the well. */
 .slot-well, .search-wrap {
     position: relative;
-    background: linear-gradient(var(--color-recess-rim-top), var(--color-recess-rim-bottom));
+    background: linear-gradient(var(--color-recess-rim-top), var(--color-well-lip));
 }
 .slot-well::before, .search-wrap::before {
     content: "";
     position: absolute;
     inset: 0 0 1px;
-    background: linear-gradient(var(--color-recess-shade), transparent 6px), var(--color-recess);
+    background: linear-gradient(var(--color-recess-shade), transparent 14px), var(--surface-inner);
     pointer-events: none;
 }
 .slot-well > *, .search-wrap > * { position: relative; z-index: 1; }
 
-/* The slot opens under the library bar for search or +. + first offers its two
-   choices; the picked one widens over the other and becomes the field. */
-/* Hidden in the page until opened (so it stays shut even under an old stylesheet);
-   it slides open from nothing and slides shut before it's hidden. */
-.slot {
-    display: grid; grid-template-rows: 1fr; flex-shrink: 0;
-    transition: grid-template-rows 0.2s var(--ease-slot), display 0.2s allow-discrete;
+/* Drawers (the slot, list searches, menus) slide open from nothing and shut
+   before they're hidden. */
+.slot, .search-wrap, .menu {
+    flex-shrink: 0; overflow: hidden;
+    interpolate-size: allow-keywords; height: auto;
+    transition: height var(--dur-open) var(--ease-spring), display var(--dur-open) allow-discrete;
 }
-.slot[hidden] { grid-template-rows: 0fr; }
-@starting-style { .slot { grid-template-rows: 0fr; } }
-.sidebar.in-list .slot { display: none; }
-.slot-well { display: grid; min-height: 0; overflow: hidden; }
+.slot[hidden], .search-wrap[hidden], .menu[hidden] { height: 0; transition: height var(--dur-shut) var(--ease-shut), display var(--dur-shut) allow-discrete; }
+@starting-style { .slot, .search-wrap, .menu:not(.steady) { height: 0; } }
+.sidebar.in-list .slot { display: none; transition: none; }   /* gone at once inside a list */
+.slot-well { display: grid; }
 .slot-choices, .slot-field {
     grid-area: 1 / 1; display: flex; align-items: center; min-height: 40px;
     opacity: 0; visibility: hidden; transform: translateY(-4px);
@@ -111,19 +115,21 @@ body {
 .slot-input::-webkit-search-cancel-button { display: none; }
 .slot-act {
     display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
-    border: 0; background: none; cursor: pointer; color: var(--color-text-muted);
+    border: 0; background: none; cursor: pointer; color: var(--color-accent);
 }
 .slot-act svg { width: 14px; height: 14px; }
-.slot-act:hover { color: var(--color-text-primary); }
-.slot-act.go { color: var(--color-accent); }
+.slot-act:hover { color: var(--color-accent-hover); }
 .slot-act:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: -2px; }
 /* The field in use: a fine accent line along the bottom of the well. */
 .slot-well:focus-within::after, .search-wrap:focus-within::after {
     content: ""; position: absolute; left: var(--space-3); right: var(--space-3); bottom: 1px; height: 1px;
     background: var(--color-accent); opacity: 0.6; z-index: 1;
 }
-@media (prefers-reduced-motion: reduce) { .slot, .slot-choice, .slot-choices, .slot-field { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .slot, .search-wrap, .menu, .search-wrap > *, .menu > *, .slot-choice, .slot-choices, .slot-field { transition: none; } }
 .sidebar.in-list .lib-bar { display: none; }
+.sidebar[data-depth="1"] { --surface: var(--color-depth-1); --surface-inner: var(--color-depth-2); --surface-outer: var(--color-bg-pane); }
+.sidebar[data-depth="2"] { --surface: var(--color-depth-2); --surface-inner: var(--color-depth-3); --surface-outer: var(--color-depth-1); }
+.list-bar { background: var(--surface-outer); }   /* a list's bar keeps the colour of the row it came from */
 .lib-logo { margin: 0 var(--space-2) 0 0; font-size: var(--text-base); line-height: 1; color: var(--color-accent); }
 .lib-tabs { display: flex; flex: 1; min-width: 0; gap: var(--space-1); }
 .lib-tab {
@@ -175,7 +181,7 @@ body {
 }
 
 /* Each list's search: the same recess as the slot, its field bare inside it. */
-.search-wrap { flex-shrink: 0; padding: 0 var(--space-4); }
+.search-wrap { padding: 0 var(--space-4); }
 .search-wrap .input { width: 100%; height: 40px; padding: 0; border: 0; background: none; caret-color: var(--color-accent); }
 
 .track-list {
@@ -350,7 +356,7 @@ body {
 /* ---- tracks view ---- */
 .tape-title {
     flex: 1; min-width: 0;
-    font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary);   /* the same as the library bar's open tab */
+    font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary);   /* as the library's open tab */
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tape-title.editable { cursor: text; }
@@ -437,30 +443,54 @@ body {
 .dl-bar { height: 4px; background: var(--color-border); border-radius: var(--radius-pill); margin-top: 4px; overflow: hidden; }
 .dl-bar-fill { height: 100%; background: var(--color-accent); transition: width 0.3s ease; }
 
-/* ---- popover menus (add-to-tape, deck settings) ---- */
+/* ---- menus: slots under a row or bar, aligned to its title ---- */
 .menu {
-    /* Above the phone's full-screen library (30); below modals/toasts (100). */
-    position: fixed; z-index: 40; background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border-soft); border-radius: var(--radius-md);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.44), 0 4px 10px rgba(0, 0, 0, 0.3);
-    padding: var(--space-1); min-width: 180px; max-width: 280px;
-    max-height: 60vh; overflow-y: auto;
-    transform-origin: top left;   /* overridden per-open in JS to the anchored corner */
-    animation: menu-in 0.13s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    margin: 0 calc(-1 * var(--space-2));   /* edge to edge, past the list's padding, like the search slot */
+    background: linear-gradient(var(--color-recess-rim-top), var(--color-well-lip));
 }
-@keyframes menu-in {
-    from { opacity: 0; transform: scale(0.96); }
-    to   { opacity: 1; transform: scale(1); }
+.menu::before {
+    content: ""; position: absolute; inset: 0 0 1px; pointer-events: none;
+    background: linear-gradient(var(--color-recess-shade), transparent 14px), var(--surface-inner);
 }
+.menu > * { position: relative; }
+.list-bar + .menu { margin: 0; }
+.list-bar:has(+ .menu:not([hidden])) { box-shadow: none; }
 .menu-item {
-    padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer;
-    font-size: var(--text-sm); color: var(--color-text-primary);
+    display: flex; align-items: center; min-height: 40px;
+    padding: 0 var(--space-4) 0 var(--menu-indent, var(--space-4));
+    cursor: pointer; color: var(--color-text-secondary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: color 0.12s ease, box-shadow 0.12s ease;
 }
-.menu-item:hover { background: rgba(235, 219, 178, 0.1); color: var(--color-text-primary); }
-.menu-sep { height: 1px; margin: var(--space-1) var(--space-2); background: var(--color-border-soft); }
-@media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
+/* Hover is light, not paint: brighter text, a faint lit lower edge. */
+.menu-item:hover, .menu-item:focus-visible {
+    outline: none; color: var(--color-text-primary);
+    box-shadow: inset 0 -1px 0 var(--color-recess-rim-bottom);
+}
+/* An engraved line between groups. */
+.menu-sep {
+    height: 1px; margin: var(--space-1) var(--space-4) var(--space-1) var(--menu-indent, var(--space-4));
+    background: var(--color-recess-rim-top); box-shadow: 0 1px 0 var(--color-recess-rim-bottom);
+}
+/* A form (song details, album) in the same well. */
+.menu .form-card {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) var(--space-3) var(--menu-indent, var(--space-4));
+}
+.menu .form-card .modal-actions { margin-top: 0; }
+.edit-tidy { margin-right: auto; }
+/* A menu asking for a name shows the slot's field. */
+.menu .slot-field { opacity: 1; visibility: visible; transform: none; padding-left: var(--menu-indent, var(--space-4)); }
+/* A drawer's contents lift slightly into the seam and fade as it shuts, and settle
+   in as it opens (the slot's own choices and field already cross-fade). */
+.search-wrap > *, .menu > * { transition: opacity calc(var(--dur-shut) * 0.7) ease, transform var(--dur-shut) var(--ease-shut), color 0.12s ease, box-shadow 0.12s ease; }
+.search-wrap[hidden] > *, .menu[hidden] > * { opacity: 0; transform: translateY(-6px); }
+@starting-style { .search-wrap > *, .menu:not(.steady) > * { opacity: 0; transform: translateY(-6px); } }
+.menu:not([hidden]) > :nth-child(2) { transition-delay: 25ms; }   /* items seat one after another */
+.menu:not([hidden]) > :nth-child(3) { transition-delay: 50ms; }
+.menu:not([hidden]) > :nth-child(n+4) { transition-delay: 75ms; }
+
 
 /* ---- sort selector (All Tracks / Singles) ---- */
 
@@ -501,7 +531,7 @@ body {
     border-radius: var(--radius-md);
     box-shadow: 0 12px 40px var(--color-shadow);
 }
-.modal-head { font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary); }   /* the bar's weight: a dialog is chrome, not a page title */
+.modal-head { font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary); }
 .modal-actions .btn { font-size: var(--text-sm); font-weight: 500; min-height: 36px; }
 .modal-field {
     display: flex;
@@ -516,38 +546,6 @@ body {
     gap: var(--space-2);
     margin-top: var(--space-2);
 }
-
-/* ---- the ask sheet: one short field (a link, a name), Cancel and the action
-   in its header. A centred card here; on phones a sheet above the keyboard. ---- */
-/* On desktop the sheet stays in the sidebar it was opened from: the scrim
-   covers only the sidebar (--side-w, measured in JS) and leaves the deck alone. */
-.ask-scrim { inset: 0 auto 0 0; width: var(--side-w, 320px); align-items: flex-start; padding: 60px var(--space-3) var(--space-3); }   /* below the bar */
-.ask-sheet {
-    width: 100%;
-    padding: var(--space-2) var(--space-4) var(--space-4);
-    background: var(--color-bg-elevated);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 12px 40px var(--color-shadow);
-    animation: menu-in 0.16s var(--ease-emphasized);
-}
-.ask-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 44px; margin-bottom: var(--space-2); }
-.ask-title { font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ask-btn {
-    justify-self: start; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
-    font: inherit; color: var(--color-text-secondary);
-}
-.ask-ok { justify-self: end; color: var(--color-accent); font-weight: 600; }
-.ask-ok:disabled { color: var(--color-text-muted); cursor: default; }
-.ask-btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; border-radius: var(--radius-sm); }
-.ask-input {
-    width: 100%; height: 48px; padding: 0 var(--space-3);
-    background: var(--color-bg-base); border: 1px solid transparent; border-radius: var(--radius-md);
-    font: inherit; color: var(--color-text-primary); caret-color: var(--color-accent);
-}
-.ask-input:focus { outline: none; border-color: var(--color-border); }
-.ask-input::placeholder { color: var(--color-text-muted); }
-.ask-help { margin: var(--space-2) var(--space-1) 0; font-size: var(--text-xs); color: var(--color-text-muted); }
-@media (prefers-reduced-motion: reduce) { .ask-sheet { animation: none; } }
 
 /* ---- podcasts: episodes reuse the .track-list row (container, .tl-meta/title/sub,
    and the .tl-add button base); only these extras are episode-specific ---- */
@@ -581,10 +579,12 @@ body {
     color: var(--color-text-primary);
 }
 
-.first-run { margin: var(--space-4); padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
+/* Wide enough for its line to fit on one row on desktop. */
+.first-run { margin: var(--space-4) var(--space-1); padding: var(--space-2) var(--space-3); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
 .first-run-title { margin: 0 0 var(--space-1); color: var(--color-text-primary); font-weight: 600; }
 .first-run-body { margin: 0 0 var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 .first-run-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.first-run > :last-child { margin-bottom: 0; }
 .track-list li.unavailable .tl-title { color: var(--color-text-muted); text-decoration: line-through; }
 .tl-sub .unknown { font-style: italic; }
 .tl-issues { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-top: 2px; }
@@ -597,19 +597,6 @@ body {
 #confirmOk.danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
 .toast { display: flex; align-items: center; gap: var(--space-3); pointer-events: auto; }
 .toast-action { background: none; border: 0; color: var(--color-accent); font: inherit; font-weight: 600; cursor: pointer; padding: var(--space-1) var(--space-2); min-height: 32px; }
-
-/* Sheet title (which song a menu is for) — phones only. */
-.menu-head {
-    display: none;
-    padding: var(--space-2) var(--space-3) var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    border-bottom: 1px solid var(--color-border-soft);
-    margin-bottom: var(--space-1);
-}
 
 /* Phone overrides come last so they win over the base rules above. */
 /* ---- Phones: library first, deck as a full-screen "now playing" ----
@@ -629,6 +616,7 @@ body {
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
     }
+    .app.nav-collapsed .sidebar > * { transform: none; }   /* the phone's library never slides aside */
     .main {
         position: fixed;
         inset: 0;
@@ -734,66 +722,26 @@ body {
     .modal-actions .btn { min-height: 44px; }
     .slot-choices, .slot-field { min-height: 44px; }
     .slot-act { width: 44px; height: 44px; }
+    .menu-item { min-height: 44px; }
+    .first-run { margin: var(--space-4); padding: var(--space-2) var(--space-4); }
     .search-wrap .input { height: 44px; }
 
 
-    /* Menus become bottom sheets, over a dimmed screen. JS positions menus with
-       inline top/left, so the sheet placement needs !important. */
-    .menu {
-        top: auto !important;
-        left: 0 !important;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        max-width: none;
-        max-height: 70dvh;
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        padding: var(--space-2) var(--space-2) calc(var(--space-3) + env(safe-area-inset-bottom));
-        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5);
-        transform-origin: bottom center !important;
-        animation: sheet-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .menu-item { min-height: 48px; display: flex; align-items: center; font-size: var(--text-base); }
-    .menu-head { display: block; }
-    @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
-
     /* Edit dialog: anchored to the top so the keyboard never covers Save. */
     .modal-scrim { align-items: flex-start; padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
-    /* The ask sheet rises from the bottom like the + menu it came from, and
-       sits on the keyboard (--kb, set from the visual viewport in JS). */
-    .ask-scrim { inset: 0; width: auto; align-items: flex-end; padding: 0; }
-    .ask-sheet {
-        max-width: none; margin-bottom: var(--kb, 0px);
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-        animation: sheet-in 0.22s var(--ease-emphasized);
-    }
 }
 @media (prefers-reduced-motion: reduce) { .dl-summary .ico svg { transition: none; } }
 
-/* In the library a menu opens as a slot under its row or bar: recessed like the
-   slot, sliding open, its items in a column. (After the phone rules, which make
-   menus bottom sheets, so it wins over them.) */
-.menu.inline {
-    position: relative; top: auto !important; left: auto !important; right: auto; bottom: auto; z-index: auto;
-    width: auto; min-width: 0; max-width: none; max-height: none; overflow: hidden;
-    margin: var(--space-1) 0; padding: 0;
-    border: 0; border-radius: var(--radius-sm); box-shadow: none; animation: none;
-    background: linear-gradient(var(--color-recess-rim-top), var(--color-recess-rim-bottom));
-    interpolate-size: allow-keywords; height: auto;
-    transition: height 0.2s var(--ease-slot);
+/* Moving between lists (see showView). */
+.nav-stage { position: fixed; z-index: 50; overflow: hidden; pointer-events: none; }
+.nav-belt { position: absolute; inset: 0; }
+.nav-copy { position: absolute !important; inset: 0 !important; width: auto !important; transition: none !important; z-index: auto !important; }   /* (no !important transform: the copies move) */
+.nav-copy * { transition: none !important; }   /* copies are frozen: nothing replays opening */
+.nav-well {
+    position: absolute; left: 0; right: 0; overflow: hidden;
+    box-shadow: inset 0 1px 0 var(--color-recess-rim-top);   /* background set in JS */
 }
-@starting-style { .menu.inline { height: 0; } }
-.menu.inline::before {
-    content: ""; position: absolute; inset: 0 0 1px; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(var(--color-recess-shade), transparent 6px), var(--color-recess);
-}
-.menu.inline > * { position: relative; }
-.menu.inline .menu-head { display: none !important; }
-.menu.inline .menu-item { display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-4); border-radius: 0; font-size: var(--text-base); }
-.menu.inline .menu-sep { margin: var(--space-1) var(--space-4); background: var(--color-recess-rim-top); box-shadow: 0 1px 0 var(--color-recess-rim-bottom); }
-.list-bar + .menu.inline, .lib-bar + .menu.inline { margin: 0; border-radius: 0; }
-.list-bar:has(+ .menu.inline:not([hidden])) { box-shadow: none; }
-@media (max-width: 640px) { .menu.inline .menu-item { min-height: 44px; } }
-@media (prefers-reduced-motion: reduce) { .menu.inline { transition: none; } }
+.nav-well > ul { position: absolute; top: 0; margin: 0; }
+.nav-bar-copy { position: absolute; left: 0; right: 0; }
+.nav-label { position: absolute; white-space: nowrap; }
 
