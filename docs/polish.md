@@ -10,7 +10,7 @@ Screenshots of every state, at 1440×900 and 390×844, come from `scripts/shoot_
 
 - **Confirmation** (`docs/polish/confirm.png`): was a card over a dimmed screen. It's now a slot: inside the form it's about (in place of the form's buttons, a slot within the form's well), or under the list's bar like a menu (delete an episode, unfollow or delete a show, merge an artist). The scrim, card and modal styles are gone; the forms' `modal-` class names are now `form-`.
 - **Up Next** (`docs/polish/up-next.png`): was a blurred pill with a drop shadow that opened a floating rounded card (a raised sheet on phones). It's now a flat bar at the deck's foot; the queue slides up out of a seam along its top edge as a well one step darker than the deck, on the shared spring, and shuts like every other drawer. The "UP NEXT" heading (repeating the bar) and the pill-shaped count went; rows are square and edge to edge.
-- **Toasts** (`docs/polish/toast.png`): were floating rounded cards with a shadow, and on phones they covered the mini-player. They're now a flat strip that rises out of the bottom edge (a seam along its top), cut at its resting edge so it emerges rather than floats; on phones it rises from the mini-player's top edge.
+- **Toasts** (`docs/polish/toast.png`): were floating rounded cards with a shadow, centred on the whole window (off-centre from the deck with the library open), and on phones they covered the mini-player. They're now a flat strip that rises out of the bottom edge (a seam along its top), cut at its resting edge so it emerges rather than floats; on desktop it's centred under the deck, and on phones it rises from the mini-player's top edge.
 
 ### Forms and menus
 
@@ -53,7 +53,3 @@ All tests pass, including the style-token test, and the slot, navigation and men
 - **Cover art corners**: album art keeps its small rounded corners, as covers do; the blank-cover placeholders match them.
 - **Raw pixel sizes**: about 45 icon, touch-target and layout sizes are still written in px rather than tokens. The style test only covers font sizes, and moving them is mechanical with no visible change, so it's better as its own pass.
 - **The deck's play button** stays a filled orange circle: it's the one main action on the deck, not a control in a well.
-
-## Needs your decision
-
-- **Toasts on desktop** are centred on the whole window, so with the library open they straddle the sidebar and the deck. Centring them under the deck would be tidier.

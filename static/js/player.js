@@ -57,6 +57,9 @@
     const mini = document.querySelector(".mini:not([hidden])");
     const top = mini && mini.offsetParent && !app.classList.contains("deck-open") ? mini.getBoundingClientRect().top : innerHeight;
     t.style.bottom = `${Math.max(0, innerHeight - top)}px`;
+    // On desktop it's centred under the deck, not the whole window (the library may be open).
+    const deck = document.querySelector(".main");
+    if (!matchMedia("(max-width: 640px)").matches && deck) { const r = deck.getBoundingClientRect(); t.style.left = `${r.left + r.width / 2}px`; }
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add("show"));
     setTimeout(dismiss, action ? 8000 : 3200);
