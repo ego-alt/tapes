@@ -91,7 +91,7 @@ body {
 }
 /* Visible at once when shown (so the field can take focus), hidden after the fade. */
 .slot[data-mode="choose"] .slot-choices,
-.slot:not([data-mode="choose"]) .slot-field { opacity: 1; visibility: visible; transform: none; transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s; }
+.slot:not([data-mode=""]):not([data-mode="choose"]) .slot-field { opacity: 1; visibility: visible; transform: none; transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s; }
 .slot-choice {
     flex: 1 1 0; min-width: 0; height: 100%; padding: 0 var(--space-3);
     border: 0; background: none; cursor: pointer; overflow: hidden; white-space: nowrap;
