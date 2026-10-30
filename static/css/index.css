@@ -601,7 +601,7 @@ body {
 .confirm-detail { color: var(--color-text-muted); font-size: var(--text-sm); }
 .confirm-detail:empty { display: none; }
 .confirm-slot .form-actions { margin: 0; flex-shrink: 0; }
-.form-card .confirm-slot { margin: 0; padding-inline: 0; }   /* inside a form: a slot within the form's well */
+.form-card .confirm-slot { margin: 0; padding-inline: 0 var(--space-1); }   /* inside a form: a slot within the form's well */
 .toast-action { background: none; border: 0; color: var(--color-accent); font: inherit; font-weight: 600; cursor: pointer; padding: var(--space-1) var(--space-2); min-height: 32px; }
 
 /* Phone overrides come last so they win over the base rules above. */
