@@ -58,6 +58,7 @@
     /* Recessed wells: shaded along the top, lit along the bottom. */
     /* Depth: each level in, and each slot within a level, is a step darker. */
     --color-depth-1: #121212;
+    --color-deck-well: var(--color-bg-pane);   /* a slot in the deck (Up Next): a step darker than the deck */
     --color-depth-2: #0b0b0b;
     --color-depth-3: #050505;
     --color-recess-shade: rgba(0, 0, 0, 0.9);

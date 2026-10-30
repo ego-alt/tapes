@@ -186,72 +186,64 @@
 .tbtn .icn { width: 22px; height: 22px; }
 .tbtn.play .icn { width: 28px; height: 28px; }
 
-/* ---- Up Next: floating pill (bottom-right) that expands into the queue ---- */
+/* ---- Up Next: a flat bar at the deck's foot; the queue slides up out of the
+   seam along its top edge, a well a step darker than the deck ---- */
 .upnext {
     position: absolute;
     right: var(--space-4);
     bottom: max(var(--space-4), env(safe-area-inset-bottom));
-    z-index: 15;   /* above the deck art, below menus (40) and modals (100) */
+    z-index: 15;   /* above the deck art, below menus */
     display: flex;
-    flex-direction: column;     /* panel above, pill below → expands upward */
-    align-items: flex-end;
-    gap: var(--space-2);
-    max-width: calc(100% - 2 * var(--space-4));
+    flex-direction: column;     /* the queue above, the bar below: it opens upward */
+    align-items: stretch;
+    width: min(320px, 78vw);
 }
 .upnext-bar {
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-bg-overlay);
-    border: 1px solid var(--color-border-soft);
-    border-radius: var(--radius-pill);
-    box-shadow: 0 4px 16px var(--color-shadow);
-    color: var(--color-text-primary);
+    min-height: 40px;
+    padding: 0 var(--space-2);
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
     font: inherit;
     font-size: var(--text-sm);
     cursor: pointer;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    transition: color 0.12s ease;
 }
-.upnext-bar:hover { border-color: var(--color-border); }
+.upnext-bar:hover { color: var(--color-text-primary); }   /* light, not a filled block */
+.upnext.expanded .upnext-bar { box-shadow: inset 0 1px 0 var(--color-recess-rim-top), inset 0 2px 0 var(--color-recess-rim-bottom); }   /* the seam it opened from */
 .upnext-ico { display: inline-flex; color: var(--color-accent); }
 .upnext-ico .icn { width: 16px; height: 16px; }
-.upnext-label { color: var(--color-text-secondary); letter-spacing: 0.02em; }
-.upnext-count {
-    min-width: 18px;
-    padding: 0 6px;
-    border-radius: var(--radius-pill);
-    background: var(--color-bg-inset);
-    color: var(--color-text-muted);
-    text-align: center;
-}
+.upnext-count { font-family: var(--font-mono); color: var(--color-text-muted); }
 .upnext-count:empty { display: none; }
-.upnext-caret { display: inline-flex; color: var(--color-text-muted); transition: transform 0.2s ease; }
+.upnext-caret { display: inline-flex; color: var(--color-text-muted); transition: transform var(--dur-shut) var(--ease-shut); }
 .upnext-caret .icn { width: 14px; height: 14px; }
 .upnext.expanded .upnext-caret { transform: rotate(180deg); }
 
 .upnext-panel {
-    display: none;
+    position: relative;
+    display: flex;
     flex-direction: column;
-    width: min(320px, 78vw);
     max-height: min(50vh, 360px);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 12px 40px var(--color-shadow);
     overflow: hidden;
+    background: linear-gradient(var(--color-recess-rim-top), var(--color-well-lip));
+    interpolate-size: allow-keywords;
+    height: 0;
+    transition: height var(--dur-shut) var(--ease-shut);
 }
-.upnext.expanded .upnext-panel { display: flex; }
-.upnext-panel-head {
-    padding: var(--space-3) var(--space-4) var(--space-2);
-    font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--color-text-muted);
+.upnext.expanded .upnext-panel { height: auto; transition: height var(--dur-open) var(--ease-spring); }
+.upnext-panel::before {   /* the well */
+    content: ""; position: absolute; inset: 0 0 1px; pointer-events: none;
+    background: linear-gradient(var(--color-recess-shade), transparent 14px), var(--color-deck-well);
 }
-@media (prefers-reduced-motion: reduce) { .upnext-caret { transition: none; } }
+.upnext-panel > * { position: relative; }
+@media (prefers-reduced-motion: reduce) { .upnext-caret, .upnext-panel { transition: none; } }
 
-.queue-list { overflow-y: auto; list-style: none; margin: 0; padding: 0 var(--space-2) var(--space-3); }
-.q-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer; }
+.queue-list { overflow-y: auto; list-style: none; margin: 0; padding: var(--space-2) 0; }
+.q-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); cursor: pointer; }   /* square, edge to edge */
 .q-row:hover { background: var(--track-hover); }
 .q-row.active { background: var(--color-bg-inset); }
 .q-row.active .q-title { color: var(--track-active); }
@@ -278,20 +270,10 @@
         width: min(92vw, 440px);
         max-width: 92vw;
     }
-    /* Up Next: a full-width bottom sheet instead of a floating card. */
-    .upnext {
-        left: 0;
-        right: 0;
-        bottom: 0;
-        max-width: none;
-        align-items: stretch;
-        gap: 0;
-        padding: 0 var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
-    }
-    .upnext.expanded { background: var(--color-bg-elevated); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5); padding-top: var(--space-2); }
-    .upnext-bar { justify-content: center; min-height: 44px; }
-    .upnext-panel { width: 100%; max-height: 60dvh; border: 0; box-shadow: none; background: none; }
+    /* Up Next: full width along the bottom; the queue opens up out of the bar. */
+    .upnext { left: 0; right: 0; bottom: 0; width: auto; padding-bottom: env(safe-area-inset-bottom); }
+    .upnext-bar { justify-content: center; min-height: 48px; }
+    .upnext-panel { max-height: 60dvh; }
     .q-drag, .q-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
     /* Just previous, play and next: big enough to hit without looking. */
     .tbtn { width: 58px; height: 58px; }
