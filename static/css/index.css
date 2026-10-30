@@ -163,12 +163,12 @@ body {
     width: 40px;
     height: 40px;
     border: 0;
-    border-radius: var(--radius-md);
     background: none;
     color: var(--color-text-muted);
     cursor: pointer;
+    transition: color 0.12s ease;
 }
-.bar-btn:hover, .bar-btn[aria-expanded="true"] { color: var(--color-text-primary); background: var(--track-hover); }
+.bar-btn:hover, .bar-btn[aria-expanded="true"] { color: var(--color-text-primary); }   /* light, not a filled block */
 .bar-btn .ico svg { width: 20px; height: 20px; }
 .lib-tab:focus-visible, .bar-btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
 .sr-only {
@@ -563,21 +563,27 @@ body {
 .ep-played { opacity: 1; }
 .track-list li.played .ep-played { color: var(--color-accent); }
 
-.ep-filter { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4) var(--space-3); }
+.ep-filter { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2) var(--space-2); }
+/* Filters read like the library's tabs: words, the chosen one underlined. */
 .ep-filter-btn {
+    position: relative;
+    padding: var(--space-2);
+    border: 0;
     background: none;
-    border: 1px solid var(--color-border);
     color: var(--color-text-muted);
-    border-radius: var(--radius-md);
-    padding: 4px 12px;
-    font-family: inherit;
+    font: inherit;
     font-size: var(--text-sm);
+    font-weight: 600;
     cursor: pointer;
+    transition: color 0.12s ease;
 }
-.ep-filter-btn.active {
-    background: var(--color-bg-inset);
-    color: var(--color-text-primary);
+.ep-filter-btn:hover { color: var(--color-text-secondary); }
+.ep-filter-btn.active { color: var(--color-text-primary); }
+.ep-filter-btn.active::after {
+    content: ""; position: absolute; left: var(--space-2); right: var(--space-2); bottom: 1px;
+    height: 2px; background: var(--color-accent);
 }
+.ep-filter-btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
 
 /* Wide enough for its line to fit on one row on desktop. */
 .first-run { margin: var(--space-4) var(--space-1); padding: var(--space-2) var(--space-3); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
@@ -637,9 +643,6 @@ body {
         left: max(var(--space-3), env(safe-area-inset-left));
         width: 44px;
         height: 44px;
-        border-radius: var(--radius-md);
-        background: var(--color-bg-overlay);
-        border: 1px solid var(--color-border-soft);
         color: var(--color-text-primary);
     }
 
@@ -717,7 +720,7 @@ body {
     .dl-summary { min-height: 44px; }
     .lib-tab { min-height: 44px; }
     .shelf-row, .browse-row { min-height: 48px; }
-    .ep-filter-btn { min-height: 40px; padding-inline: var(--space-3); }
+    .ep-filter-btn { min-height: 44px; padding-inline: var(--space-3); }
     .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
     .modal-actions .btn { min-height: 44px; }
     .slot-choices, .slot-field { min-height: 44px; }
