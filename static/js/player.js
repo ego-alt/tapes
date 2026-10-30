@@ -53,6 +53,10 @@
       b.addEventListener("click", (e) => { e.stopPropagation(); dismiss(); onAction(); });
       t.appendChild(b);
     }
+    // On a phone it rises from the mini-player's top edge rather than covering it.
+    const mini = document.querySelector(".mini:not([hidden])");
+    const top = mini && mini.offsetParent && !app.classList.contains("deck-open") ? mini.getBoundingClientRect().top : innerHeight;
+    t.style.bottom = `${Math.max(0, innerHeight - top)}px`;
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add("show"));
     setTimeout(dismiss, action ? 8000 : 3200);
