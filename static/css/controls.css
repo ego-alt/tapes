@@ -13,6 +13,7 @@
     transition: background-color var(--dur-base) ease, border-color var(--dur-base) ease, color var(--dur-base) ease;
 }
 .btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
+.btn-ghost, .btn-act { border-radius: 0; }   /* words, not boxes: a square focus ring like the slots */
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary   { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }

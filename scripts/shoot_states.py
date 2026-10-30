@@ -67,8 +67,7 @@ def shoot(size, page):
     step("plus", lambda: (page.click("#dlToggle"), snap("02-plus-choices")))
     step("add-tape", lambda: (page.locator(".slot-choice").nth(1).click(), page.keyboard.type("Road Trip"), snap("03-add-tape-typed")))
     step("add-tape-error", lambda: (page.keyboard.press("Enter"), page.wait_for_timeout(600), snap("04-add-tape-duplicate")))
-    step("rip-error", lambda: (page.click("#dlToggle") if page.is_hidden("#libSlot") else None, page.wait_for_timeout(300),
-                                page.click("#dlToggle") if page.locator(".slot-choice").count() == 0 else None,
+    step("rip-error", lambda: (page.keyboard.press("Escape"), page.wait_for_timeout(300), page.click("#dlToggle"),
                                 page.locator(".slot-choice").first.click(), page.keyboard.type("https://example.invalid/nope"),
                                 page.keyboard.press("Enter"), page.wait_for_timeout(4000), snap("05-downloads-error")))
     step("dl-open", lambda: (page.click("#dlSummary"), snap("06-downloads-open"), page.click("#dlSummary")))
@@ -96,7 +95,7 @@ def shoot(size, page):
     step("up-next", lambda: (page.click("#upnextBar"), snap("23-up-next"), page.click("#upnextBar")))
     step("full-screen", lambda: (page.evaluate("DeckFX.setImmersive(true)"), snap("24-full-screen"), page.evaluate("DeckFX.setImmersive(false)")))
     step("toast", lambda: (page.goto(BASE + "/"), page.wait_for_timeout(1200), page.evaluate("document.querySelector('.toast') || 0"),
-                           page.click("#dlToggle"), page.locator(".slot-choice").nth(1).click(), page.keyboard.type("Toast Tape"),
+                           page.click("#dlToggle"), page.locator(".slot-choice").nth(1).click(), page.keyboard.type(f"Toast Tape {size}"),
                            page.keyboard.press("Enter"), page.wait_for_timeout(250), page.screenshot(path=str(out / "25-toast.png"))))
 
     # Motion, slowed: + opening, a row menu opening and shutting, going into a list and back.
