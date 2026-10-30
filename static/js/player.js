@@ -1909,6 +1909,7 @@
   const slotOpen = () => !!slot.dataset.mode;
   function setSlot(m) {
     slot.dataset.mode = m;
+    slotMessage("");
     slot.hidden = !m;
     $("libSearchBtn").setAttribute("aria-expanded", String(m === "search"));
     $("dlToggle").setAttribute("aria-expanded", String(!!m && m !== "search"));
@@ -1958,18 +1959,21 @@
     closeMenu();
     setSlot("choose");
   }
+  // Adding keeps the slot open until it worked; a problem shows in the well, the text kept.
   async function submitSlot() {
     const m = slot.dataset.mode, v = slotInput.value.trim();
     if (!v || m === "search") return;
-    closeSlot();
-    if (m === "rip") await startRip(v);
-    else if (m === "follow") await addPodcast(v);
-    else if (m === "tape") await createTape(v);
-    else if (m === "show") await createShow(v);
+    const problem = await { rip: startRip, follow: addPodcast, tape: createTape, show: createShow }[m](v);
+    if (problem) slotMessage(problem);
+    else closeSlot();
+  }
+  function slotMessage(text) {
+    $("slotMsg").textContent = text || "";
+    $("slotMsg").hidden = !text;
   }
   $("dlToggle").addEventListener("click", () => (slotOpen() && slot.dataset.mode !== "search" ? closeSlot() : chooseSlot()));
   $("libSearchBtn").addEventListener("click", () => (slot.dataset.mode === "search" ? closeSlot() : openSlot("search")));
-  slotInput.addEventListener("input", syncSlotAct);
+  slotInput.addEventListener("input", () => { syncSlotAct(); slotMessage(""); });
   slotInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSlot(); }
     if (e.key === "Enter" && slot.dataset.mode !== "search") { e.preventDefault(); submitSlot(); }
@@ -2044,7 +2048,7 @@
       // library) gets announced.
       (r.job_ids || []).forEach((id) => { dlPrev[id] = { finished: false }; });
       handleJobs(await jget("api/downloads"));   // the row appears at once
-    } catch (err) { console.error(err); toast(errText(err, "Couldn't start that rip.")); }
+    } catch (err) { console.error(err); return errText(err, "Couldn't start that rip."); }
   }
   async function addPodcast(url) {
     try {
@@ -2055,7 +2059,7 @@
         : `Following “${r.title}”`;
       toast(msg);
       openPodcasts();
-    } catch (err) { console.error(err); toast(errText(err, "Couldn't add that — check the link.")); }
+    } catch (err) { console.error(err); return errText(err, "Couldn't add that — check the link."); }
   }
   // The downloads row: shown while there are jobs, its list opened by a tap.
   function setDlList(open) {
@@ -2573,12 +2577,12 @@
   $("miniOpen").addEventListener("click", openDeck);
   $("search").addEventListener("input", debounce(applySearch, 120));
   async function createTape(name) {
-    try { await jsend("api/playlists", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
+    try { await jsend("api/playlists", "POST", { name }); } catch (e) { return errText(e, "Couldn't create that. Try again."); }
     loadShelf();
     toast(`Created the tape “${name}”`);
   }
   async function createShow(name) {
-    try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { toast(errText(e, "Couldn't create that. Try again.")); return; }
+    try { await jsend("api/podcast/shows", "POST", { name }); } catch (e) { return errText(e, "Couldn't create that. Try again."); }
     showsData = null;
     openPodcasts();
     toast(`Created the show “${name}”`);

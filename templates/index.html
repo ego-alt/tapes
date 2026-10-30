@@ -39,6 +39,7 @@
             <input class="slot-input" id="libSearch" type="search" aria-label="Search your library" autocomplete="off" enterkeyhint="search" tabindex="-1">
             <button class="slot-act" id="slotAct" type="button" aria-label="Add" hidden><span class="ico" data-icon="arrowRight"></span></button>
           </div>
+          <p class="slot-msg" id="slotMsg" role="alert" hidden></p>
         </div>
       </div>
 
@@ -510,28 +511,28 @@
   <!-- Forms that open in a menu's slot, kept here while closed. -->
   <div id="formHome" hidden>
     <div class="form-card" id="editCard" role="group" aria-label="Edit track">
-      <label class="modal-field">Title<input class="input" id="edTitle" autocomplete="off"></label>
-      <label class="modal-field">Artist<input class="input" id="edArtist" autocomplete="off"></label>
-      <label class="modal-field">Album<input class="input" id="edAlbum" autocomplete="off"></label>
-      <label class="modal-field">Track #<input class="input" id="edTrackNo" type="number" min="1" autocomplete="off"></label>
+      <label class="modal-field">Title<input class="input bare" id="edTitle" autocomplete="off"></label>
+      <label class="modal-field">Artist<input class="input bare" id="edArtist" autocomplete="off"></label>
+      <label class="modal-field">Album<input class="input bare" id="edAlbum" autocomplete="off"></label>
+      <label class="modal-field">Track #<input class="input bare" id="edTrackNo" type="number" min="1" autocomplete="off"></label>
       <div class="modal-actions">
         <button class="btn btn-ghost edit-tidy" id="edTidy" type="button">Tidy up</button>
         <button class="btn btn-ghost" id="edCancel" type="button">Cancel</button>
-        <button class="btn btn-primary" id="edSave" type="button">Save</button>
+        <button class="btn btn-act" id="edSave" type="button">Save</button>
       </div>
     </div>
     <div class="form-card" id="albumCard" role="group" aria-label="Edit album">
-      <label class="modal-field">Album<input class="input" id="alName" autocomplete="off"></label>
-      <label class="modal-field">Artist for every song<input class="input" id="alArtist" placeholder="Leave blank to keep each song's artist" autocomplete="off"></label>
+      <label class="modal-field">Album<input class="input bare" id="alName" autocomplete="off"></label>
+      <label class="modal-field">Artist for every song<input class="input bare" id="alArtist" placeholder="Each song's own" autocomplete="off"></label>
       <div class="modal-field">Cover
         <div class="album-cover-row">
           <img class="album-cover-preview" id="alCoverPreview" alt="">
-          <label class="btn btn-secondary album-cover-pick">Choose image…<input type="file" id="alCover" accept="image/*" hidden></label>
+          <label class="btn btn-ghost album-cover-pick">Choose image…<input type="file" id="alCover" accept="image/*" hidden></label>
         </div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="alCancel" type="button">Cancel</button>
-        <button class="btn btn-primary" id="alSave" type="button">Save</button>
+        <button class="btn btn-act" id="alSave" type="button">Save</button>
       </div>
     </div>
   </div>

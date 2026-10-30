@@ -20,6 +20,11 @@
 .btn-secondary:hover:not(:disabled) { background: var(--color-highlight-soft); border-color: var(--color-border); color: var(--color-text-primary); }
 .btn-ghost     { background: transparent; border-color: transparent; color: var(--color-text-muted); padding: var(--space-2); }
 .btn-ghost:hover:not(:disabled) { color: var(--color-text-primary); }
+/* An action in words, in the accent (Save, Discard): for slots and forms in wells,
+   where a filled block would sit on the surface instead of in it. */
+.btn-act       { background: transparent; border-color: transparent; color: var(--color-accent); font-weight: 600; padding: var(--space-2); }
+.btn-act:hover:not(:disabled) { color: var(--color-accent-hover); }
+.btn-act.danger { color: var(--color-danger-hover); }
 
 .input {
     background: var(--color-bg-inset);
@@ -33,5 +38,12 @@
 }
 .input:focus { outline: none; border-color: var(--color-accent); }
 .input::placeholder { color: var(--color-text-muted); }
+/* A bare field, for wells: no box, an engraved line under it that lights up in use. */
+.input.bare {
+    background: none; border: 0; border-radius: 0; padding: var(--space-2) 0;
+    box-shadow: inset 0 -1px 0 var(--color-recess-rim-top), 0 1px 0 var(--color-recess-rim-bottom);
+    transition: box-shadow var(--dur-base) ease;
+}
+.input.bare:focus { box-shadow: inset 0 -1px 0 var(--color-accent), 0 1px 0 transparent; }
 /* No clear button in search fields: the magnifier that opens one closes and clears it. */
 .input[type="search"]::-webkit-search-cancel-button { display: none; }
