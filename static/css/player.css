@@ -159,7 +159,7 @@
     font-size: var(--text-xl);
     background: var(--color-accent);
     border-color: var(--color-accent);
-    color: #1b1b1b;
+    color: var(--color-on-accent);
 }
 .tbtn.play:hover { background: var(--color-accent-hover); }
 

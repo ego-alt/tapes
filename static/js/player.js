@@ -749,7 +749,7 @@
       el.firstChild.textContent = q ? `Nothing matches “${q}”.`
         : epFilter === "unplayed" ? "No unplayed episodes."
         : epFilter === "downloaded" ? "No downloaded episodes."
-        : "No episodes yet. Use Refresh to check for new ones.";
+        : "No episodes yet. Use ⋯ → Check for new episodes.";
       return;
     }
     renderInChunks(el, list, (e, i) => {

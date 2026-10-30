@@ -48,6 +48,8 @@
     --color-text-muted: #a89984;
     --color-accent: #fe8019;          /* gruvbox bright orange */
     --color-accent-hover: #d65d0e;    /* gruvbox neutral orange */
+    --color-on-accent: #1b1b1b;       /* an icon on the accent (the play buttons) */
+    --color-label-paper: #f4f1e9;     /* the cassette label's paper (the mini player's blank cover) */
     --color-danger: #cc241d;
     --color-danger-hover: #fb4934;
     --color-highlight-soft: rgba(235, 219, 178, 0.05);
