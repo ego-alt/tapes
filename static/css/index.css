@@ -35,7 +35,7 @@ body {
 }
 /* Sliding in and out, the library keeps its width and slides under the edge,
    rather than squeezing (which reflows every row, every frame). */
-.sidebar > * { min-width: 320px; transition: transform 0.18s var(--ease-slot); }
+.sidebar > * { min-width: calc(320px - 1px); transition: transform 0.18s var(--ease-slot); }   /* the sidebar's width, less its border */
 .app.nav-collapsed .sidebar > * { transform: translateX(-100%); transition-timing-function: var(--ease-shut); }
 .app.nav-collapsed .sidebar {
     transition-timing-function: var(--ease-shut);
