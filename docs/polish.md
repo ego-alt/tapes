@@ -34,6 +34,8 @@ Screenshots of every state, at 1440×900 and 390×844, come from `scripts/shoot_
 
 ### Details and states
 
+- Empty states are all plain text now: the dashed first-run boxes ("No shows yet.", an empty library) became a line and a quieter line under it, like an empty tape; the library's first-run buttons became text actions.
+
 - The playing song's ▸ marker was invisible inside albums (hiding its number shrank the marker too); it shows again.
 - Download errors wrap to two lines instead of being cut off mid-sentence.
 - An empty show said "Use Refresh", which doesn't exist; it now names the menu item ("Use ⋯ → Check for new episodes").
@@ -45,6 +47,8 @@ All tests pass, including the style-token test, and the slot, navigation and men
 
 ## Left as it is
 
+- **The confirmation focuses its action** (Discard, Delete), as the old dialog did, so Enter confirms (kept, by your decision).
+
 - **The cassette, its label inks and the transport buttons** (round, raised): the cassette is the one physical object, and the deck's controls belong to it. Their raw colours in `player.css` are the printed label's inks.
 - **Cover art corners**: album art keeps its small rounded corners, as covers do; the blank-cover placeholders match them.
 - **Raw pixel sizes**: about 45 icon, touch-target and layout sizes are still written in px rather than tokens. The style test only covers font sizes, and moving them is mechanical with no visible change, so it's better as its own pass.
@@ -52,6 +56,4 @@ All tests pass, including the style-token test, and the slot, navigation and men
 
 ## Needs your decision
 
-- **Empty states come in two styles**: the library's and podcasts' first-run notes are a dashed box ("No shows yet."), while an empty tape or show is a plain line of text. You tuned that box's padding recently, so I left it. Plain text everywhere would be the more consistent choice.
-- **The confirmation focuses its action** (Discard, Delete), as the old dialog did, so Enter confirms. Focusing Cancel would be safer for destructive actions, at the cost of an extra key press.
 - **Toasts on desktop** are centred on the whole window, so with the library open they straddle the sidebar and the deck. Centring them under the deck would be tidier.
