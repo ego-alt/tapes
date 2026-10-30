@@ -64,7 +64,7 @@
   // back in line after every tap or key and whenever something opens.
   // (Live once the page has set up: the layers below are defined further on.)
   const layers = () => [   // topmost first: [is it open?, close it]
-    [() => !$("confirmModal").hidden, () => $("confirmCancel").click()],
+    [() => !$("confirmSlot").hidden, () => $("confirmCancel").click()],
     [() => albumEditing, () => dismissAlbum()],
     [() => !!editing, () => dismissEdit()],
     [() => !menu.hidden, closeMenu],
@@ -94,19 +94,30 @@
   });
   ["click", "keydown", "touchend"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncHistory, 0), true));
 
-  // In-app confirm: resolves true/false. `danger` styles the OK button red.
+  // A confirmation, resolving true/false: a slot inside the open form it's about
+  // (in place of the form's buttons), or else under the open list's bar.
+  // `danger` colours the action red.
   function askConfirm(text, { detail = "", ok = "OK", danger = false } = {}) {
     return new Promise((resolve) => {
+      const box = $("confirmSlot");
       $("confirmText").textContent = text;
       $("confirmDetail").textContent = detail;
       $("confirmOk").textContent = ok;
       $("confirmOk").classList.toggle("danger", danger);
-      $("confirmModal").hidden = false;
-      $("confirmOk").focus();
+      const form = !menu.hidden && menu.querySelector(".form-card");
+      const actions = form && form.querySelector(":scope > .form-actions");
+      if (form) { actions.hidden = true; form.appendChild(box); }
+      else {
+        const bar = [...document.querySelectorAll(".sidebar .list-bar, .sidebar .lib-bar")].find((b) => b.offsetParent);
+        (bar || document.querySelector(".sidebar")).after(box);
+      }
+      box.hidden = false;
+      $("confirmOk").focus({ preventScroll: true });
       syncHistory();
       const done = (v) => {
-        $("confirmModal").hidden = true;
-        $("confirmOk").onclick = $("confirmCancel").onclick = $("confirmModal").onclick = null;
+        box.hidden = true;
+        if (actions) actions.hidden = false;
+        $("confirmOk").onclick = $("confirmCancel").onclick = null;
         document.removeEventListener("keydown", onKey, true);
         resolve(v);
       };
@@ -116,7 +127,6 @@
       };
       $("confirmOk").onclick = () => done(true);
       $("confirmCancel").onclick = () => done(false);
-      $("confirmModal").onclick = (e) => { if (e.target === $("confirmModal")) done(false); };
       document.addEventListener("keydown", onKey, true);
     });
   }
@@ -2571,7 +2581,7 @@
     // the tape is a gesture).
     if (isMobile() || immersive() || app.classList.contains("nav-collapsed") || !e.target.isConnected) return;
     const t = e.target;
-    if (t.closest(".sidebar, button, a, input, select, textarea, [role='slider'], [role='menu'], .menu, .modal-scrim, .toast, .upnext, #navToggle")) return;
+    if (t.closest(".sidebar, button, a, input, select, textarea, [role='slider'], [role='menu'], .menu, .toast, .upnext, #navToggle")) return;
     app.classList.add("nav-collapsed");
   });
   $("miniOpen").addEventListener("click", openDeck);
@@ -2662,8 +2672,8 @@
     seekTo(Math.min(audio.duration, audio.currentTime + (e.key === "ArrowRight" ? 5 : -5)));
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && editing && $("confirmModal").hidden) { dismissEdit(); return; }
-    if (e.key === "Escape" && albumEditing && $("confirmModal").hidden) { dismissAlbum(); return; }
+    if (e.key === "Escape" && editing && $("confirmSlot").hidden) { dismissEdit(); return; }
+    if (e.key === "Escape" && albumEditing && $("confirmSlot").hidden) { dismissAlbum(); return; }
     if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden;
@@ -2672,7 +2682,7 @@
     }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;   // leave browser shortcuts alone
-    if (document.querySelector(".modal-scrim:not([hidden])")) return;
+    if (!$("confirmSlot").hidden) return;
     // A focused list row: Enter opens/plays it, ↑/↓ move between rows.
     if (e.target.matches && e.target.matches("li[tabindex]")) {
       if (e.key === "Enter") { e.preventDefault(); e.target.click(); return; }

@@ -494,7 +494,7 @@ body {
     display: flex; flex-direction: column; gap: var(--space-3);
     padding: var(--space-3) var(--space-4) var(--space-3) var(--menu-indent, var(--space-4));
 }
-.menu .form-card .modal-actions { margin-top: 0; }
+.menu .form-card .form-actions { margin-top: 0; }
 .edit-tidy { margin-right: auto; }
 /* A menu asking for a name shows the slot's field. */
 .menu .slot-field { opacity: 1; visibility: visible; transform: none; padding-left: var(--menu-indent, var(--space-4)); }
@@ -523,40 +523,16 @@ body {
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ---- edit-track modal ---- */
-.modal-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-4);
-    background: rgba(0, 0, 0, 0.5);
-}
-
-.modal-card {
-    width: 100%;
-    max-width: 380px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: 0 12px 40px var(--color-shadow);
-}
-.modal-head { font-size: var(--text-base); font-weight: 600; color: var(--color-text-primary); }
-.modal-actions .btn { font-size: var(--text-sm); font-weight: 500; min-height: 36px; }
-.modal-field {
+.form-actions .btn { font-size: var(--text-sm); font-weight: 500; min-height: 36px; }
+.form-actions .btn-act { font-weight: 600; }
+.form-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
     font-size: var(--text-sm);
     color: var(--color-text-muted);
 }
-.modal-actions {
+.form-actions {
     display: flex;
     justify-content: flex-end;
     gap: var(--space-2);
@@ -614,9 +590,14 @@ body {
 .album-cover-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1); }
 .album-cover-preview { width: 64px; height: 64px; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-bg-inset); }
 .album-cover-preview:not([src]) { visibility: hidden; }
-.confirm-detail { color: var(--color-text-muted); font-size: var(--text-sm); margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
+/* The confirmation slot: the question beside its two actions. */
+.confirm-slot { margin: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
+.confirm-q { flex: 1; min-width: 0; padding-block: var(--space-1); }
+.confirm-text { color: var(--color-text-primary); }
+.confirm-detail { color: var(--color-text-muted); font-size: var(--text-sm); }
 .confirm-detail:empty { display: none; }
-#confirmOk.danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+.confirm-slot .form-actions { margin: 0; flex-shrink: 0; }
+.form-card .confirm-slot { margin: 0; padding-inline: 0; }   /* inside a form: a slot within the form's well */
 .toast { display: flex; align-items: center; gap: var(--space-3); pointer-events: auto; }
 .toast-action { background: none; border: 0; color: var(--color-accent); font: inherit; font-weight: 600; cursor: pointer; padding: var(--space-1) var(--space-2); min-height: 32px; }
 
@@ -738,7 +719,7 @@ body {
     .shelf-row, .browse-row { min-height: 48px; }
     .ep-filter-btn { min-height: 44px; padding-inline: var(--space-3); }
     .dl-act, .dl-dismiss { min-height: 44px; min-width: 44px; }
-    .modal-actions .btn { min-height: 44px; }
+    .form-actions .btn { min-height: 44px; }
     .slot-choices, .slot-field { min-height: 44px; }
     .slot-act { width: 44px; height: 44px; }
     .menu-item { min-height: 44px; }
@@ -747,7 +728,6 @@ body {
 
 
     /* Edit dialog: anchored to the top so the keyboard never covers Save. */
-    .modal-scrim { align-items: flex-start; padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
 }
 @media (prefers-reduced-motion: reduce) { .dl-summary .ico svg { transition: none; } }
 

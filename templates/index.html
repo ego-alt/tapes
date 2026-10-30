@@ -511,41 +511,38 @@
   <!-- Forms that open in a menu's slot, kept here while closed. -->
   <div id="formHome" hidden>
     <div class="form-card" id="editCard" role="group" aria-label="Edit track">
-      <label class="modal-field">Title<input class="input bare" id="edTitle" autocomplete="off"></label>
-      <label class="modal-field">Artist<input class="input bare" id="edArtist" autocomplete="off"></label>
-      <label class="modal-field">Album<input class="input bare" id="edAlbum" autocomplete="off"></label>
-      <label class="modal-field">Track #<input class="input bare" id="edTrackNo" type="number" min="1" autocomplete="off"></label>
-      <div class="modal-actions">
+      <label class="form-field">Title<input class="input bare" id="edTitle" autocomplete="off"></label>
+      <label class="form-field">Artist<input class="input bare" id="edArtist" autocomplete="off"></label>
+      <label class="form-field">Album<input class="input bare" id="edAlbum" autocomplete="off"></label>
+      <label class="form-field">Track #<input class="input bare" id="edTrackNo" type="number" min="1" autocomplete="off"></label>
+      <div class="form-actions">
         <button class="btn btn-ghost edit-tidy" id="edTidy" type="button">Tidy up</button>
         <button class="btn btn-ghost" id="edCancel" type="button">Cancel</button>
         <button class="btn btn-act" id="edSave" type="button">Save</button>
       </div>
     </div>
     <div class="form-card" id="albumCard" role="group" aria-label="Edit album">
-      <label class="modal-field">Album<input class="input bare" id="alName" autocomplete="off"></label>
-      <label class="modal-field">Artist for every song<input class="input bare" id="alArtist" placeholder="Each song's own" autocomplete="off"></label>
-      <div class="modal-field">Cover
+      <label class="form-field">Album<input class="input bare" id="alName" autocomplete="off"></label>
+      <label class="form-field">Artist for every song<input class="input bare" id="alArtist" placeholder="Each song's own" autocomplete="off"></label>
+      <div class="form-field">Cover
         <div class="album-cover-row">
           <img class="album-cover-preview" id="alCoverPreview" alt="">
           <label class="btn btn-ghost album-cover-pick">Choose image…<input type="file" id="alCover" accept="image/*" hidden></label>
         </div>
       </div>
-      <div class="modal-actions">
+      <div class="form-actions">
         <button class="btn btn-ghost" id="alCancel" type="button">Cancel</button>
         <button class="btn btn-act" id="alSave" type="button">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- In-app confirmation (replaces the browser's confirm()). -->
-  <div class="modal-scrim" id="confirmModal" hidden>
-    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmText">
-      <div class="modal-head" id="confirmText"></div>
-      <div class="confirm-detail" id="confirmDetail"></div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
-        <button class="btn btn-primary" id="confirmOk" type="button">OK</button>
-      </div>
+  <!-- The confirmation: a slot, opened in the form it's about or under the list's bar. -->
+  <div class="menu confirm-slot" id="confirmSlot" role="alertdialog" aria-labelledby="confirmText" hidden>
+    <div class="confirm-q"><div class="confirm-text" id="confirmText"></div><div class="confirm-detail" id="confirmDetail"></div></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
+      <button class="btn btn-act" id="confirmOk" type="button">OK</button>
     </div>
   </div>
 
