@@ -179,6 +179,7 @@
     library: svgIcon('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     link: svgIcon('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
     arrowRight: svgIcon('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+    tick: svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   };
 
   let shelf = [];         // tapes
@@ -809,7 +810,7 @@
     if (ep.show_id != null && currentShow && currentShow.refreshable)
       menu.appendChild(menuItem("Hide episode", () => hideEpisode(ep), closeMenu));
     else
-      menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu));
+      menu.appendChild(menuItem("Delete episode", () => deleteEpisode(ep), closeMenu, { danger: true }));
     showMenuAt(e);
   }
   async function openAssignMenu(e, ep) {
@@ -1740,12 +1741,15 @@
 
   // Without `close`, the menu stays open (it becomes a sub-picker or a form); the
   // click mustn't then reach the close-on-outside handler.
-  function menuItem(label, fn, close) {
+  // `danger` colours a destructive item; `current` marks the chosen one (a sort).
+  function menuItem(label, fn, close, { danger = false, current = false } = {}) {
     const item = document.createElement("div");
-    item.className = "menu-item";
-    item.setAttribute("role", "menuitem");
+    item.className = "menu-item" + (danger ? " danger" : "") + (current ? " current" : "");
+    item.setAttribute("role", current ? "menuitemradio" : "menuitem");
+    if (current) item.setAttribute("aria-checked", "true");
     item.tabIndex = -1;
     item.textContent = label;
+    if (current) item.insertAdjacentHTML("beforeend", `<span class="ico menu-tick">${ICONS.tick}</span>`);
     item.addEventListener("click", (ev) => { if (!close) ev.stopPropagation(); fn(); close?.(); });
     return item;
   }
@@ -1840,7 +1844,7 @@
       menu.appendChild(menuItem("Remove from tape", () => removeFromTape(t), closeMenu));
     }
     menu.appendChild(menuItem("Edit…", () => openEdit(t)));
-    menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu));
+    menu.appendChild(menuItem("Delete from library", () => deleteTrack(t), closeMenu, { danger: true }));
     showMenuAt(e);
   }
   async function removeFromTape(t) {
@@ -1885,7 +1889,7 @@
   function openBarMenu(btn, items) {
     if (!beginMenu(btn.id)) return;
     // Items marked to stay open (Edit album…) turn the menu into a form.
-    items.forEach((it) => menu.appendChild(!it ? menuSep() : menuItem(it[0], it[1], it[2] ? null : closeMenu)));
+    items.forEach((it) => menu.appendChild(!it ? menuSep() : menuItem(it[0], it[1], it[2] ? null : closeMenu, it[3])));
     openMenuUnder(btn.closest(".list-bar"));
     syncHistory();
   }
@@ -1975,11 +1979,11 @@
   // A tape's ⋯: how to sort it (All Tracks, Singles), then what can be done to it.
   function tapeMenuItems() {
     const sorts = currentTape?.sortable
-      ? SORTS.map(([k, label]) => [k === currentSort ? `${label}  ✓` : label, () => setSort(k)]) : [];
+      ? SORTS.map(([k, label]) => [label, () => setSort(k), false, { current: k === currentSort }]) : [];
     const acts = [];
     if (currentTape?.key === "tidy") acts.push(["Tidy all", tidyAll]);
     if (!currentTape && trackParent === "albums") acts.push(["Edit album…", editAlbum, true]);
-    if (currentTape?.kind === "user") acts.push(["Delete tape", deleteCurrentTape]);
+    if (currentTape?.kind === "user") acts.push(["Delete tape", deleteCurrentTape, false, { danger: true }]);
     return sorts.length && acts.length ? [...sorts, null, ...acts] : [...sorts, ...acts];
   }
   // The open list's bar: where back goes, a fresh search, and whether ⋯ has anything.
@@ -1996,7 +2000,7 @@
     e.stopPropagation();
     openBarMenu(e.currentTarget, [
       showActions.refreshable && ["Check for new episodes", refreshCurrentShow],
-      showActions.deletable && [currentShow?.refreshable ? "Unfollow" : "Delete show", deleteCurrentShow],
+      showActions.deletable && [currentShow?.refreshable ? "Unfollow" : "Delete show", deleteCurrentShow, false, { danger: true }],
     ].filter(Boolean));
   });
   // Search stays out of the way until its magnifier is tapped; closing it clears it.

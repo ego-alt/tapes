@@ -209,12 +209,17 @@ body {
     box-shadow: 0 8px 24px var(--color-shadow);
     cursor: grabbing;
 }
+/* Rows run edge to edge with square highlights, like the slots under them: a row
+   whose menu is open reads as that drawer's lid. */
+.track-list li, .shelf-row, .browse-row {
+    margin-inline: calc(-1 * var(--space-2));
+    padding-inline: calc(var(--space-3) + var(--space-2));
+}
 .track-list li {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
+    padding-block: var(--space-2);
     cursor: pointer;
     white-space: nowrap;
 }
@@ -324,7 +329,7 @@ body {
 /* ---- album / artist browse rows ---- */
 .browse-row {
     display: flex; align-items: center; gap: var(--space-3);
-    padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
+    padding-block: var(--space-2);
     cursor: pointer;
 }
 .browse-row:hover { background: var(--track-hover); }
@@ -346,10 +351,10 @@ body {
 .shelf-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: var(--space-3) var(--space-2) 0; }
 .shelf-row {
     display: flex; align-items: center; gap: var(--space-3);
-    padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer;
+    padding-block: var(--space-2); cursor: pointer;
 }
 .shelf-row:hover { background: var(--track-hover); }
-.shelf-sep { height: 1px; margin: var(--space-2) var(--space-3); background: var(--color-border-soft); list-style: none; }
+.shelf-sep { height: 1px; margin: var(--space-2) var(--space-3); background: var(--color-recess-rim-top); box-shadow: 0 1px 0 var(--color-recess-rim-bottom); list-style: none; }   /* engraved, like a menu's */
 .shelf-ico { width: 18px; text-align: center; color: var(--color-accent); }
 .shelf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shelf-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
@@ -468,6 +473,11 @@ body {
     outline: none; color: var(--color-text-primary);
     box-shadow: inset 0 -1px 0 var(--color-recess-rim-bottom);
 }
+.menu-item.danger { color: var(--color-danger-hover); }   /* destructive: red, brightening the same way */
+.menu-item.danger:hover, .menu-item.danger:focus-visible { color: var(--color-danger-hover); }   /* stays red; the lit edge still shows */
+.menu-item.current { color: var(--color-accent); }
+.menu-tick { margin-left: auto; }
+.menu-tick svg { width: 16px; height: 16px; }
 /* An engraved line between groups. */
 .menu-sep {
     height: 1px; margin: var(--space-1) var(--space-4) var(--space-1) var(--menu-indent, var(--space-4));
