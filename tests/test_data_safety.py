@@ -68,6 +68,13 @@ def test_two_tapes_cant_share_a_name(client):
     other = client.post("/api/playlists", json={"name": "Summer"}).get_json()["key"]
     assert client.post("/api/playlists", json={"name": "road trip "}).status_code == 409
     assert client.patch(f"/api/playlists/{other}", json={"name": "Road Trip"}).status_code == 409
+    assert client.post("/api/playlists", json={"name": "Road Trip"}).get_json()["error"] == "That name's taken."
     assert client.patch(f"/api/playlists/{pid}", json={"name": "Road Trip"}).status_code == 200   # its own name, recased
     client.delete(f"/api/playlists/{pid}")
     assert client.post("/api/playlists", json={"name": "Road trip"}).status_code == 200   # the old one is in the trash
+
+
+def test_two_shows_cant_share_a_name(client):
+    assert client.post("/api/podcast/shows", json={"name": "Morning Notes"}).status_code == 201
+    r = client.post("/api/podcast/shows", json={"name": "morning notes "})
+    assert r.status_code == 409 and r.get_json()["error"] == "That name's taken."

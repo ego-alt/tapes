@@ -103,7 +103,7 @@ def _tape_name(pid=None):
     taken = Playlist.query.filter(Playlist.user_id == _uid(), Playlist.deleted_at.is_(None),
                                   db.func.lower(Playlist.name) == name.lower(), Playlist.id != pid)
     if taken.first():
-        abort(409, f"You already have a tape called “{name}”.")
+        abort(409, "That name's taken.")
     return name
 
 

@@ -94,6 +94,9 @@ def create_show():
     name = (request.json or {}).get("name", "").strip()
     if not name:
         abort(400, "Give the show a name.")
+    # Like tapes: two of your shows with one name can't be told apart in "Move to show".
+    if Show.query.filter(Show.user_id == _uid(), db.func.lower(Show.title) == name.lower()).first():
+        abort(409, "That name's taken.")
     s = Show(user_id=_uid(), title=name, source_type="manual", source_url="")
     db.session.add(s)
     db.session.commit()
