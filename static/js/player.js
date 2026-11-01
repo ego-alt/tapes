@@ -355,6 +355,9 @@
   const rowLabel = (row) => row?.querySelector(".shelf-name, .browse-name");
   const rowKey = (li) => li.dataset.id || li.dataset.job || "";   // a song, episode or download
   const ease = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const durMs = (v) => parseFloat(ease(v));   // a duration token, in ms
+  // The spring's sampled stops (the values inside --ease-spring's linear()).
+  const springStops = () => (ease("--ease-spring").match(/-?[\d.]+(?=\s*(?:,|\)|$))/g) || ["0", "1"]).map(Number);
   const surface = (which) => getComputedStyle(sidebar).getPropertyValue(which).trim();
   const shutting = (extra) => ({ duration: parseFloat(ease("--dur-shut")), easing: ease("--ease-shut"), fill: "forwards", ...extra });   // every drawer closes alike
   // A tall slot gets more time than a small one (with the square root of its
@@ -1794,8 +1797,8 @@
       shutting.classList.add("steady");   // no opening animation
       menu.replaceWith(shutting);
       requestAnimationFrame(() => { shutting.hidden = true; });
-      setTimeout(() => shutting.remove(), 260);
-      menuWait = reducedMotion() ? 0 : 200;
+      setTimeout(() => shutting.remove(), durMs("--dur-shut") + 60);
+      menuWait = reducedMotion() ? 0 : durMs("--dur-shut") / 2;   // the new one starts as the old is half shut
     }
     menu.hidden = true;
     menu.dataset.for = key;
@@ -1818,11 +1821,32 @@
       const edge = anchor.parentElement.getBoundingClientRect().left;   // the menu runs edge to edge
       menu.style.setProperty("--menu-indent", title ? `${Math.round(title.getBoundingClientRect().left - edge)}px` : "");
       menu.hidden = false;
-      requestAnimationFrame(() => menu.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+      revealOpening(menu, anchor);
     };
     const wait = menuWait;
     menuWait = 0;
     if (wait) setTimeout(open, wait); else open();
+  }
+  // A drawer opening near the bottom of a scrolling list: measure its final height
+  // up front and scroll by exactly what it needs, alongside the opening, on the
+  // same spring (read from --ease-spring, so CSS and JS move as one).
+  function revealOpening(drawer, anchor) {
+    const list = anchor.closest("ul");
+    if (!list) return;
+    // (its contents are pinned to its bottom edge, so add them up rather than read scrollHeight)
+    const height = [...drawer.children].reduce((h, c) => h + c.offsetHeight, 0);
+    const need = anchor.getBoundingClientRect().bottom + height + 8 - list.getBoundingClientRect().bottom;
+    if (need <= 0) return;
+    const from = list.scrollTop, to = Math.min(from + need, list.scrollHeight);   // (it can grow into the space the drawer adds)
+    if (reducedMotion()) { list.scrollTop = to; return; }
+    const curve = springStops(), dur = durMs("--dur-open"), t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur), i = p * (curve.length - 1), k = Math.floor(i);
+      const v = k >= curve.length - 1 ? 1 : curve[k] + (curve[k + 1] - curve[k]) * (i - k);
+      list.scrollTop = from + (to - from) * v;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
   // A redrawn list keeps its open menu under the same row.
   function keepMenu(list) {
@@ -1895,7 +1919,7 @@
     menu.hidden = true;
     delete menu.dataset.for;
     editing = null; albumEditing = false;
-    setTimeout(() => { if (menu.hidden) clearMenu(); }, 260);   // after it slides shut
+    setTimeout(() => { if (menu.hidden) clearMenu(); }, durMs("--dur-shut") + 60);   // after it slides shut
   };
   // A tap elsewhere closes a menu, but not a form.
   document.addEventListener("click", (e) => {
@@ -1925,7 +1949,10 @@
   const SLOT_CHOICES = { music: [["rip", "Rip a song"], ["tape", "Add a tape"]], podcasts: [["follow", "Follow a podcast"], ["show", "Add a show"]] };
   const slotOpen = () => !!slot.dataset.mode;
   function setSlot(m) {
+    const opening = !!m && slot.hidden;
     slot.dataset.mode = m;
+    if (m) slot.dataset.show = m;   // (kept while it shuts, so the contents ride in with the edge)
+    if (opening) { slot.classList.add("opening"); requestAnimationFrame(() => requestAnimationFrame(() => slot.classList.remove("opening"))); }
     slotMessage("");
     slot.hidden = !m;
     $("libSearchBtn").setAttribute("aria-expanded", String(m === "search"));

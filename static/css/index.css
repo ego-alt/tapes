@@ -55,9 +55,10 @@ body {
     /* a seam: a dark groove over a lit lip */
     border-bottom: 1px solid var(--color-recess-rim-top);
     box-shadow: 0 1px 0 var(--color-recess-rim-bottom);
+    transition: box-shadow 70ms ease calc(var(--dur-shut) - 70ms);   /* the lip comes back as a closing well reaches it */
 }
-/* With a drawer open, the seam has parted. */
-.lib-bar:has(+ .slot:not([hidden])), .list-bar:has(+ .search-wrap:not([hidden])) { box-shadow: none; }
+/* With a drawer open, the seam has parted: its light passes to the well's lip. */
+.lib-bar:has(+ .slot:not([hidden])), .list-bar:has(+ .search-wrap:not([hidden])) { box-shadow: none; transition: box-shadow 70ms ease; }
 .list-bar { padding-left: var(--space-1); }
 /* Recessed wells: the element is the rim, ::before the well. */
 .slot-well, .search-wrap {
@@ -74,24 +75,29 @@ body {
 .slot-well > *, .search-wrap > * { position: relative; z-index: 1; }
 
 /* Drawers (the slot, list searches, menus) slide open from nothing and shut
-   before they're hidden. */
+   before they're hidden. Their contents are pinned to the moving bottom edge, so
+   they ride out of the seam with it, and back in. */
 .slot, .search-wrap, .menu {
     flex-shrink: 0; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-end;
     interpolate-size: allow-keywords; height: auto;
     transition: height var(--dur-open) var(--ease-spring), display var(--dur-open) allow-discrete;
 }
+.slot > *, .search-wrap > *, .menu > * { flex-shrink: 0; }
 .slot[hidden], .search-wrap[hidden], .menu[hidden] { height: 0; transition: height var(--dur-shut) var(--ease-shut), display var(--dur-shut) allow-discrete; }
 @starting-style { .slot, .search-wrap, .menu:not(.steady) { height: 0; } }
 .sidebar.in-list .slot { display: none; transition: none; }   /* gone at once inside a list */
 .slot-well { display: grid; }
+/* What the slot shows (data-show) outlasts its being open, so it rides shut with
+   the edge. Choices and field cross-fade only when switching inside an open slot. */
 .slot-choices, .slot-field {
     grid-area: 1 / 1; display: flex; align-items: center; min-height: 40px;
-    opacity: 0; visibility: hidden; transform: translateY(-4px);
-    transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s 0.14s;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.14s ease, visibility 0s 0.14s;
 }
-/* Visible at once when shown (so the field can take focus), hidden after the fade. */
-.slot[data-mode="choose"] .slot-choices,
-.slot:not([data-mode=""]):not([data-mode="choose"]) .slot-field { opacity: 1; visibility: visible; transform: none; transition: opacity 0.14s ease, transform 0.2s var(--ease-slot), visibility 0s; }
+.slot[data-show="choose"] .slot-choices,
+.slot[data-show]:not([data-show="choose"]) .slot-field { opacity: 1; visibility: visible; transition: opacity 0.14s ease, visibility 0s; }
+.slot.opening .slot-choices, .slot.opening .slot-field { transition: none; }   /* opening: no fade, just the slide */
 .slot-choice {
     flex: 1 1 0; min-width: 0; height: 100%; padding: 0 var(--space-3);
     border: 0; background: none; cursor: pointer; overflow: hidden; white-space: nowrap;
@@ -131,7 +137,7 @@ body {
     content: ""; position: absolute; left: var(--space-3); right: var(--space-3); bottom: 1px; height: 1px;
     background: var(--color-accent); opacity: 0.6; z-index: 1;
 }
-@media (prefers-reduced-motion: reduce) { .slot, .search-wrap, .menu, .search-wrap > *, .menu > *, .slot-choice, .slot-choices, .slot-field { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .slot, .search-wrap, .menu, .slot-choice, .slot-choices, .slot-field, .lib-bar, .list-bar { transition: none !important; } }
 .sidebar.in-list .lib-bar { display: none; }
 .sidebar[data-depth="1"] { --surface: var(--color-depth-1); --surface-inner: var(--color-depth-2); --surface-outer: var(--color-bg-pane); }
 .sidebar[data-depth="2"] { --surface: var(--color-depth-2); --surface-inner: var(--color-depth-3); --surface-outer: var(--color-depth-1); }
@@ -466,7 +472,7 @@ body {
 }
 .menu > * { position: relative; }
 .list-bar + .menu { margin: 0; }
-.list-bar:has(+ .menu:not([hidden])) { box-shadow: none; }
+.list-bar:has(+ .menu:not([hidden])) { box-shadow: none; transition: box-shadow 70ms ease; }
 .menu-item {
     display: flex; align-items: center; min-height: 40px;
     padding: 0 var(--space-4) 0 var(--menu-indent, var(--space-4));
@@ -498,14 +504,6 @@ body {
 .edit-tidy { margin-right: auto; }
 /* A menu asking for a name shows the slot's field. */
 .menu .slot-field { opacity: 1; visibility: visible; transform: none; padding-left: var(--menu-indent, var(--space-4)); }
-/* A drawer's contents lift slightly into the seam and fade as it shuts, and settle
-   in as it opens (the slot's own choices and field already cross-fade). */
-.search-wrap > *, .menu > * { transition: opacity calc(var(--dur-shut) * 0.7) ease, transform var(--dur-shut) var(--ease-shut), color 0.12s ease, box-shadow 0.12s ease; }
-.search-wrap[hidden] > *, .menu[hidden] > * { opacity: 0; transform: translateY(-6px); }
-@starting-style { .search-wrap > *, .menu:not(.steady) > * { opacity: 0; transform: translateY(-6px); } }
-.menu:not([hidden]) > :nth-child(2) { transition-delay: 25ms; }   /* items seat one after another */
-.menu:not([hidden]) > :nth-child(3) { transition-delay: 50ms; }
-.menu:not([hidden]) > :nth-child(n+4) { transition-delay: 75ms; }
 
 
 /* ---- sort selector (All Tracks / Singles) ---- */
@@ -595,7 +593,7 @@ body {
 .album-cover-preview { width: 64px; height: 64px; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-bg-inset); }
 .album-cover-preview:not([src]) { visibility: hidden; }
 /* The confirmation slot: the question beside its two actions. */
-.confirm-slot { margin: 0; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
+.confirm-slot { margin: 0; display: flex; flex-direction: row; align-items: flex-end; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
 .confirm-q { flex: 1; min-width: 0; padding-block: var(--space-1); }
 .confirm-text { color: var(--color-text-primary); }
 .confirm-detail { color: var(--color-text-muted); font-size: var(--text-sm); }
