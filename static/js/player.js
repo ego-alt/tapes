@@ -75,7 +75,7 @@
     [() => albumEditing, () => dismissAlbum()],
     [() => !!editing, () => dismissEdit()],
     [() => !menu.hidden, closeMenu],
-    [() => upnext.classList.contains("expanded"), () => upnext.classList.remove("expanded")],
+    [() => upnext.classList.contains("expanded"), () => setUpNext(false)],
     [() => app.classList.contains("immersive") && !isMobile() && !app.classList.contains("nav-collapsed"), () => app.classList.add("nav-collapsed")],
     [() => app.classList.contains("immersive"), () => DeckFX.setImmersive(false)],
     [() => isMobile() && app.classList.contains("deck-open"), closeDeck],
@@ -1465,7 +1465,7 @@
   function updateUpNext() {
     if (qi < 0 || !queue.length) {
       upnext.hidden = true;
-      upnext.classList.remove("expanded");
+      setUpNext(false);
       return;
     }
     upnext.hidden = false;
@@ -1473,13 +1473,14 @@
     $("upnextCount").textContent = remaining > 0 ? String(remaining) : "";
     if (upnext.classList.contains("expanded")) renderQueue();
   }
-  function toggleUpNext() {
-    upnext.classList.toggle("expanded");
-    if (upnext.classList.contains("expanded")) renderQueue();
+  const toggleUpNext = () => setUpNext(!upnext.classList.contains("expanded"));
+  function setUpNext(open) {
+    upnext.classList.toggle("expanded", open);
+    if (open) renderQueue();
   }
   // Tapping outside the open queue closes it (it's a sheet on phones).
   document.addEventListener("click", (e) => {
-    if (upnext.classList.contains("expanded") && !upnext.contains(e.target)) upnext.classList.remove("expanded");
+    if (upnext.classList.contains("expanded") && !upnext.contains(e.target)) setUpNext(false);
   });
   function renderQueue() {
     const el = $("queueList");
@@ -2711,7 +2712,7 @@
     if (e.key === "Escape" && app.classList.contains("immersive")) { DeckFX.setImmersive(false); return; }
     if (e.key === "Escape") {
       const anyOpen = upnext.classList.contains("expanded") || !menu.hidden;
-      upnext.classList.remove("expanded"); closeMenu();
+      setUpNext(false); closeMenu();
       if (!anyOpen && isMobile()) closeDeck();
     }
     if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable) return;

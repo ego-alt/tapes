@@ -227,7 +227,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    max-height: min(50vh, 360px);
+    justify-content: flex-end;   /* the rows ride the moving edge, like any drawer */
     overflow: hidden;
     background: linear-gradient(var(--color-recess-rim-top), var(--color-well-lip));
     interpolate-size: allow-keywords;
@@ -239,10 +239,10 @@
     content: ""; position: absolute; inset: 0 0 1px; pointer-events: none;
     background: linear-gradient(var(--color-recess-shade), transparent 14px), var(--color-deck-well);
 }
-.upnext-panel > * { position: relative; }
+.upnext-panel > * { position: relative; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) { .upnext-caret, .upnext-panel { transition: none; } }
 
-.queue-list { overflow-y: auto; list-style: none; margin: 0; padding: var(--space-2) 0; }
+.queue-list { max-height: min(50vh, 360px); overflow-y: auto; list-style: none; margin: 0; padding: var(--space-2) 0; }
 .q-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); cursor: pointer; }   /* square, edge to edge */
 .q-row:hover { background: var(--track-hover); }
 .q-row.active { background: var(--color-bg-inset); }
@@ -273,7 +273,7 @@
     /* Up Next: full width along the bottom; the queue opens up out of the bar. */
     .upnext { left: 0; right: 0; bottom: 0; width: auto; padding-bottom: env(safe-area-inset-bottom); }
     .upnext-bar { justify-content: center; min-height: 48px; }
-    .upnext-panel { max-height: 60dvh; }
+    .queue-list { max-height: 60dvh; }
     .q-drag, .q-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
     /* Just previous, play and next: big enough to hit without looking. */
     .tbtn { width: 58px; height: 58px; }
