@@ -333,17 +333,23 @@
 
   // Build a long list a chunk at a time: the first rows straight away, the
   // rest as the end of the list scrolls into view.
-  const CHUNK = 150;
+  // The first rows a screen needs go in at once, the rest of the first chunk just
+  // after (so opening a long list doesn't stall its motion); el.fillNow() puts
+  // them in straight away when something needs them sooner (a remembered scroll).
+  const CHUNK = 150, FIRST = 40;
   function renderInChunks(el, items, makeRow, after) {
-    let n = 0;
-    const more = () => {
+    let n = 0, later = 0;
+    const more = (count = CHUNK) => {
+      clearTimeout(later);
+      el.querySelector(":scope > .list-more")?.remove();
       const frag = document.createDocumentFragment();
-      const end = Math.min(items.length, n + CHUNK);
+      const end = Math.min(items.length, n + count);
       for (; n < end; n++) frag.appendChild(makeRow(items[n], n));
       el.appendChild(frag);
       if (after) after();
       if (n < items.length) watch();
     };
+    el.fillNow = () => { if (n < Math.min(items.length, CHUNK)) more(CHUNK - n); };
     const watch = () => {
       const sentinel = document.createElement("li");
       sentinel.className = "list-more"; sentinel.setAttribute("aria-hidden", "true");
@@ -354,7 +360,9 @@
       }, { rootMargin: "600px 0px" });
       io.observe(sentinel);
     };
-    more();
+    more(FIRST);
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 0));
+    if (n < items.length) later = setTimeout(() => idle(() => { if (el.isConnected && n < CHUNK) more(CHUNK - n); }, { timeout: 1000 }), 600);
   }
   function debounce(fn, ms) {
     let t = null;
@@ -391,14 +399,33 @@
     return { top: r.top - s.top, bottom: r.bottom - s.top, left: r.left - s.left, height: r.height };
   }
   const stripIds = (el) => { el.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id")); el.removeAttribute("id"); return el; };
-  const sidebarCopy = () => { const c = stripIds(sidebar.cloneNode(true)); c.classList.add("nav-copy"); return c; };
+  // The copies hold only what's on screen: a hidden view, or rows scrolled out of
+  // sight, would cost cloning and layout at the very moment the motion starts.
+  const onScreen = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+  function trimRows(orig, copy) {
+    const top = orig.scrollTop - orig.clientHeight, bottom = orig.scrollTop + orig.clientHeight * 2;
+    const keep = [...orig.children].map((li) => li.offsetTop + li.offsetHeight >= top && li.offsetTop <= bottom);
+    [...copy.children].forEach((li, i) => { if (keep[i] === false) li.remove(); });
+    // what's left keeps its place: a spacer stands in for the rows above
+    const first = keep.indexOf(true);
+    if (first > 0) { const pad = document.createElement("li"); pad.style.cssText = `height:${orig.children[first].offsetTop}px;padding:0;margin:0;border:0`; pad.setAttribute("aria-hidden", "true"); copy.prepend(pad); }
+  }
+  function sidebarCopy() {
+    const c = sidebar.cloneNode(false);
+    for (const child of sidebar.children) if (onScreen(child)) c.appendChild(child.cloneNode(true));
+    const lists = [...sidebar.querySelectorAll("ul")].filter((u) => u.offsetParent);
+    [...c.querySelectorAll("ul")].forEach((u, i) => lists[i] && trimRows(lists[i], u));
+    stripIds(c).classList.add("nav-copy");
+    return c;
+  }
   function listCopy(list) {
-    const c = stripIds(list.cloneNode(true));
-    c.style.cssText = `left:${list.offsetLeft}px;width:${list.offsetWidth}px;height:${list.offsetHeight}px`;
+    const c = list.cloneNode(true);
+    trimRows(list, c);
+    stripIds(c).style.cssText = `left:${list.offsetLeft}px;width:${list.offsetWidth}px;height:${list.offsetHeight}px`;
     return c;
   }
   // Scroll positions, read before a swap and given to the copies.
-  const scrollsOf = (root) => [...root.querySelectorAll("ul")].map((u) => u.scrollTop);
+  const scrollsOf = (root) => [...root.querySelectorAll("ul")].filter((u) => u.offsetParent).map((u) => u.scrollTop);
   const setScrolls = (root, v) => root.querySelectorAll("ul").forEach((u, i) => { u.scrollTop = v[i] || 0; });
   // The stage: the sidebar above and below a row, with a well between.
   function stage(copy, row) {
@@ -409,26 +436,39 @@
     const belt = document.createElement("div"), well = document.createElement("div"), above = copy, below = copy.cloneNode(true);
     belt.className = "nav-belt";
     well.className = "nav-well";
+    // Full height from the start, under the copy below the row: the slot opens as
+    // that copy slides down off it (a transform, which the GPU runs; animating the
+    // well's height would lay the page out again on every frame).
     well.style.top = `${r.bottom}px`;
+    well.style.height = `${s.height}px`;
     well.style.right = edge();   // leave the sidebar's border showing
     above.style.clipPath = `inset(0 0 calc(100% - ${r.bottom}px) 0)`;
     below.style.clipPath = `inset(${r.bottom}px 0 0 0)`;
-    belt.append(above, below, well);
+    belt.append(above, well, below);
     el.appendChild(belt);
     document.body.appendChild(el);
     setScrolls(above, scrolls);
     setScrolls(below, scrolls);
     // The label travels on top of everything as its own piece; the copy's is hidden.
     const copyRow = above.querySelector("[data-nav-row]"), real = rowLabel(row), lr = inSidebar(real), cs = getComputedStyle(real);
+    // Regular and bold stacked: the title's weight changes by crossfading the two
+    // (animating font-weight would re-set the text on every frame).
     const label = document.createElement("div");
     label.className = "nav-label";
-    label.textContent = real.textContent;
+    label.innerHTML = '<span class="nav-w-regular"></span><span class="nav-w-bold"></span>';
+    label.querySelectorAll("span").forEach((sp) => { sp.textContent = real.textContent; });
     label.style.cssText = `top:${lr.top}px;left:${lr.left}px;height:${lr.height}px;line-height:${lr.height}px;color:${cs.color};font-size:${cs.fontSize};font-weight:${cs.fontWeight}`;
     belt.appendChild(label);
     if (copyRow) rowLabel(copyRow).style.visibility = "hidden";
     return { el, belt, well, above, below, r, label, rowBits: copyRow ? [...copyRow.children] : [] };
   }
   const centre = (r) => r.top + r.height / 2;
+  // The moving title from regular to bold (going in) or back (toBack).
+  function crossfade(label, toBack, timing) {
+    const [regular, bold] = label.children, shown = [{ opacity: 0 }, { opacity: 1 }], gone = [{ opacity: 1 }, { opacity: 0 }];
+    regular.animate(toBack ? shown : gone, timing);
+    bold.animate(toBack ? gone : shown, timing);
+  }
   const edge = () => getComputedStyle(sidebar).borderRightWidth;
   // A copy of a list's bar, its title hidden (the moving label stands in for it).
   function barCopy(view, top) {
@@ -470,7 +510,6 @@
     st.well.style.background = surface("--surface-inner");
     const h = sidebar.clientHeight - st.r.bottom;
     const open = { duration: forHeight(h, 170, 260), easing: ease("--ease-slot"), fill: "forwards" };
-    st.well.animate([{ height: "0px" }, { height: `${h}px` }], open);
     st.below.animate([{ transform: "none" }, { transform: `translateY(${h}px)` }], open);
     // An open search shuts as the row rises: everything below it moves up with it.
     if (slotH) {
@@ -487,7 +526,6 @@
       if (!pending || pending.st !== st) return;
       pending = null;
       const shut = shutting({ duration: forHeight(h, 200, 380) });
-      st.well.animate([{ height: `${h}px` }, { height: "0px" }], shut);
       st.below.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], shut).finished.then(() => st.el.remove());
     }, 2500);
   }, true);
@@ -518,14 +556,15 @@
     st.well.appendChild(inner);
     inner.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: "ease-out" });
     st.el.style.background = toBg;   // no gaps showing the view underneath
-    st.well.animate([{ top: `${st.r.bottom}px`, height: `${h}px` }, { top: `${L.top + dy + slotH}px`, height: `${sidebar.clientHeight - L.top}px` }],
-      { ...rise, easing: "ease-out", duration: 200 });
+    const settle = { ...rise, easing: "ease-out", duration: 200 };
+    st.well.animate([{ transform: "none" }, { transform: `translateY(${L.top + dy + slotH - st.r.bottom}px)` }], settle);
+    st.below.animate([{ transform: `translateY(${h}px)` }, { transform: `translateY(${sidebar.clientHeight + Math.abs(dy)}px)` }], settle);   // on out of sight under the list
     const bar = barCopy(name, inSidebar($(LIST_VIEW[name]).querySelector(".list-bar")).top + dy);
     bar.style.background = fromBg;   // the row's colour: only the list goes darker
     st.belt.insertBefore(bar, st.label);
     bar.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: 200, fill: "both", easing: "ease-out" });
     st.label.animate([{ transform: "none" }, { transform: `translateX(${dx}px)` }], rise);
-    st.label.animate([{ fontWeight: 400 }, { fontWeight: 600 }], { ...rise, easing: "ease-out", duration: 300 });
+    crossfade(st.label, false, { ...rise, easing: "ease-out", duration: 300 });
     st.rowBits.forEach((c) => c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, delay: 60, fill: "forwards" }));
     setTimeout(tick, 290);
     st.belt.animate([{ transform: "none" }, { transform: `translateY(${-dy}px)` }], rise).finished.then(() => st.el.remove(), () => st.el.remove());
@@ -549,7 +588,7 @@
     const st = stage(sidebarCopy(), row);
     delete row.dataset.navRow;
     const label = inSidebar(rowLabel(row)), dy = Math.round(centre(label) - centre(title)), dx = Math.round(title.left - label.left), h = sidebar.clientHeight - L.top;
-    Object.assign(st.well.style, { top: `${L.top + dy}px`, height: `${h}px`, background: fromBg });
+    Object.assign(st.well.style, { top: `${L.top + dy}px`, background: fromBg });
     st.el.style.background = surface("--surface");
     st.well.appendChild(leaving);
     leaving.scrollTop = scroll;
@@ -560,11 +599,10 @@
     const shut = shutting({ delay: 160, duration: forHeight(h, 200, 380), fill: "both" });
     bar.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: "both", easing: "ease-in" });
     st.belt.animate([{ transform: `translateY(${-dy}px)` }, { transform: "none" }], drop);
-    st.well.animate([{ height: `${h}px` }, { height: "0px" }], shut);
     // The list is drawn up and fades early, so a tall slot reads as a dark band closing.
     leaving.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(-16px)", opacity: 0 }], { ...shut, duration: shut.duration * 0.6 });
     st.label.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], drop);
-    st.label.animate([{ fontWeight: 600 }, { fontWeight: 400 }], { duration: 300, easing: "ease-out", fill: "both" });
+    crossfade(st.label, true, { duration: 300, easing: "ease-out", fill: "both" });
     st.rowBits.forEach((c) => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, delay: 120, fill: "both" }));
     setTimeout(tick, 240);
     st.below.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], shut).finished.then(() => st.el.remove(), () => st.el.remove());
@@ -587,8 +625,11 @@
     sidebar.dataset.depth = name === "browse" || name === "episodes" ? 1
       : name === "tracks" ? (trackParent === "albums" || trackParent === "artists" ? 2 : 1) : 0;
     if (sidebar.classList.contains("in-list") && !libJumping) closeSlot();   // (a library search closes it itself, after moving its text across)
-    const back = scrollMem[scrollKey(name)];
-    if (back != null) $(LIST_ID[name]).scrollTop = back;
+    const back = scrollMem[scrollKey(name)], list = $(LIST_ID[name]);
+    if (back != null) {
+      if (back > list.scrollHeight - list.clientHeight) list.fillNow?.();   // rows still to come
+      list.scrollTop = back;
+    }
     syncHistory();
   }
 

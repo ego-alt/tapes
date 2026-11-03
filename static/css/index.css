@@ -227,6 +227,9 @@ body {
     margin-inline: calc(-1 * var(--space-2));
     padding-inline: calc(var(--space-3) + var(--space-2));
 }
+/* A long list lays out and paints only the rows near the screen: a drawer
+   opening in it, or a copy of it moving, then costs a few rows, not hundreds. */
+.track-list li, .shelf-list li { content-visibility: auto; contain-intrinsic-size: auto 52px; }
 .track-list li {
     display: flex;
     align-items: center;
@@ -744,8 +747,9 @@ body {
 @media (prefers-reduced-motion: reduce) { .dl-summary .ico svg { transition: none; } }
 
 /* Moving between lists (see showView). */
-.nav-stage { position: fixed; z-index: 50; overflow: hidden; pointer-events: none; }
+.nav-stage { position: fixed; z-index: 50; overflow: hidden; pointer-events: none; contain: strict; }   /* its own layer: nothing in it lays out the page */
 .nav-belt { position: absolute; inset: 0; }
+.nav-belt, .nav-belt > * { will-change: transform; }   /* every moving piece on the GPU */
 .nav-copy { position: absolute !important; inset: 0 !important; width: auto !important; transition: none !important; z-index: auto !important; }   /* (no !important transform: the copies move) */
 .nav-copy * { transition: none !important; }   /* copies are frozen: nothing replays opening */
 .nav-well {
@@ -754,5 +758,7 @@ body {
 }
 .nav-well > ul { position: absolute; top: 0; margin: 0; }
 .nav-bar-copy { position: absolute; left: 0; right: 0; }
-.nav-label { position: absolute; white-space: nowrap; }
+.nav-label { position: absolute; white-space: nowrap; display: grid; }
+.nav-label > span { grid-area: 1 / 1; }
+.nav-w-bold { font-weight: 600; opacity: 0; }
 
