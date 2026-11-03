@@ -246,8 +246,18 @@ body {
     color: var(--color-text-muted);
     flex-shrink: 0;
 }
-.track-list li.active .tl-num::before { content: "▸"; color: var(--track-active); font-size: var(--text-sm); }   /* (the number itself is hidden) */
-.track-list li.active .tl-num { font-size: 0; }
+/* The playing song: a triangle in place of its number, as tall as the digits
+   (a drawn shape: the ▸ character sits small in most fonts, and ▶ turns into
+   an emoji on some phones). */
+.track-list li.active .tl-num { display: flex; align-items: center; justify-content: center; font-size: 0; }
+.track-list li.active .tl-num::before {
+    content: "";
+    width: 0.62em;
+    height: 0.72em;
+    font-size: var(--text-sm);
+    background: var(--track-active);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
 .tl-meta { overflow: hidden; flex: 1; min-width: 0; }
 .tl-title {
     font-size: var(--text-base);
