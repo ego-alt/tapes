@@ -276,7 +276,7 @@
     const tok = ++navToken;
     const sortable = key === "all" || key === "singles";
     currentSort = sortable ? savedSort(key) : "default";
-    const data = await navGet(`api/playlists/${key}/tracks?sort=${currentSort}`);
+    const data = await quickGet(`api/playlists/${key}/tracks?sort=${currentSort}`, tok, (fresh) => { view = fresh; applySearch(); });
     if (tok !== navToken) return;   // a newer view opened while we waited
     currentTape = { key, name, kind, sortable };
     view = data;
@@ -311,6 +311,25 @@
     });
   }
   const navGet = (url) => whileLoading(jget(url));
+
+  // A list opened before shows at once from its last copy (the service worker keeps one),
+  // then catches up when the network answers: away from home, over Tailscale, that can take
+  // a second or two, and the slot would sit open and empty. `update` gets the fresh list
+  // only if it changed and the view is still the one that asked.
+  async function lastCopy(u) {
+    try {
+      const r = await caches.match(new URL(u, location.href).href, { ignoreVary: true });
+      return r ? await r.json() : null;
+    } catch (_) { return null; }   // no Cache API (not a secure origin) or a bad copy
+  }
+  async function quickGet(u, tok, update) {
+    const had = await lastCopy(u);
+    if (!had) return navGet(u);
+    jget(u).then((fresh) => {
+      if (tok === navToken && JSON.stringify(fresh) !== JSON.stringify(had)) update(fresh);
+    }).catch(() => {});   // offline: the copy stands
+    return had;
+  }
 
   // Build a long list a chunk at a time: the first rows straight away, the
   // rest as the end of the list scrolls into view.
@@ -576,7 +595,7 @@
   // ---------- album / artist browse ----------
   async function openBrowse(kind) {
     const tok = ++navToken;
-    const rows = await navGet(kind === "albums" ? "api/albums" : "api/artists");
+    const rows = await quickGet(kind === "albums" ? "api/albums" : "api/artists", tok, (fresh) => { browseRows = fresh; applyBrowseSearch(); });
     if (tok !== navToken) return;
     currentBrowse = kind;
     browseRows = rows;
@@ -625,14 +644,14 @@
   }
   async function openAlbumTracks(album) {
     const tok = ++navToken;
-    const data = await navGet(`api/albums/tracks?album=${encodeURIComponent(album)}`);
+    const data = await quickGet(`api/albums/tracks?album=${encodeURIComponent(album)}`, tok, (fresh) => { view = fresh; applySearch(); });
     if (tok !== navToken) return;
     view = data;
     openTrackList(album, "albums", "Albums");
   }
   async function openArtistTracks(artist) {
     const tok = ++navToken;
-    const data = await navGet(`api/artists/tracks?artist=${encodeURIComponent(artist)}`);
+    const data = await quickGet(`api/artists/tracks?artist=${encodeURIComponent(artist)}`, tok, (fresh) => { view = fresh; applySearch(); });
     if (tok !== navToken) return;
     view = data;
     openTrackList(artist, "artists", "Artists");
@@ -689,7 +708,7 @@
   async function openPodcasts() {
     const tok = ++navToken;
     let data;
-    try { data = await navGet("api/podcast/shows"); }
+    try { data = await quickGet("api/podcast/shows", tok, (fresh) => { showsData = fresh; renderShows(fresh); }); }
     catch (e) { console.error(e); toast("Couldn't load podcasts."); return; }
     if (tok !== navToken) return;
     showsData = data;
@@ -732,7 +751,7 @@
   }
   async function openShow(s) {
     const tok = ++navToken;
-    const data = await navGet(`api/podcast/shows/${s.id}/episodes`);
+    const data = await quickGet(`api/podcast/shows/${s.id}/episodes`, tok, (fresh) => { currentShow = fresh.show; episodes = fresh.episodes; applyEpisodeSearch(); });
     if (tok !== navToken) return;
     currentShow = data.show;
     // manual tapes can't refresh; only real shows can be deleted from here
@@ -740,7 +759,7 @@
   }
   async function openLoose() {
     const tok = ++navToken;
-    const data = await navGet("api/podcast/episodes/loose");
+    const data = await quickGet("api/podcast/episodes/loose", tok, (fresh) => { episodes = fresh.episodes; applyEpisodeSearch(); });
     if (tok !== navToken) return;
     currentShow = null;
     enterEpisodes("Unsorted episodes", data.episodes, { refreshable: false, deletable: false });
@@ -2810,6 +2829,9 @@
       await restorePlaystate();
       updateUpNext();
       jget("api/downloads").then(handleJobs).catch(() => {});   // rips still running, or finished since last time
+      // Fetch the big lists ahead, so even their first opening is from a copy.
+      setTimeout(() => ["api/albums", "api/artists", `api/playlists/all/tracks?sort=${savedSort("all")}`]
+        .forEach((u) => jget(u).catch(() => {})), 1500);
     } catch (e) {
       console.error(e);
       toast("Couldn't load your library.");
