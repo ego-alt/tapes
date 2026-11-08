@@ -561,6 +561,10 @@ def _process_podcast(app, job):
     music_dir = pathlib.Path(app.config["MUSIC_DIR"])
     podcast_dir = pathlib.Path(app.config["PODCAST_DIR"])
 
+    if ep.hidden_at is not None:
+        _drop_hidden(job, ep)
+        return
+
     # Already downloaded (e.g. a second play queued it again)? Just finish.
     if ep.status == "ready" and ep.file_path and (music_dir / ep.file_path).exists():
         _finish(job, "added", ep.title)
@@ -579,6 +583,13 @@ def _process_podcast(app, job):
     else:
         final = _download_enclosure(ep.source_url, target, job)
 
+    # Hidden while it downloaded: keep nothing.
+    db.session.refresh(ep)
+    if ep.hidden_at is not None:
+        final.unlink(missing_ok=True)
+        _drop_hidden(job, ep)
+        return
+
     duration = None
     try:
         from mutagen import File as MutagenFile
@@ -593,6 +604,15 @@ def _process_podcast(app, job):
         ep.duration_s = duration
     ep.status = "ready"
     _finish(job, "added", ep.title)
+    db.session.commit()
+
+
+def _drop_hidden(job, ep):
+    """An episode hidden before its download finished: not downloaded, and the
+    job leaves the panel without a word."""
+    ep.status = "new"
+    _finish(job, "hidden", ep.title)
+    job.dismissed = True
     db.session.commit()
 
 

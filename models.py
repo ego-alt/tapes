@@ -188,7 +188,7 @@ class Episode(db.Model):
     channel_id = db.Column(db.String)
     # Relative to MUSIC_DIR (under the reserved _podcasts/ subdir); null until fetched.
     file_path = db.Column(db.String)
-    status = db.Column(db.String, nullable=False, default="new")  # new|downloading|ready|error
+    status = db.Column(db.String, nullable=False, default="new")  # new|downloading|ready (a failed download goes back to new)
     duration_s = db.Column(db.Float)
     description = db.Column(db.Text)
     published_at = db.Column(db.DateTime, index=True)
@@ -235,7 +235,8 @@ class DownloadJob(db.Model):
     playlist_index = db.Column(db.Integer)
     episode_id = db.Column(db.Integer, db.ForeignKey("episodes.id"), nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
-    # What came of it, for the panel: added | exists | duplicate | error.
+    # What came of it, for the panel: added | exists | duplicate | error, or
+    # hidden (an episode hidden before its download finished; dismissed).
     outcome = db.Column(db.String)
     finished_at = db.Column(db.DateTime, index=True)
     dismissed = db.Column(db.Boolean, default=False)
