@@ -91,3 +91,5 @@ uv run flask --app app:create_app db migrate -m "what changed"   # after editing
 `analyze` writes standard ReplayGain tags into each file (tags only; the audio is untouched), so other players get the same levelling.
 
 Rips are filed as `MUSIC_DIR/Artist/Album/NN Title.mp3`. Deleted songs wait in `MUSIC_DIR/.trash/` for 30 days.
+
+Planned work is in [`docs/roadmap.md`](docs/roadmap.md).

@@ -1,6 +1,6 @@
 /* Tokens — every size and colour Tapes uses (Gruvbox dark, orange accent).
  * Nothing outside this file sets a raw font size (tests/test_style_tokens.py
- * checks). Role names follow dashboard/docs/ui-spec.md. */
+ * checks). Role names follow dashboard/docs/design.md. */
 :root {
     /* Spacing (× 4px) */
     --space-1: 4px;
