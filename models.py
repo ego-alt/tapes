@@ -1,10 +1,40 @@
+from datetime import UTC, datetime
+
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event
+from sqlalchemy import DateTime, event
 from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.sql import func
+from sqlalchemy.types import TypeDecorator
 
 db = SQLAlchemy()
+
+
+def utcnow() -> datetime:
+    """Now, as aware UTC: the one clock every timestamp is taken from."""
+    return datetime.now(UTC)
+
+
+class UtcDateTime(TypeDecorator):
+    """A moment stored as naive UTC (SQLite keeps no zone, and its own
+    CURRENT_TIMESTAMP defaults are UTC) and always read back as aware UTC, so
+    code never mixes the two and isoformat() ends in +00:00, which browsers
+    read correctly. Every timestamp column uses it (tests/test_timestamps.py)."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("UtcDateTime needs an aware datetime, not a naive one")
+        return value.astimezone(UTC).replace(tzinfo=None)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class User(UserMixin, db.Model):
@@ -13,7 +43,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String, unique=True, nullable=False)
     password_hash = db.Column(db.String)
-    created_at = db.Column(db.DateTime, server_default=func.now())
+    created_at = db.Column(UtcDateTime, server_default=func.now())
 
 
 class Track(db.Model):
@@ -52,12 +82,12 @@ class Track(db.Model):
     enc_delay = db.Column(db.Integer)
     enc_padding = db.Column(db.Integer)
     audio_samples = db.Column(db.Integer)
-    audio_analyzed_at = db.Column(db.DateTime)
+    audio_analyzed_at = db.Column(UtcDateTime)
     mtime = db.Column(db.Float)
-    added_at = db.Column(db.DateTime, server_default=func.now())
+    added_at = db.Column(UtcDateTime, server_default=func.now())
     # Set while the track sits in the trash (file under MUSIC_DIR/.trash/);
     # every query hides it unless run with execution_options(include_deleted=True).
-    deleted_at = db.Column(db.DateTime, index=True)
+    deleted_at = db.Column(UtcDateTime, index=True)
 
     def to_dict(self):
         return {
@@ -107,9 +137,9 @@ class Playlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     name = db.Column(db.String, nullable=False)
-    created_at = db.Column(db.DateTime, server_default=func.now())
+    created_at = db.Column(UtcDateTime, server_default=func.now())
     # Set while the tape sits in the trash; hidden like trashed tracks.
-    deleted_at = db.Column(db.DateTime, index=True)
+    deleted_at = db.Column(UtcDateTime, index=True)
 
 
 class PlaylistTrack(db.Model):
@@ -127,7 +157,7 @@ class Play(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     track_id = db.Column(db.Integer, db.ForeignKey("tracks.id"), nullable=False)
-    played_at = db.Column(db.DateTime, server_default=func.now(), index=True)
+    played_at = db.Column(UtcDateTime, server_default=func.now(), index=True)
 
 
 class PlaybackSession(db.Model):
@@ -145,7 +175,7 @@ class PlaybackSession(db.Model):
     queue_json = db.Column(db.Text)
     cursor = db.Column(db.Integer, default=0)
     position_s = db.Column(db.Float, default=0)
-    updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at = db.Column(UtcDateTime, server_default=func.now(), onupdate=func.now())
 
 
 class Show(db.Model):
@@ -163,8 +193,8 @@ class Show(db.Model):
     channel_id = db.Column(db.String, index=True)
     description = db.Column(db.Text)
     has_image = db.Column(db.Boolean, default=False)     # cover cached at shows/<id>.jpg
-    created_at = db.Column(db.DateTime, server_default=func.now())
-    last_refreshed_at = db.Column(db.DateTime)
+    created_at = db.Column(UtcDateTime, server_default=func.now())
+    last_refreshed_at = db.Column(UtcDateTime)
 
 
 class Episode(db.Model):
@@ -191,14 +221,14 @@ class Episode(db.Model):
     status = db.Column(db.String, nullable=False, default="new")  # new|downloading|ready (a failed download goes back to new)
     duration_s = db.Column(db.Float)
     description = db.Column(db.Text)
-    published_at = db.Column(db.DateTime, index=True)
-    added_at = db.Column(db.DateTime, server_default=func.now())
+    published_at = db.Column(UtcDateTime, index=True)
+    added_at = db.Column(UtcDateTime, server_default=func.now())
     # Per-user playback state (episodes are already per-user — no separate table).
     position_s = db.Column(db.Float, default=0)
     played = db.Column(db.Boolean, default=False, index=True)
     # Hidden from a followed show's list. The row stays, so a refresh doesn't
     # bring the episode back as new.
-    hidden_at = db.Column(db.DateTime, nullable=True)
+    hidden_at = db.Column(UtcDateTime, nullable=True)
 
     def to_dict(self):
         return {
@@ -210,7 +240,7 @@ class Episode(db.Model):
             "duration": self.duration_s or 0,
             "position": self.position_s or 0,
             "played": bool(self.played),
-            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "published_at": self.published_at.isoformat(timespec="seconds") if self.published_at else None,
             "source_url": self.source_url or "",
             "source_type": self.source_type,
             "has_cover": True,  # cover endpoint falls back to the show image
@@ -234,11 +264,11 @@ class DownloadJob(db.Model):
     source_playlist = db.Column(db.Text)
     playlist_index = db.Column(db.Integer)
     episode_id = db.Column(db.Integer, db.ForeignKey("episodes.id"), nullable=True)
-    created_at = db.Column(db.DateTime, server_default=func.now(), index=True)
+    created_at = db.Column(UtcDateTime, server_default=func.now(), index=True)
     # What came of it, for the panel: added | exists | duplicate | error, or
     # hidden (an episode hidden before its download finished; dismissed).
     outcome = db.Column(db.String)
-    finished_at = db.Column(db.DateTime, index=True)
+    finished_at = db.Column(UtcDateTime, index=True)
     dismissed = db.Column(db.Boolean, default=False)
 
     def to_dict(self):

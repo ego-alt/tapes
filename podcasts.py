@@ -7,10 +7,10 @@ Two source types feed the same Show/Episode model:
 Adding/refreshing only catalogues *metadata* (cheap). The audio is fetched on
 demand the first time an episode is played — see downloader._process_podcast.
 """
+import calendar
 import datetime as _dt
 import pathlib
 import re
-import time
 import urllib.request
 from urllib.parse import urlparse
 
@@ -30,7 +30,7 @@ def _struct_to_dt(st) -> _dt.datetime | None:
     if not st:
         return None
     try:
-        return _dt.datetime.fromtimestamp(time.mktime(st))
+        return _dt.datetime.fromtimestamp(calendar.timegm(st), _dt.UTC)   # feedparser's times are UTC
     except Exception:  # noqa: BLE001
         return None
 

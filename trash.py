@@ -4,9 +4,9 @@ file, the row, its tape links and its play history are removed for good.
 Deleted tapes wait the same way, with their track lists intact."""
 import pathlib
 import shutil
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from models import Play, Playlist, PlaylistTrack, Track, db
+from models import Play, Playlist, PlaylistTrack, Track, db, utcnow
 
 TRASH_DIRNAME = ".trash"
 TRASH_DAYS = 30
@@ -22,7 +22,7 @@ def trash_track(app, track):
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.exists():
         shutil.move(str(src), str(dst))
-    track.deleted_at = datetime.now()
+    track.deleted_at = utcnow()
     db.session.commit()
 
 
@@ -42,7 +42,7 @@ def restore_track(app, track):
 
 
 def trash_playlist(playlist):
-    playlist.deleted_at = datetime.now()
+    playlist.deleted_at = utcnow()
     db.session.commit()
 
 
@@ -59,7 +59,7 @@ def restore_playlist(playlist):
 def purge_trash(app, days=TRASH_DAYS) -> int:
     """Permanently remove tracks and tapes trashed more than `days` ago.
     Returns the number of songs removed."""
-    cutoff = datetime.now() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     old = (Track.query.execution_options(include_deleted=True)
            .filter(Track.deleted_at.isnot(None), Track.deleted_at < cutoff).all())
     for t in old:

@@ -9,12 +9,11 @@ import subprocess
 import sys
 import threading
 import urllib.request
-from datetime import datetime
 from urllib.parse import urlparse
 
 import youtube
 from cleaning import clean_meta, clean_title, reconcile_artist
-from models import DownloadJob, Episode, Playlist, PlaylistTrack, Track, db
+from models import DownloadJob, Episode, Playlist, PlaylistTrack, Track, db, utcnow
 from scan import scan_library
 
 log = logging.getLogger("tapes.downloader")
@@ -123,7 +122,7 @@ def _finish(job, outcome: str, message: str):
     job.status = "error" if outcome == "error" else "done"
     job.outcome = outcome
     job.message = message[:300]
-    job.finished_at = datetime.now()
+    job.finished_at = utcnow()
     if outcome != "error":
         job.progress = 100
 

@@ -1,12 +1,12 @@
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from flask import Blueprint, Response, abort, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
 
 from downloader import enqueue, expand_playlist
-from models import DownloadJob, Playlist, db
+from models import DownloadJob, Playlist, db, utcnow
 
 downloads_blueprint = Blueprint("downloads", __name__)
 
@@ -26,7 +26,7 @@ def _panel_jobs(user_id):
     """Active jobs plus recently finished, undismissed ones, newest first."""
     recent = (DownloadJob.query.filter_by(user_id=user_id)
               .filter(DownloadJob.status.in_(["done", "error"]),
-                      DownloadJob.finished_at >= datetime.now() - RECENT,
+                      DownloadJob.finished_at >= utcnow() - RECENT,
                       DownloadJob.dismissed.isnot(True))
               .order_by(DownloadJob.finished_at.desc()).all())
     return _active_jobs(user_id) + recent

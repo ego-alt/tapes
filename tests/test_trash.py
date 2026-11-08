@@ -1,7 +1,7 @@
 """Audit 4.3: deleting from the library is undoable (trash), admin-gated when
 admins are configured; 4.5: artist rename previews merges and can be undone."""
 import pathlib
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from models import Play, PlaylistTrack, Track, db
 from trash import purge_trash
@@ -55,7 +55,7 @@ def test_purge_removes_only_old_trash(app, client, add_track):
     client.delete(f"/api/tracks/{old.id}")
     client.delete(f"/api/tracks/{recent.id}")
     row = db.session.get(Track, old.id, execution_options={"include_deleted": True})
-    row.deleted_at = datetime.now() - timedelta(days=31)
+    row.deleted_at = datetime.now(UTC) - timedelta(days=31)
     db.session.commit()
     assert purge_trash(app) == 1
     assert db.session.get(Track, old.id, execution_options={"include_deleted": True}) is None
@@ -115,7 +115,7 @@ def test_deleted_tape_waits_in_the_trash_and_comes_back(app, client, add_track):
 
 
 def test_old_deleted_tapes_are_purged(app, client, add_track):
-    from datetime import datetime, timedelta
+    from datetime import UTC, datetime, timedelta
 
     from models import Playlist, PlaylistTrack, db
     from trash import purge_trash
@@ -124,7 +124,7 @@ def test_old_deleted_tapes_are_purged(app, client, add_track):
     client.post(f"/api/playlists/{key}/tracks", json={"track_id": t.id})
     client.delete(f"/api/playlists/{key}")
     p = Playlist.query.execution_options(include_deleted=True).filter_by(id=int(key)).one()
-    p.deleted_at = datetime.now() - timedelta(days=31)
+    p.deleted_at = datetime.now(UTC) - timedelta(days=31)
     db.session.commit()
     purge_trash(app)
     assert Playlist.query.execution_options(include_deleted=True).filter_by(id=int(key)).first() is None

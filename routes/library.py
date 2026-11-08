@@ -1,13 +1,12 @@
 import json
 import logging
 import pathlib
-from datetime import datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 
-from models import Episode, Play, PlaybackSession, Playlist, PlaylistTrack, Show, Track, db
+from models import Episode, Play, PlaybackSession, Playlist, PlaylistTrack, Show, Track, db, utcnow
 
 library_blueprint = Blueprint("library", __name__)
 log = logging.getLogger("tapes.library")
@@ -624,6 +623,6 @@ def playstate():
     # Explicit microsecond stamp: SQLite's func.now() is second-resolution, so two
     # context saves in the same second would tie and the "last active" pick on GET
     # would be undefined.
-    s.updated_at = datetime.now()
+    s.updated_at = utcnow()
     db.session.commit()
     return "", 204

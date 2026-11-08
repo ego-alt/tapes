@@ -1,12 +1,11 @@
 import pathlib
-from datetime import UTC, datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 import podcasts
 from downloader import enqueue
-from models import DownloadJob, Episode, Show, db
+from models import DownloadJob, Episode, Show, db, utcnow
 
 from .serving import accel_audio, cached_jpeg
 
@@ -80,7 +79,7 @@ def add():
             show.has_image = podcasts.download_show_image(
                 show_meta["image_url"], current_app.config["COVER_DIR"], show.id)
     added = podcasts.upsert_episodes(_uid(), show.id, eps)
-    show.last_refreshed_at = datetime.now()
+    show.last_refreshed_at = utcnow()
     db.session.commit()
     return jsonify({**_show_dict(show), "added": added, "created": created}), 201
 
@@ -151,7 +150,7 @@ def refresh(sid):
         current_app.logger.info("refresh failed for show %s: %s", sid, e)
         abort(400, "Couldn't check for new episodes. Try again later.")
     added = podcasts.upsert_episodes(_uid(), show.id, eps)
-    show.last_refreshed_at = datetime.now()
+    show.last_refreshed_at = utcnow()
     db.session.commit()
     return jsonify({"added": added})
 
@@ -275,7 +274,7 @@ def hide_episode(eid):
     ep.file_path = None
     if ep.status == "ready":
         ep.status = "new"
-    ep.hidden_at = datetime.now(UTC).replace(tzinfo=None)
+    ep.hidden_at = utcnow()
     db.session.commit()
     return jsonify({"hidden": True})
 

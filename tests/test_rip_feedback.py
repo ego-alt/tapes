@@ -1,5 +1,5 @@
 """Audit 2.2, 2.3, 2.5: rips report what happened, in plain language, as JSON."""
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -43,7 +43,7 @@ def test_finished_jobs_stay_in_the_panel_until_dismissed(client, add_track):
     _finish(failed, "error", "This video is private.")
     old = _job(user, status="queued")
     _finish(old, "added", "Old")
-    old.finished_at = datetime.now() - timedelta(hours=2)
+    old.finished_at = datetime.now(UTC) - timedelta(hours=2)
     db.session.commit()
 
     jobs = {j["id"]: j for j in client.get("/api/downloads").get_json()}

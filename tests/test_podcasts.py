@@ -45,7 +45,7 @@ def test_hidden_episode_stays_hidden_after_refresh(app, client):
 def _hidden_mid_download(app, monkeypatch, hide_when):
     """An episode hidden before (`queued`) or during (`downloading`) its download."""
     import pathlib
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     import downloader
     from models import DownloadJob
@@ -57,7 +57,7 @@ def _hidden_mid_download(app, monkeypatch, hide_when):
     job = DownloadJob(user_id=uid, url=ep.source_url, kind="podcast", episode_id=ep.id, status="queued")
     db.session.add(job)
     if hide_when == "queued":
-        ep.hidden_at = datetime(2026, 11, 8)
+        ep.hidden_at = datetime(2026, 11, 8, tzinfo=UTC)
     db.session.commit()
 
     def fake_download(url, target, job):

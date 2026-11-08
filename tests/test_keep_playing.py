@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import radio
 from models import Play, User, db
@@ -26,7 +26,7 @@ def test_songs_heard_together_come_before_strangers(app, client, add_track):
     uid = _uid(client)
     seed, friend = add_track(title="S", artist="A"), add_track(title="F", artist="B")
     strangers = [add_track(title=f"Z{i}", artist=f"C{i}") for i in range(6)]
-    long_ago = datetime.now() - timedelta(days=3)
+    long_ago = datetime.now(UTC) - timedelta(days=3)
     for k in range(4):   # four evenings where S and F were played back to back
         at = long_ago - timedelta(days=k)
         db.session.add_all([Play(user_id=uid, track_id=seed.id, played_at=at), Play(user_id=uid, track_id=friend.id, played_at=at + timedelta(minutes=4))])
@@ -39,7 +39,7 @@ def test_songs_heard_together_come_before_strangers(app, client, add_track):
 def test_just_heard_songs_wait(app, client, add_track):
     uid = _uid(client)
     seed, recent = add_track(title="S", artist="A"), add_track(title="R", artist="A")
-    db.session.add(Play(user_id=uid, track_id=recent.id, played_at=datetime.now() - timedelta(minutes=20)))
+    db.session.add(Play(user_id=uid, track_id=recent.id, played_at=datetime.now(UTC) - timedelta(minutes=20)))
     db.session.commit()
     assert recent.id not in [t.id for t in radio.pick(uid, [seed.id], [])]
 

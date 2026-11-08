@@ -10,9 +10,9 @@ when it can be helped.
 import math
 import random
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from models import Play, Track, db
+from models import Play, Track, db, utcnow
 
 SESSION = timedelta(minutes=45)      # plays this close together count as one sitting
 RECENT = timedelta(hours=2)          # just heard: skip
@@ -40,7 +40,7 @@ def pick(user_id: int, seed_ids: list[int], exclude_ids: list[int], limit: int =
     albums = {(t.album.lower(), (t.artist or "").lower()) for t in seeds if t.album}
     together = _together(user_id, seed_ids) if seed_ids else Counter()
     plays = Counter(dict(db.session.query(Play.track_id, db.func.count()).filter(Play.user_id == user_id).group_by(Play.track_id).all()))
-    recent = {tid for (tid,) in db.session.query(Play.track_id).filter(Play.user_id == user_id, Play.played_at >= datetime.now() - RECENT)}
+    recent = {tid for (tid,) in db.session.query(Play.track_id).filter(Play.user_id == user_id, Play.played_at >= utcnow() - RECENT)}
     skip = set(exclude_ids) | set(seed_ids) | recent
 
     scored = []

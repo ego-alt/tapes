@@ -180,7 +180,7 @@ def write_replaygain_tags(path: str, track: Loudness, album: Loudness | None) ->
 def analyze_track(track, music_dir) -> bool:
     """Measure one track and store loudness + gapless info on it (no commit).
     Returns True when loudness was measured."""
-    from datetime import datetime
+    from models import utcnow
 
     path = str(pathlib.Path(music_dir) / track.file_path)
     loud = measure_loudness(path)
@@ -191,7 +191,7 @@ def analyze_track(track, music_dir) -> bool:
     track.enc_delay = gap.delay if gap else None
     track.enc_padding = gap.padding if gap else None
     track.audio_samples = gap.samples if gap else None
-    track.audio_analyzed_at = datetime.now()
+    track.audio_analyzed_at = utcnow()
     return loud is not None
 
 
@@ -226,11 +226,9 @@ def analyze_new_track(track, music_dir) -> None:
 def claim_next(session):
     """Atomically claim one unmeasured track (so two server workers never
     measure the same one), or None when there's nothing left."""
-    from datetime import datetime
-
     from sqlalchemy import update
 
-    from models import Track
+    from models import Track, utcnow
 
     while True:
         t = (Track.query.filter(Track.audio_analyzed_at.is_(None))
@@ -239,7 +237,7 @@ def claim_next(session):
             return None
         claimed = session.execute(
             update(Track).where(Track.id == t.id, Track.audio_analyzed_at.is_(None))
-            .values(audio_analyzed_at=datetime.now())
+            .values(audio_analyzed_at=utcnow())
         ).rowcount
         session.commit()
         if claimed:
