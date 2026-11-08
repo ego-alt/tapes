@@ -1455,7 +1455,7 @@
       if (queue !== q) return;   // a new tape went in meanwhile
       const items = more.map((t) => ({ ...t, radio: true }));
       queue.push(...items);
-      if (baseQueue !== queue) baseQueue.push(...items);
+      baseQueue.push(...items);
       prefetchNext();
       savePlaystate();
       updateUpNext();
@@ -1567,8 +1567,9 @@
   function queueRemove(i) {
     const wasCurrent = i === qi;
     const cur = queue[qi];
-    queue.splice(i, 1);
-    baseQueue = queue.slice();
+    const [gone] = queue.splice(i, 1);
+    // Shuffled, the unshuffled order loses it too, and stays the album's order.
+    baseQueue = baseQueue.filter((t) => t !== gone);
     if (!queue.length) {
       qi = -1; audio.pause(); audio.removeAttribute("src");
       updateUpNext(); markActive(); updateMini(); savePlaystate(); return;
